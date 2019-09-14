@@ -1,5 +1,6 @@
- //export GOPATH=/Users/russell/git/MarketMaker
+ //export GOPATH=/Users/russell/git/go
  //export PATH=$PATH:$(go env GOPATH)/bin
+ //go install GoMarketMaker && GoMarketMaker
 
 package main
 
@@ -22,7 +23,6 @@ import (
 var maxRetries int32 = 3
 
 func main() {
-	start := time.Now()
 	apiKey := "xPUtF8r0GEVeIF2v5fTZz3pj"
 	apiSecret := "wyac7JCoRjyizVZlj_nJHFy_JzTRQeX-2fEj8J5aEbxCG38V"
 	averageCost := 0.0
@@ -79,9 +79,6 @@ func main() {
 
 	forever := make(chan bool)
 	<-forever
-
-	elapsed := time.Since(start)
-	fmt.Println("Execution Speed", elapsed)
 }
 
 func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []Order, retry int32) {
@@ -160,7 +157,7 @@ func createJsonOrderString(orders []Order) string {
 
 
 func placeOrdersOnBook(price float64, averageCost float64, quantity float64, currentOrders []*swagger.Order) ([]Order, []Order, []string) {
-	liquid := 0.1 //Defined as btc but will be % in the future
+	liquid := 0.05 //Defined as btc but will be % in the future
 	var priceArr, orderArr []float64
 	var selling float64
 
@@ -177,7 +174,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 	} else {
 		priceArr, orderArr = createSpread(1, 2, price, 0.01, 2, 8)
 	}
-
+	fmt.Println("Placing", buying, "on bid")
 	var orders []Order
 	orderArr = mulArr(orderArr, buying)
 
@@ -207,6 +204,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		priceArr, orderArr = createSpread(-1, 2, price, 0.01, 2, 8)
 	}
 
+	fmt.Println("Placing", selling, "on ask")
 	orderArr = mulArr(orderArr, selling)
 
 	totalQty = 0.0
