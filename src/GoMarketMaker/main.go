@@ -19,11 +19,7 @@ import (
 	"github.com/sumorf/bitmex-api/swagger"
 )
 
-var maxRetries int32 = 2
-
-func maplothtebin() {
-	plotOB()
-}
+var maxRetries int32 = 3
 
 func main() {
 	start := time.Now()
