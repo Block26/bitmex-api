@@ -20,7 +20,7 @@ import (
 )
 
 var maxRetries int32 = 3
-var maxOrders int32 = 12
+var maxOrders float64 = 12.0
 
 func main() {
 	fireDB := setupFirebase()
