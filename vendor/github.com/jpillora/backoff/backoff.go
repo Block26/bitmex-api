@@ -71,8 +71,7 @@ func (b *Backoff) ForAttempt(attempt float64) time.Duration {
 	//keep within bounds
 	if dur < min {
 		return min
-	}
-	if dur > max {
+	} else if dur > max {
 		return max
 	}
 	return dur
@@ -86,14 +85,4 @@ func (b *Backoff) Reset() {
 // Attempt returns the current attempt counter value.
 func (b *Backoff) Attempt() float64 {
 	return b.attempt
-}
-
-// Copy returns a backoff with equals constraints as the original
-func (b *Backoff) Copy() *Backoff {
-	return &Backoff{
-		Factor: b.Factor,
-		Jitter: b.Jitter,
-		Min:    b.Min,
-		Max:    b.Max,
-	}
 }

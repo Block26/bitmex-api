@@ -1,5 +1,4 @@
- //export GOPATH=/Users/russell/git/go
- //export PATH=$PATH:$(go env GOPATH)/bin
+ //export GOPATH=/Users/russell/git/go && export PATH=$PATH:$(go env GOPATH)/bin
  //go install GoMarketMaker && GoMarketMaker
 
 package main
@@ -21,8 +20,10 @@ import (
 )
 
 var maxRetries int32 = 3
+var maxOrders int32 = 12
 
 func main() {
+	fireDB := setupFirebase()
 	apiKey := "xPUtF8r0GEVeIF2v5fTZz3pj"
 	apiSecret := "wyac7JCoRjyizVZlj_nJHFy_JzTRQeX-2fEj8J5aEbxCG38V"
 	averageCost := 0.0
@@ -56,14 +57,14 @@ func main() {
 		} else if position.CurrentQty == 0 {
 			averageCost = 0
 		}
-		fmt.Println("AvgCostPrice", averageCost, "Quantity", quantity)
+		log.Println("AvgCostPrice", averageCost, "Quantity", quantity)
 	}).On(bitmex.BitmexWSTradeBin1m, func(bins []*swagger.TradeBin, action string) {
 		for _, bin := range bins {
-			fmt.Println(bin.Close)
+			log.Println(bin.Close)
 			price = bin.Close
 			toCreate, toAmend, toCancel := placeOrdersOnBook(price, averageCost, quantity, orders)
 
-			// fmt.Println(len(newOrders), "New Orders")
+			// log.Println(len(newOrders), "New Orders")
 			auth := bitmexgo.NewAPIKeyContext(apiKey, apiSecret)
 			client := bitmexgo.NewAPIClient(bitmexgo.NewTestnetConfiguration())
 
@@ -72,6 +73,8 @@ func main() {
 			cancelOrders(auth, client, toCancel, 0)
 			createOrders(auth, client, toCreate, 0)
 			amendOrders(auth, client, toAmend, 0)
+
+			updateAlgo(fireDB, "mm")
 		}
 	})
 
@@ -82,7 +85,7 @@ func main() {
 }
 
 func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []Order, retry int32) {
-	fmt.Println("Create ->", len(orders))
+	log.Println("Create ->", len(orders))
 	if len(orders) > 0 {
 		orderString := createJsonOrderString(orders)
 		var orderParams bitmexgo.OrderNewBulkOpts
@@ -90,7 +93,7 @@ func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []Ord
 		_, res, err := client.OrderApi.OrderNewBulk(auth, &orderParams)
 		if res.StatusCode != 200 || err != nil {
 			if retry <= maxRetries {
-				fmt.Println(res.StatusCode, "Retrying...")
+				log.Println(res.StatusCode, "Retrying...")
 				time.Sleep(1 * time.Second)
 				createOrders(auth, client, orders, retry+1)
 			}
@@ -99,7 +102,7 @@ func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []Ord
 }
 
 func amendOrders(auth context.Context, client *bitmexgo.APIClient, orders []Order, retry int32) {
-	fmt.Println("Amend ->",  len(orders))
+	log.Println("Amend ->",  len(orders))
 	if len(orders) > 0 {
 		orderString := createJsonOrderString(orders)
 		var amendParams bitmexgo.OrderAmendBulkOpts
@@ -107,7 +110,7 @@ func amendOrders(auth context.Context, client *bitmexgo.APIClient, orders []Orde
 		_, res, err := client.OrderApi.OrderAmendBulk(auth, &amendParams)
 		if res.StatusCode != 200 || err != nil {
 			if retry <= maxRetries {
-				fmt.Println(res.StatusCode, "Retrying...")
+				log.Println(res.StatusCode, "Retrying...")
 				time.Sleep(1 * time.Second)
 				amendOrders(auth, client, orders, retry+1)
 			}
@@ -117,16 +120,16 @@ func amendOrders(auth context.Context, client *bitmexgo.APIClient, orders []Orde
 }
 
 func cancelOrders(auth context.Context, client *bitmexgo.APIClient, orders []string, retry int32) {
-	fmt.Println("Cancel ->", len(orders))
+	log.Println("Cancel ->", len(orders))
 	if len(orders) > 0 {
 		orderString := createCancelOrderString(orders)
 		var cancelParams bitmexgo.OrderCancelOpts
 		cancelParams.OrderID.Set(orderString)
-		// fmt.Println(orderString)
+		// log.Println(orderString)
 		_, res, err := client.OrderApi.OrderCancel(auth, &cancelParams)
 		if res.StatusCode != 200 || err != nil {
 			if retry <= maxRetries {
-				fmt.Println(res.StatusCode, "Retrying...")
+				log.Println(res.StatusCode, "Retrying...")
 				time.Sleep(1 * time.Second)
 				cancelOrders(auth, client, orders, retry+1)
 			}
@@ -145,10 +148,10 @@ func createJsonOrderString(orders []Order) string {
 	for _, o := range orders {
 		jsonOrder, err := json.Marshal(o)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return ""
 		}
-		// fmt.Println(string(jsonOrder))
+		// log.Println(string(jsonOrder))
 		jsonOrders = append(jsonOrders, string(jsonOrder))
 	}
 	orderString := "[" + strings.Join(jsonOrders,",") + "]"
@@ -170,11 +173,11 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		if averageCost < price {
 			startBuyPrice = averageCost
 		}
-		priceArr, orderArr = createSpread(1, 2, startBuyPrice, 0.005, 2, 8)
+		priceArr, orderArr = createSpread(1, 2, startBuyPrice, 0.005, 2, maxOrders)
 	} else {
-		priceArr, orderArr = createSpread(1, 2, price, 0.01, 2, 8)
+		priceArr, orderArr = createSpread(1, 2, price, 0.01, 2, maxOrders)
 	}
-	fmt.Println("Placing", buying, "on bid")
+	log.Println("Placing", buying, "on bid")
 	var orders []Order
 	orderArr = mulArr(orderArr, buying)
 
@@ -189,7 +192,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		}
 	}
 
-	// fmt.Println(orders)
+	// log.Println(orders)
 
 	// Create Sell orders
 	selling = liquid * price
@@ -204,7 +207,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		priceArr, orderArr = createSpread(-1, 2, price, 0.01, 2, 8)
 	}
 
-	fmt.Println("Placing", selling, "on ask")
+	log.Println("Placing", selling, "on ask")
 	orderArr = mulArr(orderArr, selling)
 
 	totalQty = 0.0
@@ -243,7 +246,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 							order.ExecInst = "Close"
 						}
 						orderFound = true
-						// fmt.Println("Found order", newOrder.ClOrdID)
+						// log.Println("Found order", newOrder.ClOrdID)
 						// Only Ammend if qty changes
 						if order.OrderQty != int32(oldOrder.OrderQty) {
 							now := time.Now().Unix() - 1524872844
@@ -259,7 +262,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 				now := time.Now().Unix() - 1524872844
 				newOrder.ClOrdID = fmt.Sprintf("%s-%d", newOrder.ClOrdID, now)
 				toCreate = append(toCreate, newOrder)
-				// fmt.Println("Found order", newOrder.ClOrdID)
+				// log.Println("Found order", newOrder.ClOrdID)
 				orderToPlace = append(orderToPlace, newOrder.ClOrdID)
 			}
 
@@ -272,7 +275,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		for _, newOrder := range orderToPlace {
 			ordID := strings.Split(oldOrder.ClOrdID, "-")[0]
 			if strings.Contains(newOrder, ordID)  {
-				// fmt.Println("Dont Cancel", ordID, newOrder)
+				// log.Println("Dont Cancel", ordID, newOrder)
 				found = true
 				break
 			}
@@ -321,18 +324,18 @@ func updateLocalOrders(oldOrders []*swagger.Order, newOrders []*swagger.Order) (
 			if newOrder.OrderID == oldOrder.OrderID {
 				found = true
 				if newOrder.OrdStatus == "Canceled" || newOrder.OrdStatus == "Filled" || newOrder.OrdStatus == "Rejected" {
-					fmt.Println(newOrder.OrdStatus, oldOrder.OrderID)
+					log.Println(newOrder.OrdStatus, oldOrder.OrderID)
 				} else {
 					updatedOrders = append(updatedOrders, newOrder)
-					// fmt.Println("Updated Order", newOrder.OrderID, newOrder.OrdStatus)
+					// log.Println("Updated Order", newOrder.OrderID, newOrder.OrdStatus)
 				}
 			}
 		}
 		if !found {
 			if oldOrder.OrdStatus == "Canceled" || oldOrder.OrdStatus == "Filled" || oldOrder.OrdStatus == "Rejected" {
-				fmt.Println(oldOrder.OrdStatus, oldOrder.OrderID)
+				log.Println(oldOrder.OrdStatus, oldOrder.OrderID)
 			} else {
-				// fmt.Println("Old Order", oldOrder.OrderID)
+				// log.Println("Old Order", oldOrder.OrderID)
 				updatedOrders = append(updatedOrders, oldOrder)
 			}
 		}
@@ -347,11 +350,11 @@ func updateLocalOrders(oldOrders []*swagger.Order, newOrders []*swagger.Order) (
 		}
 		if !found {
 			updatedOrders = append(updatedOrders, newOrder)
-			fmt.Println("Adding Order", newOrder.OrderID, newOrder.OrdStatus)
+			log.Println("Adding Order", newOrder.OrderID, newOrder.OrdStatus)
 		}
 	}
 
-	fmt.Println(len(updatedOrders), "orders")
+	log.Println(len(updatedOrders), "orders")
 	return updatedOrders
 }
 
