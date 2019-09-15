@@ -11,6 +11,9 @@ import (
 	"time"
 	"strings"
 	"encoding/json"
+
+    "GoMarketMaker/models"
+
 	//Restful
 	"github.com/zmxv/bitmexgo"
 
@@ -19,27 +22,34 @@ import (
 	"github.com/sumorf/bitmex-api/swagger"
 )
 
-var maxRetries int32 = 3
-var maxOrders float64 = 12.0
+var settings models.Config
 
 func main() {
+	settings = loadConfiguration("dev/mm/testnet", true)
 	fireDB := setupFirebase()
-	apiKey := "xPUtF8r0GEVeIF2v5fTZz3pj"
-	apiSecret := "wyac7JCoRjyizVZlj_nJHFy_JzTRQeX-2fEj8J5aEbxCG38V"
 	averageCost := 0.0
 	quantity := 0.0
 	price := 0.0
 
 	var orders []*swagger.Order
-	// Create an authentication context
-	// auth := bitmexgo.NewAPIKeyContext(apiKey, apiSecret)
-	// client := bitmexgo.NewAPIClient(bitmexgo.NewTestnetConfiguration())
-	// bitmex := exchange.bitmex
-	b := bitmex.New(bitmex.HostTestnet, apiKey, apiSecret)
+	var b *bitmex.BitMEX
+	var auth context.Context
+	var client *bitmexgo.APIClient
+
+	if settings.TestNet {
+		b = bitmex.New(bitmex.HostTestnet, settings.ApiKey, settings.ApiSecret)
+		auth = bitmexgo.NewAPIKeyContext(settings.ApiKey, settings.ApiSecret)
+		client = bitmexgo.NewAPIClient(bitmexgo.NewTestnetConfiguration())
+	} else {
+		b = bitmex.New(bitmex.HostReal, settings.ApiKey, settings.ApiSecret)
+		auth = bitmexgo.NewAPIKeyContext(settings.ApiKey, settings.ApiSecret)
+		client = bitmexgo.NewAPIClient(bitmexgo.NewConfiguration())
+	}
+
 	subscribeInfos := []bitmex.SubscribeInfo{
-		{Op: bitmex.BitmexWSOrder, Param: "XBTUSD"},
-		{Op: bitmex.BitmexWSPosition, Param: "XBTUSD"},
-		{Op: bitmex.BitmexWSTradeBin1m, Param: "XBTUSD"},
+		{Op: bitmex.BitmexWSOrder, Param: settings.Symbol},
+		{Op: bitmex.BitmexWSPosition, Param: settings.Symbol},
+		{Op: bitmex.BitmexWSTradeBin1m, Param: settings.Symbol},
 	}
 	
 	err := b.Subscribe(subscribeInfos)
@@ -65,9 +75,6 @@ func main() {
 			toCreate, toAmend, toCancel := placeOrdersOnBook(price, averageCost, quantity, orders)
 
 			// log.Println(len(newOrders), "New Orders")
-			auth := bitmexgo.NewAPIKeyContext(apiKey, apiSecret)
-			client := bitmexgo.NewAPIClient(bitmexgo.NewTestnetConfiguration())
-
 			// Cancel first?
 			// Should consider cancel/create in 10 order blocks so cancel 10 then create the 10 to replace
 			cancelOrders(auth, client, toCancel, 0)
@@ -84,7 +91,7 @@ func main() {
 	<-forever
 }
 
-func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []Order, retry int32) {
+func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []models.Order, retry int32) {
 	log.Println("Create ->", len(orders))
 	if len(orders) > 0 {
 		orderString := createJsonOrderString(orders)
@@ -92,7 +99,7 @@ func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []Ord
 		orderParams.Orders.Set(orderString)
 		_, res, err := client.OrderApi.OrderNewBulk(auth, &orderParams)
 		if res.StatusCode != 200 || err != nil {
-			if retry <= maxRetries {
+			if retry <= settings.MaxRetries {
 				log.Println(res.StatusCode, "Retrying...")
 				time.Sleep(1 * time.Second)
 				createOrders(auth, client, orders, retry+1)
@@ -101,7 +108,7 @@ func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []Ord
 	}
 }
 
-func amendOrders(auth context.Context, client *bitmexgo.APIClient, orders []Order, retry int32) {
+func amendOrders(auth context.Context, client *bitmexgo.APIClient, orders []models.Order, retry int32) {
 	log.Println("Amend ->",  len(orders))
 	if len(orders) > 0 {
 		orderString := createJsonOrderString(orders)
@@ -109,7 +116,7 @@ func amendOrders(auth context.Context, client *bitmexgo.APIClient, orders []Orde
 		amendParams.Orders.Set(orderString)
 		_, res, err := client.OrderApi.OrderAmendBulk(auth, &amendParams)
 		if res.StatusCode != 200 || err != nil {
-			if retry <= maxRetries {
+			if retry <= settings.MaxRetries {
 				log.Println(res.StatusCode, "Retrying...")
 				time.Sleep(1 * time.Second)
 				amendOrders(auth, client, orders, retry+1)
@@ -128,7 +135,7 @@ func cancelOrders(auth context.Context, client *bitmexgo.APIClient, orders []str
 		// log.Println(orderString)
 		_, res, err := client.OrderApi.OrderCancel(auth, &cancelParams)
 		if res.StatusCode != 200 || err != nil {
-			if retry <= maxRetries {
+			if retry <= settings.MaxRetries {
 				log.Println(res.StatusCode, "Retrying...")
 				time.Sleep(1 * time.Second)
 				cancelOrders(auth, client, orders, retry+1)
@@ -143,7 +150,7 @@ func createCancelOrderString(ids []string) string {
 	return orderString
 }
 
-func createJsonOrderString(orders []Order) string {
+func createJsonOrderString(orders []models.Order) string {
 	var jsonOrders []string
 	for _, o := range orders {
 		jsonOrder, err := json.Marshal(o)
@@ -159,7 +166,7 @@ func createJsonOrderString(orders []Order) string {
 }
 
 
-func placeOrdersOnBook(price float64, averageCost float64, quantity float64, currentOrders []*swagger.Order) ([]Order, []Order, []string) {
+func placeOrdersOnBook(price float64, averageCost float64, quantity float64, currentOrders []*swagger.Order) ([]models.Order, []models.Order, []string) {
 	liquid := 0.05 //Defined as btc but will be % in the future
 	var priceArr, orderArr []float64
 	var selling float64
@@ -173,12 +180,12 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		if averageCost < price {
 			startBuyPrice = averageCost
 		}
-		priceArr, orderArr = createSpread(1, 2, startBuyPrice, 0.005, 2, maxOrders)
+		priceArr, orderArr = createSpread(1, 2, startBuyPrice, 0.005, 2, settings.MaxOrders)
 	} else {
-		priceArr, orderArr = createSpread(1, 2, price, 0.01, 2, maxOrders)
+		priceArr, orderArr = createSpread(1, 2, price, 0.01, 2, settings.MaxOrders)
 	}
 	log.Println("Placing", buying, "on bid")
-	var orders []Order
+	var orders []models.Order
 	orderArr = mulArr(orderArr, buying)
 
 	totalQty := 0.0
@@ -186,7 +193,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		totalQty = totalQty + qty
 		if totalQty > 25 {
 			orderPrice := priceArr[i]
-			order := createLimitOrder("XBTUSD", int32(totalQty), orderPrice, "Buy")
+			order := createLimitOrder(settings.Symbol, int32(totalQty), orderPrice, "Buy")
 			orders = append(orders, order)
 			totalQty = 0.0
 		}
@@ -202,9 +209,9 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		if averageCost > price {
 			startSellPrice = averageCost
 		}
-		priceArr, orderArr = createSpread(-1, 0.1, startSellPrice, 0.005, 2, 8)
+		priceArr, orderArr = createSpread(-1, 0.1, startSellPrice, 0.005, 2, settings.MaxOrders)
 	} else {
-		priceArr, orderArr = createSpread(-1, 2, price, 0.01, 2, 8)
+		priceArr, orderArr = createSpread(-1, 2, price, 0.01, 2, settings.MaxOrders)
 	}
 
 	log.Println("Placing", selling, "on ask")
@@ -215,14 +222,14 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		totalQty = totalQty + qty
 		if totalQty > 25 {
 			orderPrice := priceArr[i]
-			order := createLimitOrder("XBTUSD", int32(totalQty), orderPrice, "Sell")
+			order := createLimitOrder(settings.Symbol, int32(totalQty), orderPrice, "Sell")
 			orders = append(orders, order)
 			totalQty = 0.0
 		}
 	}
 
-	var toCreate []Order 
-	var toAmend []Order
+	var toCreate []models.Order 
+	var toAmend []models.Order
 	var orderToPlace []string
 
 	for _, newOrder := range orders {
@@ -288,21 +295,12 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 	return toCreate, toAmend, toCancel
 }
 
-type Order struct {
-    Symbol string 		`json:"symbol"`
-	ClOrdID string		`json:"clOrdID"`
-	OrdType string  	`json:"ordType"`
-	Price float64		`json:"price"`
-	Side string			`json:"side"`
-	OrderQty int32		`json:"orderQty"`
-	ExecInst string		`json:"execInst"`
-	OrigClOrdID string  `json:"origClOrdID"`
-}
 
-func createLimitOrder(symbol string, amount int32, price float64, side string) Order {
+
+func createLimitOrder(symbol string, amount int32, price float64, side string) models.Order {
 	// price = toNearest(price, coin.tick_size)
 	orderId := fmt.Sprintf("%.1f_limit", price)
-	order := Order{
+	order := models.Order{
 		Symbol: symbol,
 		ClOrdID: orderId,
 		OrdType: "Limit",
@@ -395,7 +393,7 @@ func getFilledAskOrders(prices []float64, orders []float64, price float64) ([]fl
     return p, o
 }
 
-func createSpread(weight int32, confidence float64, price float64, spread float64, tick_size float64, max_orders float64) ([]float64, []float64) {
+func createSpread(weight int32, confidence float64, price float64, spread float64, tick_size float64, max_orders int32) ([]float64, []float64) {
 	x_start := 0.0
 	if weight == 1 {
 		x_start = price - (price*spread)
@@ -406,8 +404,8 @@ func createSpread(weight int32, confidence float64, price float64, spread float6
 	x_end := x_start + (x_start*spread)
 	diff := x_end - x_start
 
-	if diff / tick_size >= max_orders {
-		tick_size = diff / (max_orders-1)
+	if diff / tick_size >= float64(max_orders) {
+		tick_size = diff / (float64(max_orders)-1)
 	}
 
 	price_arr := arange(x_start, x_end, float64(int32(tick_size)))

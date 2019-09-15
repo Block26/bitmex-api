@@ -1,8 +1,31 @@
 package main
 
 import (
-	"math"
+    "math"
+    "os"
+    "log"
+    "encoding/json"
+    "GoMarketMaker/models"
 )
+
+func loadConfiguration(file string, secret bool) models.Config {
+    var config  models.Config
+    if secret {
+        secret := getSecret(file)
+        config := models.Config{}
+        json.Unmarshal([]byte(secret), &config)
+    } else {
+        configFile, err := os.Open(file)
+        defer configFile.Close()
+        if err != nil {
+            log.Println(err.Error())
+        }
+        jsonParser := json.NewDecoder(configFile)
+        jsonParser.Decode(&config)
+    }
+
+    return config
+}
 
 func reverseArr(a []float64) []float64 {
 	for i := len(a)/2-1; i >= 0; i-- {
