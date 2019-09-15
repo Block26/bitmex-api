@@ -165,63 +165,66 @@ func createJsonOrderString(orders []models.Order) string {
 	return orderString
 }
 
-
-func placeOrdersOnBook(price float64, averageCost float64, quantity float64, currentOrders []*swagger.Order) ([]models.Order, []models.Order, []string) {
+func createOrderArrays(price float64, averageCost float64, quantity float64) (models.OrderArray, models.OrderArray) {
 	liquid := 0.05 //Defined as btc but will be % in the future
-	var priceArr, orderArr []float64
-	var selling float64
+	var buyOrders, sellOrders models.OrderArray
 
 	// Create Buy Orders
 	buying := liquid * price
-	// if baseBalance < 0 { buying = buying + (math.Abs(baseBalance) / bar.Open)  }
 	if quantity < 0 { 
 		buying = buying + math.Abs(quantity)
 		startBuyPrice := price
 		if averageCost < price {
 			startBuyPrice = averageCost
 		}
-		priceArr, orderArr = createSpread(1, 2, startBuyPrice, 0.005, 2, settings.MaxOrders)
+		buyOrders = createSpread(1, 2, startBuyPrice, 0.005, 2, settings.MaxOrders)
 	} else {
-		priceArr, orderArr = createSpread(1, 2, price, 0.01, 2, settings.MaxOrders)
+		buyOrders = createSpread(1, 2, price, 0.01, 2, settings.MaxOrders)
 	}
 	log.Println("Placing", buying, "on bid")
-	var orders []models.Order
-	orderArr = mulArr(orderArr, buying)
-
-	totalQty := 0.0
-	for i, qty := range orderArr {
-		totalQty = totalQty + qty
-		if totalQty > 25 {
-			orderPrice := priceArr[i]
-			order := createLimitOrder(settings.Symbol, int32(totalQty), orderPrice, "Buy")
-			orders = append(orders, order)
-			totalQty = 0.0
-		}
-	}
-
-	// log.Println(orders)
+	buyOrders.Quantity = mulArr(buyOrders.Quantity, buying)
 
 	// Create Sell orders
-	selling = liquid * price
+	selling := liquid * price
 	if quantity > 0 { 
 		selling = selling + quantity
 		startSellPrice := price
 		if averageCost > price {
 			startSellPrice = averageCost
 		}
-		priceArr, orderArr = createSpread(-1, 0.1, startSellPrice, 0.005, 2, settings.MaxOrders)
+		sellOrders = createSpread(-1, 0.1, startSellPrice, 0.005, 2, settings.MaxOrders)
 	} else {
-		priceArr, orderArr = createSpread(-1, 2, price, 0.01, 2, settings.MaxOrders)
+		sellOrders = createSpread(-1, 2, price, 0.01, 2, settings.MaxOrders)
 	}
 
 	log.Println("Placing", selling, "on ask")
-	orderArr = mulArr(orderArr, selling)
+	sellOrders.Quantity = mulArr(sellOrders.Quantity, selling)
 
-	totalQty = 0.0
-	for i, qty := range orderArr {
+	return buyOrders, sellOrders
+}
+
+
+func placeOrdersOnBook(price float64, averageCost float64, quantity float64, currentOrders []*swagger.Order) ([]models.Order, []models.Order, []string) {
+	var orders []models.Order
+
+	buyOrders, sellOrders := createOrderArrays(price, averageCost, quantity)
+
+	totalQty := 0.0
+	for i, qty := range buyOrders.Quantity {
 		totalQty = totalQty + qty
 		if totalQty > 25 {
-			orderPrice := priceArr[i]
+			orderPrice := buyOrders.Price[i]
+			order := createLimitOrder(settings.Symbol, int32(totalQty), orderPrice, "Buy")
+			orders = append(orders, order)
+			totalQty = 0.0
+		}
+	}
+
+	totalQty = 0.0
+	for i, qty := range sellOrders.Quantity {
+		totalQty = totalQty + qty
+		if totalQty > 25 {
+			orderPrice := sellOrders.Price[i]
 			order := createLimitOrder(settings.Symbol, int32(totalQty), orderPrice, "Sell")
 			orders = append(orders, order)
 			totalQty = 0.0
@@ -367,58 +370,4 @@ func getCostAverage(pricesFilled []float64, ordersFilled []float64) (float64, fl
 	} else {
 		return 0.0, 0.0
 	}
-}
-
-func getFilledBidOrders(prices []float64, orders []float64, price float64) ([]float64, []float64) {
-	var p []float64
-	var o []float64
-	for i := range prices {
-		if prices[i] >= price {
-			p = append(p, prices[i])
-			o = append(o, orders[i])
-		}
-    }
-    return p, o
-}
-
-func getFilledAskOrders(prices []float64, orders []float64, price float64) ([]float64, []float64) {
-	var p []float64
-	var o []float64
-	for i := range prices {
-		if prices[i] <= price {
-			p = append(p, prices[i])
-			o = append(o, orders[i])
-		}
-    }
-    return p, o
-}
-
-func createSpread(weight int32, confidence float64, price float64, spread float64, tick_size float64, max_orders int32) ([]float64, []float64) {
-	x_start := 0.0
-	if weight == 1 {
-		x_start = price - (price*spread)
-	} else {
-		x_start = price
-	}
-
-	x_end := x_start + (x_start*spread)
-	diff := x_end - x_start
-
-	if diff / tick_size >= float64(max_orders) {
-		tick_size = diff / (float64(max_orders)-1)
-	}
-
-	price_arr := arange(x_start, x_end, float64(int32(tick_size)))
-	temp := divArr(price_arr, x_start)
-	// temp := (price_arr/x_start)-1
-
-	dist := expArr(temp, confidence)
-
-	normalizer := 1/sumArr(dist)
-	order_arr := mulArr(dist, normalizer)
-	if weight == 1 { 
-		order_arr = reverseArr(order_arr)
-	}
-
-	return price_arr, order_arr
 }

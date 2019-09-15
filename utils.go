@@ -28,6 +28,36 @@ func loadConfiguration(file string, secret bool) models.Config {
 
 }
 
+func createSpread(weight int32, confidence float64, price float64, spread float64, tick_size float64, max_orders int32) (models.OrderArray) {
+	x_start := 0.0
+	if weight == 1 {
+		x_start = price - (price*spread)
+	} else {
+		x_start = price
+	}
+
+	x_end := x_start + (x_start*spread)
+	diff := x_end - x_start
+
+	if diff / tick_size >= float64(max_orders) {
+		tick_size = diff / (float64(max_orders)-1)
+	}
+
+	price_arr := arange(x_start, x_end, float64(int32(tick_size)))
+	temp := divArr(price_arr, x_start)
+	// temp := (price_arr/x_start)-1
+
+	dist := expArr(temp, confidence)
+
+	normalizer := 1/sumArr(dist)
+	order_arr := mulArr(dist, normalizer)
+	if weight == 1 { 
+		order_arr = reverseArr(order_arr)
+	}
+
+	return models.OrderArray{ Price: price_arr, Quantity: order_arr }
+}
+
 func reverseArr(a []float64) []float64 {
 	for i := len(a)/2-1; i >= 0; i-- {
 		opp := len(a)-1-i
