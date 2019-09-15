@@ -24,6 +24,10 @@
 #   go-tests = true
 #   unused-packages = true
 
+[metadata.heroku]
+  root-package = "GoMarketMaker"
+  go-version = "1.13"
+  install = [ "./..." ]
 
 [[constraint]]
   name = "firebase.google.com/go"
