@@ -9,11 +9,12 @@ import (
 )
 
 func loadConfiguration(file string, secret bool) models.Config {
-    var config  models.Config
+    var config models.Config
     if secret {
         secret := getSecret(file)
-        config := models.Config{}
+        config = models.Config{}
         json.Unmarshal([]byte(secret), &config)
+        return config
     } else {
         configFile, err := os.Open(file)
         defer configFile.Close()
@@ -22,9 +23,9 @@ func loadConfiguration(file string, secret bool) models.Config {
         }
         jsonParser := json.NewDecoder(configFile)
         jsonParser.Decode(&config)
+        return config
     }
 
-    return config
 }
 
 func reverseArr(a []float64) []float64 {

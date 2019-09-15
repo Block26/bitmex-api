@@ -13,6 +13,6 @@ workflows:
           dockerfile: Dockerfile
           path: ~/project
           profile-name: b26
-          region: us-west-1
+          region: AWS_MM_REGION
           repo: mm
           tag: latest
