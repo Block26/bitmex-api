@@ -1,0 +1,18 @@
+version: 2.1
+orbs:
+  aws-ecr: circleci/aws-ecr@6.2.0
+workflows:
+  build_test_deploy:
+    jobs:
+      - aws-ecr/build-and-push-image:
+          account-url: AWS_ECR_ACCOUNT_URL
+          aws-access-key-id: AWS_ACCESS_KEY_ID
+          aws-secret-access-key: AWS_SECRET_ACCESS_KEY
+          context: AWS-ECS
+          create-repo: true
+          dockerfile: Dockerfile
+          path: ~/project
+          profile-name: b26
+          region: AWS_DEFAULT_REGION
+          repo: mm
+          tag: latest
