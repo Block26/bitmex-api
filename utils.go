@@ -77,7 +77,7 @@ func arange(min float64, max float64, step float64) []float64 {
 func expArr(arr []float64, exp float64) []float64 {
     a := make([]float64, len(arr))
     for i := range arr {
-        a[i] = exponent(arr[i], exp)-1
+        a[i] = exponent(arr[i]-1, exp)
     }
     return a
 }

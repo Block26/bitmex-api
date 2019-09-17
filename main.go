@@ -1,18 +1,18 @@
- //export GOPATH=/Users/russell/git/go && export PATH=$PATH:$(go env GOPATH)/bin
- //go install GoMarketMaker && GoMarketMaker
+//export GOPATH=/Users/russell/git/go && export PATH=$PATH:$(go env GOPATH)/bin
+//go install GoMarketMaker && GoMarketMaker
 
 package main
 
 import (
 	"context"
-    "fmt"
-	"math"
-	"log"
-	"time"
-	"strings"
 	"encoding/json"
+	"fmt"
+	"log"
+	"math"
+	"strings"
+	"time"
 
-    "GoMarketMaker/models"
+	"GoMarketMaker/models"
 
 	//Restful
 	"github.com/zmxv/bitmexgo"
@@ -25,6 +25,7 @@ import (
 var settings models.Config
 
 func main() {
+	// settings = loadConfiguration("settings/sample_config.json", false)
 	settings = loadConfiguration("dev/mm/testnet", true)
 	fireDB := setupFirebase()
 	averageCost := 0.0
@@ -49,9 +50,9 @@ func main() {
 	subscribeInfos := []bitmex.SubscribeInfo{
 		{Op: bitmex.BitmexWSOrder, Param: settings.Symbol},
 		{Op: bitmex.BitmexWSPosition, Param: settings.Symbol},
-		{Op: bitmex.BitmexWSTradeBin1m, Param: settings.Symbol},
+		{Op: bitmex.BitmexWSQuoteBin1m, Param: settings.Symbol},
 	}
-	
+
 	err := b.Subscribe(subscribeInfos)
 	if err != nil {
 		log.Fatal(err)
@@ -68,10 +69,10 @@ func main() {
 			averageCost = 0
 		}
 		log.Println("AvgCostPrice", averageCost, "Quantity", quantity)
-	}).On(bitmex.BitmexWSTradeBin1m, func(bins []*swagger.TradeBin, action string) {
+	}).On(bitmex.BitmexWSQuoteBin1m, func(bins []*swagger.Quote, action string) {
 		for _, bin := range bins {
-			log.Println(bin.Close)
-			price = bin.Close
+			log.Println(bin.BidPrice)
+			price = bin.BidPrice
 			toCreate, toAmend, toCancel := placeOrdersOnBook(price, averageCost, quantity, orders)
 
 			// log.Println(len(newOrders), "New Orders")
@@ -80,7 +81,6 @@ func main() {
 			cancelOrders(auth, client, toCancel, 0)
 			createOrders(auth, client, toCreate, 0)
 			amendOrders(auth, client, toAmend, 0)
-
 			updateAlgo(fireDB, "mm")
 		}
 	})
@@ -109,7 +109,7 @@ func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []mod
 }
 
 func amendOrders(auth context.Context, client *bitmexgo.APIClient, orders []models.Order, retry int32) {
-	log.Println("Amend ->",  len(orders))
+	log.Println("Amend ->", len(orders))
 	if len(orders) > 0 {
 		orderString := createJsonOrderString(orders)
 		var amendParams bitmexgo.OrderAmendBulkOpts
@@ -122,7 +122,7 @@ func amendOrders(auth context.Context, client *bitmexgo.APIClient, orders []mode
 				amendOrders(auth, client, orders, retry+1)
 			}
 		}
-		
+
 	}
 }
 
@@ -144,9 +144,8 @@ func cancelOrders(auth context.Context, client *bitmexgo.APIClient, orders []str
 	}
 }
 
-
 func createCancelOrderString(ids []string) string {
-	orderString := strings.Join(ids,",")
+	orderString := strings.Join(ids, ",")
 	return orderString
 }
 
@@ -161,7 +160,7 @@ func createJsonOrderString(orders []models.Order) string {
 		// log.Println(string(jsonOrder))
 		jsonOrders = append(jsonOrders, string(jsonOrder))
 	}
-	orderString := "[" + strings.Join(jsonOrders,",") + "]"
+	orderString := "[" + strings.Join(jsonOrders, ",") + "]"
 	return orderString
 }
 
@@ -171,7 +170,7 @@ func createOrderArrays(price float64, averageCost float64, quantity float64) (mo
 
 	// Create Buy Orders
 	buying := liquid * price
-	if quantity < 0 { 
+	if quantity < 0 {
 		buying = buying + math.Abs(quantity)
 		startBuyPrice := price
 		if averageCost < price {
@@ -186,7 +185,7 @@ func createOrderArrays(price float64, averageCost float64, quantity float64) (mo
 
 	// Create Sell orders
 	selling := liquid * price
-	if quantity > 0 { 
+	if quantity > 0 {
 		selling = selling + quantity
 		startSellPrice := price
 		if averageCost > price {
@@ -202,7 +201,6 @@ func createOrderArrays(price float64, averageCost float64, quantity float64) (mo
 
 	return buyOrders, sellOrders
 }
-
 
 func placeOrdersOnBook(price float64, averageCost float64, quantity float64, currentOrders []*swagger.Order) ([]models.Order, []models.Order, []string) {
 	var orders []models.Order
@@ -231,7 +229,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		}
 	}
 
-	var toCreate []models.Order 
+	var toCreate []models.Order
 	var toAmend []models.Order
 	var orderToPlace []string
 
@@ -266,7 +264,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 						orderToPlace = append(orderToPlace, order.ClOrdID)
 					}
 				}
-			
+
 			}
 			if !orderFound {
 				now := time.Now().Unix() - 1524872844
@@ -284,7 +282,7 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 		found := false
 		for _, newOrder := range orderToPlace {
 			ordID := strings.Split(oldOrder.ClOrdID, "-")[0]
-			if strings.Contains(newOrder, ordID)  {
+			if strings.Contains(newOrder, ordID) {
 				// log.Println("Dont Cancel", ordID, newOrder)
 				found = true
 				break
@@ -298,26 +296,23 @@ func placeOrdersOnBook(price float64, averageCost float64, quantity float64, cur
 	return toCreate, toAmend, toCancel
 }
 
-
-
 func createLimitOrder(symbol string, amount int32, price float64, side string) models.Order {
 	// price = toNearest(price, coin.tick_size)
 	orderId := fmt.Sprintf("%.1f_limit", price)
 	order := models.Order{
-		Symbol: symbol,
-		ClOrdID: orderId,
-		OrdType: "Limit",
-		Price: price,
+		Symbol:   symbol,
+		ClOrdID:  orderId,
+		OrdType:  "Limit",
+		Price:    price,
 		OrderQty: amount,
-		Side: side,
+		Side:     side,
 		ExecInst: "ParticipateDoNotInitiate",
 	}
 
 	return order
 }
 
-
-func updateLocalOrders(oldOrders []*swagger.Order, newOrders []*swagger.Order) ([]*swagger.Order) {
+func updateLocalOrders(oldOrders []*swagger.Order, newOrders []*swagger.Order) []*swagger.Order {
 	var updatedOrders []*swagger.Order
 	for _, oldOrder := range oldOrders {
 		found := false
@@ -357,17 +352,4 @@ func updateLocalOrders(oldOrders []*swagger.Order, newOrders []*swagger.Order) (
 
 	log.Println(len(updatedOrders), "orders")
 	return updatedOrders
-}
-
-func getCostAverage(pricesFilled []float64, ordersFilled []float64) (float64, float64) {
-	// print(len(prices), len(orders), len(index_arr[0]))
-	percentageFilled := sumArr(ordersFilled)
-	if percentageFilled > 0 {
-		normalizer := 1/percentageFilled
-		norm := mulArr(ordersFilled, normalizer)
-		costAverage := mulArrs(pricesFilled, norm)
-		return sumArr(costAverage), percentageFilled
-	} else {
-		return 0.0, 0.0
-	}
 }
