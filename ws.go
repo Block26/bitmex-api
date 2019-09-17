@@ -101,13 +101,14 @@ func decodeMessage(message []byte) (Response, error) {
 				return res, err
 			}
 			res.Data = orderbooks
-		case BitmexWSQuote:
+		case BitmexWSQuote, BitmexWSQuoteBin1m, BitmexWSQuoteBin5m, BitmexWSQuoteBin1h, BitmexWSQuoteBin1d:
 			var quotes []*swagger.Quote
 			err = json.Unmarshal([]byte(raw), &quotes)
 			if err != nil {
 				return res, err
 			}
 			res.Data = quotes
+
 		case BitmexWSTradeBin1m, BitmexWSTradeBin5m, BitmexWSTradeBin1h, BitmexWSTradeBin1d:
 			var tradeBins []*swagger.TradeBin
 			err = json.Unmarshal([]byte(raw), &tradeBins)
