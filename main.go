@@ -31,6 +31,7 @@ func main() {
 	averageCost := 0.0
 	quantity := 0.0
 	price := 0.0
+	balance := 0.0
 
 	var orders []*swagger.Order
 	var b *bitmex.BitMEX
@@ -51,6 +52,7 @@ func main() {
 		{Op: bitmex.BitmexWSOrder, Param: settings.Symbol},
 		{Op: bitmex.BitmexWSPosition, Param: settings.Symbol},
 		{Op: bitmex.BitmexWSQuoteBin1m, Param: settings.Symbol},
+		{Op: bitmex.BitmexWSWallet},
 	}
 
 	err := b.Subscribe(subscribeInfos)
@@ -58,7 +60,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	b.On(bitmex.BitmexWSOrder, func(newOrders []*swagger.Order, action string) {
+	b.On(bitmex.BitmexWSWallet, func(wallet []*swagger.Wallet, action string) {
+		balance = float64(wallet[len(wallet)-1].Amount)
+		log.Println("balance", balance)
+	}).On(bitmex.BitmexWSOrder, func(newOrders []*swagger.Order, action string) {
 		orders = updateLocalOrders(orders, newOrders)
 	}).On(bitmex.BitmexWSPosition, func(positions []*swagger.Position, action string) {
 		position := positions[0]
