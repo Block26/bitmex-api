@@ -6,13 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/url"
+	"time"
+
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 	"github.com/sumorf/bitmex-api/swagger"
 	"github.com/tidwall/gjson"
-	"log"
-	"net/url"
-	"time"
 )
 
 const (
@@ -279,8 +280,8 @@ func (b *BitMEX) StartWS() {
 				b.processOrderbook(&resp)
 			case BitmexWSOrderBookL2:
 				b.processOrderbook(&resp)
-			case BitmexWSQuote:
-				b.processQuote(&resp)
+			case BitmexWSQuote, BitmexWSQuote, BitmexWSQuoteBin1m, BitmexWSQuoteBin5m, BitmexWSQuoteBin1h, BitmexWSQuoteBin1d:
+				b.processQuote(&resp, resp.Table)
 			case BitmexWSTradeBin1m, BitmexWSTradeBin5m, BitmexWSTradeBin1h, BitmexWSTradeBin1d:
 				b.processTradeBin(&resp, resp.Table)
 			case BitmexWSExecution:
@@ -356,13 +357,13 @@ func (b *BitMEX) processOrderbook(msg *Response) (err error) {
 	return nil
 }
 
-func (b *BitMEX) processQuote(msg *Response) (err error) {
+func (b *BitMEX) processQuote(msg *Response, name string) (err error) {
 	quotes, _ := msg.Data.([]*swagger.Quote)
 	if len(quotes) < 1 {
 		return errors.New("ws.go error - no quote data")
 	}
 
-	b.emitter.Emit(BitmexWSQuote, quotes, msg.Action)
+	b.emitter.Emit(name, quotes, msg.Action)
 	return nil
 }
 
