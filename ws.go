@@ -280,7 +280,7 @@ func (b *BitMEX) StartWS() {
 				b.processOrderbook(&resp)
 			case BitmexWSOrderBookL2:
 				b.processOrderbook(&resp)
-			case BitmexWSQuote, BitmexWSQuote, BitmexWSQuoteBin1m, BitmexWSQuoteBin5m, BitmexWSQuoteBin1h, BitmexWSQuoteBin1d:
+			case BitmexWSQuote, BitmexWSQuoteBin1m, BitmexWSQuoteBin5m, BitmexWSQuoteBin1h, BitmexWSQuoteBin1d:
 				b.processQuote(&resp, resp.Table)
 			case BitmexWSTradeBin1m, BitmexWSTradeBin5m, BitmexWSTradeBin1h, BitmexWSTradeBin1d:
 				b.processTradeBin(&resp, resp.Table)
