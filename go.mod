@@ -8,6 +8,7 @@ require (
 	firebase.google.com/go v3.9.0+incompatible
 	github.com/aws/aws-sdk-go v1.24.0
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
+	github.com/gocarina/gocsv v0.0.0-20190821091544-020a928c6f4e
 	github.com/gorilla/websocket v1.4.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/sumorf/bitmex-api v0.0.0-20190727031030-2494eda85b21

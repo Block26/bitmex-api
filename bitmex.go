@@ -1,0 +1,271 @@
+package main
+
+import (
+	"GoMarketMaker/models"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"math"
+	"strings"
+	"time"
+
+	"github.com/sumorf/bitmex-api"
+	"github.com/sumorf/bitmex-api/swagger"
+	"github.com/zmxv/bitmexgo"
+)
+
+func connect(settingsFile string, secret bool) {
+	settings = loadConfiguration(settingsFile, secret)
+	// settings = loadConfiguration("dev/mm/testnet", true)
+	fireDB := setupFirebase()
+	averageCost := 0.0
+	quantity := 0.0
+	price := 0.0
+	balance := 0.0
+
+	var orders []*swagger.Order
+	var b *bitmex.BitMEX
+	var auth context.Context
+	var client *bitmexgo.APIClient
+
+	if settings.TestNet {
+		b = bitmex.New(bitmex.HostTestnet, settings.ApiKey, settings.ApiSecret)
+		auth = bitmexgo.NewAPIKeyContext(settings.ApiKey, settings.ApiSecret)
+		client = bitmexgo.NewAPIClient(bitmexgo.NewTestnetConfiguration())
+	} else {
+		b = bitmex.New(bitmex.HostReal, settings.ApiKey, settings.ApiSecret)
+		auth = bitmexgo.NewAPIKeyContext(settings.ApiKey, settings.ApiSecret)
+		client = bitmexgo.NewAPIClient(bitmexgo.NewConfiguration())
+	}
+
+	subscribeInfos := []bitmex.SubscribeInfo{
+		{Op: bitmex.BitmexWSOrder, Param: settings.Symbol},
+		{Op: bitmex.BitmexWSPosition, Param: settings.Symbol},
+		{Op: bitmex.BitmexWSQuoteBin1m, Param: settings.Symbol},
+		{Op: bitmex.BitmexWSWallet},
+	}
+
+	err := b.Subscribe(subscribeInfos)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	b.On(bitmex.BitmexWSWallet, func(wallet []*swagger.Wallet, action string) {
+		balance = float64(wallet[len(wallet)-1].Amount)
+		log.Println("balance", balance)
+	}).On(bitmex.BitmexWSOrder, func(newOrders []*swagger.Order, action string) {
+		orders = updateLocalOrders(orders, newOrders)
+	}).On(bitmex.BitmexWSPosition, func(positions []*swagger.Position, action string) {
+		position := positions[0]
+		quantity = float64(position.CurrentQty)
+		if math.Abs(quantity) > 0 && position.AvgCostPrice > 0 {
+			averageCost = position.AvgCostPrice
+		} else if position.CurrentQty == 0 {
+			averageCost = 0
+		}
+		log.Println("AvgCostPrice", averageCost, "Quantity", quantity)
+	}).On(bitmex.BitmexWSQuoteBin1m, func(bins []*swagger.Quote, action string) {
+		for _, bin := range bins {
+			log.Println(bin.BidPrice)
+			price = bin.BidPrice
+			toCreate, toAmend, toCancel := placeOrdersOnBook(price, averageCost, quantity, orders)
+
+			// log.Println(len(newOrders), "New Orders")
+			// Cancel first?
+			// Should consider cancel/create in 10 order blocks so cancel 10 then create the 10 to replace
+			cancelOrders(auth, client, toCancel, 0)
+			createOrders(auth, client, toCreate, 0)
+			amendOrders(auth, client, toAmend, 0)
+			updateAlgo(fireDB, "mm")
+		}
+	})
+
+	b.StartWS()
+
+	forever := make(chan bool)
+	<-forever
+}
+
+func placeOrdersOnBook(price float64, averageCost float64, quantity float64, currentOrders []*swagger.Order) ([]models.Order, []models.Order, []string) {
+	var orders []models.Order
+
+	buyOrders, sellOrders := rebalance(price, averageCost, quantity)
+
+	totalQty := 0.0
+	for i, qty := range buyOrders.Quantity {
+		totalQty = totalQty + qty
+		if totalQty > 25 {
+			orderPrice := buyOrders.Price[i]
+			order := createLimitOrder(settings.Symbol, int32(totalQty), orderPrice, "Buy")
+			orders = append(orders, order)
+			totalQty = 0.0
+		}
+	}
+
+	totalQty = 0.0
+	for i, qty := range sellOrders.Quantity {
+		totalQty = totalQty + qty
+		if totalQty > 25 {
+			orderPrice := sellOrders.Price[i]
+			order := createLimitOrder(settings.Symbol, int32(totalQty), orderPrice, "Sell")
+			orders = append(orders, order)
+			totalQty = 0.0
+		}
+	}
+
+	var toCreate []models.Order
+	var toAmend []models.Order
+	var orderToPlace []string
+
+	for _, newOrder := range orders {
+		if newOrder.OrdType != "Market" {
+			orderFound := false
+			for _, oldOrder := range currentOrders {
+				if !orderFound && strings.Contains(oldOrder.ClOrdID, newOrder.ClOrdID) {
+					newOrder.OrigClOrdID = oldOrder.ClOrdID
+					order := newOrder
+					found := false
+					for _, ord := range toAmend {
+						if ord.ClOrdID == newOrder.ClOrdID || ord.OrigClOrdID == newOrder.OrigClOrdID {
+							found = true
+							break
+						}
+					}
+					if !found {
+						if !strings.Contains(newOrder.ExecInst, "Close") {
+							order.OrderQty = newOrder.OrderQty //+ old_order['orderQty']
+						} else {
+							order.ExecInst = "Close"
+						}
+						orderFound = true
+						// log.Println("Found order", newOrder.ClOrdID)
+						// Only Ammend if qty changes
+						if order.OrderQty != int32(oldOrder.OrderQty) {
+							now := time.Now().Unix() - 1524872844
+							order.ClOrdID = fmt.Sprintf("%s-%d", order.ClOrdID, now)
+							toAmend = append(toAmend, order)
+						}
+						orderToPlace = append(orderToPlace, order.ClOrdID)
+					}
+				}
+
+			}
+			if !orderFound {
+				now := time.Now().Unix() - 1524872844
+				newOrder.ClOrdID = fmt.Sprintf("%s-%d", newOrder.ClOrdID, now)
+				toCreate = append(toCreate, newOrder)
+				// log.Println("Found order", newOrder.ClOrdID)
+				orderToPlace = append(orderToPlace, newOrder.ClOrdID)
+			}
+
+		}
+	}
+
+	var toCancel []string
+	for _, oldOrder := range currentOrders {
+		found := false
+		for _, newOrder := range orderToPlace {
+			ordID := strings.Split(oldOrder.ClOrdID, "-")[0]
+			if strings.Contains(newOrder, ordID) {
+				// log.Println("Dont Cancel", ordID, newOrder)
+				found = true
+				break
+			}
+		}
+		if !found {
+			toCancel = append(toCancel, oldOrder.OrderID)
+		}
+	}
+
+	return toCreate, toAmend, toCancel
+}
+
+func createCancelOrderString(ids []string) string {
+	orderString := strings.Join(ids, ",")
+	return orderString
+}
+
+func createJSONOrderString(orders []models.Order) string {
+	var jsonOrders []string
+	for _, o := range orders {
+		jsonOrder, err := json.Marshal(o)
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
+		// log.Println(string(jsonOrder))
+		jsonOrders = append(jsonOrders, string(jsonOrder))
+	}
+	orderString := "[" + strings.Join(jsonOrders, ",") + "]"
+	return orderString
+}
+
+func createOrders(auth context.Context, client *bitmexgo.APIClient, orders []models.Order, retry int32) {
+	log.Println("Create ->", len(orders))
+	if len(orders) > 0 {
+		orderString := createJSONOrderString(orders)
+		var orderParams bitmexgo.OrderNewBulkOpts
+		orderParams.Orders.Set(orderString)
+		_, res, err := client.OrderApi.OrderNewBulk(auth, &orderParams)
+		if res.StatusCode != 200 || err != nil {
+			if retry <= settings.MaxRetries {
+				log.Println(res.StatusCode, "Retrying...")
+				time.Sleep(1 * time.Second)
+				createOrders(auth, client, orders, retry+1)
+			}
+		}
+	}
+}
+
+func amendOrders(auth context.Context, client *bitmexgo.APIClient, orders []models.Order, retry int32) {
+	log.Println("Amend ->", len(orders))
+	if len(orders) > 0 {
+		orderString := createJSONOrderString(orders)
+		var amendParams bitmexgo.OrderAmendBulkOpts
+		amendParams.Orders.Set(orderString)
+		_, res, err := client.OrderApi.OrderAmendBulk(auth, &amendParams)
+		if res.StatusCode != 200 || err != nil {
+			if retry <= settings.MaxRetries {
+				log.Println(res.StatusCode, "Retrying...")
+				time.Sleep(1 * time.Second)
+				amendOrders(auth, client, orders, retry+1)
+			}
+		}
+
+	}
+}
+
+func cancelOrders(auth context.Context, client *bitmexgo.APIClient, orders []string, retry int32) {
+	log.Println("Cancel ->", len(orders))
+	if len(orders) > 0 {
+		orderString := createCancelOrderString(orders)
+		var cancelParams bitmexgo.OrderCancelOpts
+		cancelParams.OrderID.Set(orderString)
+		// log.Println(orderString)
+		_, res, err := client.OrderApi.OrderCancel(auth, &cancelParams)
+		if res.StatusCode != 200 || err != nil {
+			if retry <= settings.MaxRetries {
+				log.Println(res.StatusCode, "Retrying...")
+				time.Sleep(1 * time.Second)
+				cancelOrders(auth, client, orders, retry+1)
+			}
+		}
+	}
+}
+
+func createLimitOrder(symbol string, amount int32, price float64, side string) models.Order {
+	// price = toNearest(price, coin.tick_size)
+	orderID := fmt.Sprintf("%.1f_limit", price)
+	order := models.Order{
+		Symbol:   symbol,
+		ClOrdID:  orderID,
+		OrdType:  "Limit",
+		Price:    price,
+		OrderQty: amount,
+		Side:     side,
+		ExecInst: "ParticipateDoNotInitiate",
+	}
+
+	return order
+}
