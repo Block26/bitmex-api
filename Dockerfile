@@ -1,5 +1,6 @@
 FROM golang:1.13-alpine AS builder
 WORKDIR /app
+RUN export GOPRIVATE=github.com/block26/*
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .

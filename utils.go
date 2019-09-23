@@ -1,18 +1,20 @@
 package main
 
 import (
-	"GoMarketMaker/models"
 	"encoding/json"
 	"log"
 	"math"
 	"os"
+
+	"github.com/block26/TheAlgoV2/settings"
+	"github.com/block26/exchanges/models"
 )
 
-func loadConfiguration(file string, secret bool) models.Config {
-	var config models.Config
+func loadConfiguration(file string, secret bool) settings.Config {
+	var config settings.Config
 	if secret {
 		secret := getSecret(file)
-		config = models.Config{}
+		config = settings.Config{}
 		json.Unmarshal([]byte(secret), &config)
 		return config
 	} else {

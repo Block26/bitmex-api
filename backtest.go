@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"unsafe"
 
-	"GoMarketMaker/models"
+	"github.com/block26/TheAlgoV2/models"
 
 	"github.com/gocarina/gocsv"
 )

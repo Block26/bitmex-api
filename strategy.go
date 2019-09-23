@@ -1,9 +1,10 @@
 package main
 
 import (
-	"GoMarketMaker/models"
 	"log"
 	"math"
+
+	"github.com/block26/exchanges/models"
 )
 
 func rebalance(price float64, averageCost float64, quantity float64) (models.OrderArray, models.OrderArray) {
@@ -18,9 +19,9 @@ func rebalance(price float64, averageCost float64, quantity float64) (models.Ord
 		if averageCost < price {
 			startBuyPrice = averageCost
 		}
-		buyOrders = createSpread(1, 2, startBuyPrice, 0.005, 2, settings.MaxOrders)
+		buyOrders = createSpread(1, 2, startBuyPrice, 0.005, 2, config.MaxOrders)
 	} else {
-		buyOrders = createSpread(1, 2, price, 0.01, 2, settings.MaxOrders)
+		buyOrders = createSpread(1, 2, price, 0.01, 2, config.MaxOrders)
 	}
 	log.Println("Placing", buying, "on bid")
 	buyOrders.Quantity = mulArr(buyOrders.Quantity, buying)
@@ -33,9 +34,9 @@ func rebalance(price float64, averageCost float64, quantity float64) (models.Ord
 		if averageCost > price {
 			startSellPrice = averageCost
 		}
-		sellOrders = createSpread(-1, 0.1, startSellPrice, 0.005, 2, settings.MaxOrders)
+		sellOrders = createSpread(-1, 0.1, startSellPrice, 0.005, 2, config.MaxOrders)
 	} else {
-		sellOrders = createSpread(-1, 2, price, 0.01, 2, settings.MaxOrders)
+		sellOrders = createSpread(-1, 2, price, 0.01, 2, config.MaxOrders)
 	}
 
 	log.Println("Placing", selling, "on ask")
