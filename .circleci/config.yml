@@ -1,18 +1,55 @@
 version: 2.1
 orbs:
   aws-ecr: circleci/aws-ecr@6.2.0
+  aws-ecs: circleci/aws-ecs@0.0.10
+
+jobs:
+  build:
+    docker: 
+      - image: golang:1.13-alpine
+    working_directory: /tmp/project
+    steps:
+      - run: apk add --no-cache git mercurial
+      - run: apk add --no-cache openssh
+      - checkout
+      - run: printf "[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig
+      - run: export GOPRIVATE=github.com/block26/*
+      - run: go mod download
+      - run: CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+      - persist_to_workspace:
+          root: /tmp/project
+          paths: 
+            - settings/*
+            - ca-certificates.crt
+            - main
+            - Dockerfile
+
 workflows:
   build_test_deploy:
-    jobs:
+    jobs: 
+      - build
       - aws-ecr/build-and-push-image:
-          account-url: AWS_MM_ECR_ACCOUNT_URL
-          aws-access-key-id: AWS_ACCESS_KEY_ID
-          aws-secret-access-key: AWS_SECRET_ACCESS_KEY
           context: AWS-ECS
+          pre-steps:
+            - attach_workspace:
+                at: ~/project/build
+          requires:
+            - build
+          checkout: false
           create-repo: true
-          dockerfile: Dockerfile
-          path: ~/project
+          account-url: AWS_MM_ECR_ACCOUNT_URL
+          dockerfile: ~/project/build/Dockerfile
+          path: ~/project/build
           profile-name: b26
-          region: AWS_MM_REGION
           repo: mm
-          tag: latest
+          tag: '${CIRCLE_SHA1}'
+      - aws-ecs/deploy-service-update:
+          context: AWS-ECS
+          requires:
+            - aws-ecr/build-and-push-image
+          family: "MM-service"
+          cluster-name: "MM-cluster"
+          container-image-name-updates: "container=MM-Latest,tag=${CIRCLE_SHA1}"
+
+
+

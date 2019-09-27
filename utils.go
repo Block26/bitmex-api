@@ -70,7 +70,7 @@ func reverseArr(a []float64) []float64 {
 func arange(min float64, max float64, step float64) []float64 {
 	a := make([]float64, int32((max-min)/step)+1)
 	for i := range a {
-		a[i] = float64(int32(min)) + (float64(i) * step)
+		a[i] = float64(int32(min+step)) + (float64(i) * step)
 	}
 	return a
 }

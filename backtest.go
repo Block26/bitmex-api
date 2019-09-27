@@ -16,17 +16,13 @@ import (
 )
 
 var history models.History
-var algo models.MMConfig
-var fee = 0.0
-var minTickSize = 0.00001
-var futures = false
-var debug = true
+var algo Algo
 
 // var minimumOrderSize = 25
 
 func runBacktest() {
 	log.Println("Loading Data... ")
-	dataFile, err := os.OpenFile("./1m-dcr.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	dataFile, err := os.OpenFile("./1m.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
@@ -65,11 +61,13 @@ func runBacktest() {
 	// }
 
 	//DCRBTC
-	algo := models.MMConfig{
-		BaseBalance:     1.0,
-		Quantity:        220.0,
-		AverageCost:     0.0,
-		MaxOrders:       15,
+	algo := Algo{
+		Asset: Asset{
+			BaseBalance: 1.0,
+			Quantity:    220.0,
+			AverageCost: 0.0,
+			MaxOrders:   15,
+		},
 		EntrySpread:     0.05,
 		EntryConfidence: 1,
 		ExitSpread:      0.03,
@@ -91,60 +89,70 @@ func runBacktest() {
 }
 
 func print(index string, msg string) {
-	if debug {
+	if algo.Debug {
 		fmt.Println(index, msg)
 	}
 }
 
-func runSingleTest(data []*models.Bar, algoConfig models.MMConfig) float64 {
+func runSingleTest(data []*models.Bar, algo Algo) float64 {
 	start := time.Now()
-	algo = algoConfig
-	// starting_algo.BaseBalance := 0
+	// starting_algo.Asset.BaseBalance := 0
 	index := ""
 	log.Println("Running", len(data), "bars")
 	for _, bar := range data {
 		if index == "" {
 			log.Println("Start Timestamp", bar.Timestamp)
 			// 	//Set average cost if starting with a quote balance
-			if algo.Quantity > 0 {
-				algo.AverageCost = bar.Close
+			if algo.Asset.Quantity > 0 {
+				algo.Asset.AverageCost = bar.Close
 			}
 		}
 		index = bar.Timestamp
 
-		liquidPerBar := algo.Liquidity * algo.BaseBalance
-		// Delta Target Strategy
-		targetDelta := 0.6
-		pValue := algo.Quantity * algo.AverageCost
-		delta := pValue / (algo.BaseBalance + pValue)
-
-		buyOrders := createSpread(1, algo.EntryConfidence, bar.Open, algo.EntrySpread, minTickSize, algo.MaxOrders)
-		buying := liquidPerBar
-		if delta < targetDelta {
-			buying = buying + (targetDelta - delta)
-		}
-		// print(index, fmt.Sprintf("buying %0.4f", buying))
-		buying = buying / bar.Open
-		pricesFilled, ordersFilled := getFilledBidOrders(buyOrders.Price, buyOrders.Quantity, bar.Low)
+		algo.rebalance(bar.Open)
+		//Check which buys filled
+		pricesFilled, ordersFilled := getFilledBidOrders(algo.BuyOrders.Price, algo.BuyOrders.Quantity, bar.Low)
 		fillCost, fillPercentage := getCostAverage(pricesFilled, ordersFilled)
-		updateBalance(fillCost, buying*fillPercentage)
+		updateBalance(fillCost, algo.Asset.Buying*fillPercentage)
 
-		sellOrders := createSpread(-1, algo.EntryConfidence, bar.Open, algo.EntrySpread, minTickSize, algo.MaxOrders)
-		selling := liquidPerBar
-		if delta > targetDelta {
-			selling = selling + (delta - targetDelta)
-		}
-		// print(index, fmt.Sprintf("selling %0.4f", selling))
-		selling = selling / bar.Open
-		pricesFilled, ordersFilled = getFilledAskOrders(sellOrders.Price, sellOrders.Quantity, bar.High)
+		//Check which sells filled
+		pricesFilled, ordersFilled = getFilledAskOrders(algo.SellOrders.Price, algo.SellOrders.Quantity, bar.High)
 		fillCost, fillPercentage = getCostAverage(pricesFilled, ordersFilled)
-		updateBalance(fillCost, selling*-fillPercentage)
+		updateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
+
+		// liquidPerBar := algo.Liquidity * algo.Asset.BaseBalance
+		// // Delta Target Strategy
+		// targetDelta := 0.6
+		// pValue := algo.Asset.Quantity * algo.Asset.AverageCost
+		// delta := pValue / (algo.Asset.BaseBalance + pValue)
+
+		// buyOrders := createSpread(1, algo.EntryConfidence, bar.Open, algo.EntrySpread, algo.MinTickSize, algo.MaxOrders)
+		// buying := liquidPerBar
+		// if delta < targetDelta {
+		// 	buying = buying + (targetDelta - delta)
+		// }
+		// // print(index, fmt.Sprintf("buying %0.4f", buying))
+		// buying = buying / bar.Open
+		// pricesFilled, ordersFilled := getFilledBidOrders(buyOrders.Price, buyOrders.Quantity, bar.Low)
+		// fillCost, fillPercentage := getCostAverage(pricesFilled, ordersFilled)
+		// updateBalance(fillCost, buying*fillPercentage)
+
+		// sellOrders := createSpread(-1, algo.EntryConfidence, bar.Open, algo.EntrySpread, algo.MinTickSize, algo.MaxOrders)
+		// selling := liquidPerBar
+		// if delta > targetDelta {
+		// 	selling = selling + (delta - targetDelta)
+		// }
+		// // print(index, fmt.Sprintf("selling %0.4f", selling))
+		// selling = selling / bar.Open
+		// pricesFilled, ordersFilled = getFilledAskOrders(sellOrders.Price, sellOrders.Quantity, bar.High)
+		// fillCost, fillPercentage = getCostAverage(pricesFilled, ordersFilled)
+		// updateBalance(fillCost, selling*-fillPercentage)
 
 		// updateBalanceXBTStrat(bar)
 		logState(bar.Open)
 		// history.Balance[len(history.Balance)-1], == portfolio value
 		portfolioValue := history.Balance[len(history.Balance)-1]
-		print(index, fmt.Sprintf("Balance %.2f | Delta %0.2f | BTC %0.2f | DCR %.2f | Price %.5f - Cost %.5f", portfolioValue, delta, algo.BaseBalance, algo.Quantity, bar.Open, algo.AverageCost))
+		print(index, fmt.Sprintf("Balance %.2f | Delta %0.2f | BTC %0.2f | DCR %.2f | Price %.5f - Cost %.5f", portfolioValue, algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, bar.Open, algo.Asset.AverageCost))
 	}
 
 	elapsed := time.Since(start)
@@ -171,26 +179,26 @@ func runSingleTest(data []*models.Bar, algoConfig models.MMConfig) float64 {
 }
 
 func logState(price float64) {
-	if futures {
-		history.Balance = append(history.Balance, algo.BaseBalance)
+	if algo.Futures {
+		history.Balance = append(history.Balance, algo.Asset.BaseBalance)
 	} else {
-		balance := algo.BaseBalance + (algo.Quantity * price)
+		balance := algo.Asset.BaseBalance + (algo.Asset.Quantity * price)
 		history.Balance = append(history.Balance, balance)
 	}
-	history.Quantity = append(history.Quantity, algo.Quantity)
-	history.AverageCost = append(history.AverageCost, algo.AverageCost)
+	history.Quantity = append(history.Quantity, algo.Asset.Quantity)
+	history.AverageCost = append(history.AverageCost, algo.Asset.AverageCost)
 
-	leverage := (math.Abs(algo.Quantity) / price) / algo.BaseBalance
+	leverage := (math.Abs(algo.Asset.Quantity) / price) / algo.Asset.BaseBalance
 	history.Leverage = append(history.Leverage, leverage)
-	algo.Profit = currentProfit(price) * leverage
-	history.Profit = append(history.Profit, algo.Profit)
+	algo.Asset.Profit = currentProfit(price) * leverage
+	history.Profit = append(history.Profit, algo.Asset.Profit)
 }
 
 func currentProfit(price float64) float64 {
-	if algo.Quantity < 0 {
-		return calculateDifference(algo.AverageCost, price)
+	if algo.Asset.Quantity < 0 {
+		return calculateDifference(algo.Asset.AverageCost, price)
 	} else {
-		return calculateDifference(price, algo.AverageCost)
+		return calculateDifference(price, algo.Asset.AverageCost)
 	}
 }
 
@@ -198,39 +206,39 @@ func updateBalance(fillCost float64, fillAmount float64) {
 	if math.Abs(fillAmount) > 0 {
 		newQuantity := fillCost * fillAmount
 		// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
-		currentCost := (algo.Quantity * algo.AverageCost)
-		totalQuantity := algo.Quantity + newQuantity
+		currentCost := (algo.Asset.Quantity * algo.Asset.AverageCost)
+		totalQuantity := algo.Asset.Quantity + newQuantity
 		newCost := fillCost * newQuantity
-		if futures {
-			if (newQuantity >= 0 && algo.Quantity >= 0) || (newQuantity <= 0 && algo.Quantity <= 0) {
+		if algo.Futures {
+			if (newQuantity >= 0 && algo.Asset.Quantity >= 0) || (newQuantity <= 0 && algo.Asset.Quantity <= 0) {
 				//Adding to position
-				algo.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
+				algo.Asset.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
 			} else {
 				var diff float64
 				if fillAmount > 0 {
-					diff = calculateDifference(algo.AverageCost, fillCost)
+					diff = calculateDifference(algo.Asset.AverageCost, fillCost)
 				} else {
-					diff = calculateDifference(fillCost, algo.AverageCost)
+					diff = calculateDifference(fillCost, algo.Asset.AverageCost)
 				}
-				algo.BaseBalance = algo.BaseBalance + ((math.Abs(newQuantity) * diff) / fillCost)
+				algo.Asset.BaseBalance = algo.Asset.BaseBalance + ((math.Abs(newQuantity) * diff) / fillCost)
 			}
-			algo.Quantity = algo.Quantity + newQuantity
+			algo.Asset.Quantity = algo.Asset.Quantity + newQuantity
 		} else {
 			if newQuantity >= 0 {
 				//Adding to position
-				algo.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
+				algo.Asset.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
 			}
 			// else {
 			// 	var diff float64
 			// 	if fillAmount > 0 {
-			// 		diff = calculateDifference(algo.AverageCost, fillCost)
+			// 		diff = calculateDifference(algo.Asset.AverageCost, fillCost)
 			// 	} else {
-			// 		diff = calculateDifference(fillCost, algo.AverageCost)
+			// 		diff = calculateDifference(fillCost, algo.Asset.AverageCost)
 			// 	}
-			// 	algo.BaseBalance = algo.BaseBalance + ((math.Abs(newQuantity)*diff) / fillCost)
+			// 	algo.Asset.BaseBalance = algo.Asset.BaseBalance + ((math.Abs(newQuantity)*diff) / fillCost)
 			// }
-			algo.BaseBalance = algo.BaseBalance - newCost
-			algo.Quantity = algo.Quantity + newQuantity
+			algo.Asset.BaseBalance = algo.Asset.BaseBalance - newCost
+			algo.Asset.Quantity = algo.Asset.Quantity + newQuantity
 		}
 	}
 }
@@ -250,7 +258,7 @@ func getCostAverage(pricesFilled []float64, ordersFilled []float64) (float64, fl
 		normalizer := 1 / percentageFilled
 		norm := mulArr(ordersFilled, normalizer)
 		costAverage := sumArr(mulArrs(pricesFilled, norm))
-		costAverage = costAverage - (costAverage * fee)
+		costAverage = costAverage - (costAverage * algo.Asset.Fee)
 		return costAverage, percentageFilled
 	}
 	return 0.0, 0.0

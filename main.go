@@ -16,8 +16,10 @@ func main() {
 			// connect("dev/mm/testnet", true)
 		} else {
 			log.Println("RUN A BACKTEST")
+			runBacktest()
 		}
 	} else {
 		log.Println("RUN A BACKTEST")
+		runBacktest()
 	}
 }

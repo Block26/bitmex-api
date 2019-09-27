@@ -13,12 +13,22 @@ var config settings.Config
 
 func connect(settingsFile string, secret bool) {
 	config = loadConfiguration(settingsFile, secret)
+	algo := Algo{
+		Asset: Asset{
+			BaseBalance: 1.0,
+			Quantity:    220.0,
+			AverageCost: 0.0,
+			MaxOrders:   10,
+		},
+		EntrySpread:     0.05,
+		EntryConfidence: 1,
+		ExitSpread:      0.03,
+		ExitConfidence:  0.1,
+		Liquidity:       0.1,
+		MaxLeverage:     0.2,
+	}
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	fireDB := setupFirebase()
-	averageCost := 0.0
-	quantity := 0.0
-	price := 0.0
-	balance := 0.0
 
 	var orders []*swagger.Order
 	var b *bitmex.BitMEX
@@ -42,25 +52,24 @@ func connect(settingsFile string, secret bool) {
 	}
 
 	b.On(bitmex.BitmexWSWallet, func(wallet []*swagger.Wallet, action string) {
-		balance = float64(wallet[len(wallet)-1].Amount)
-		log.Println("balance", balance)
+		algo.Asset.BaseBalance = float64(wallet[len(wallet)-1].Amount)
+		log.Println("algo.Asset.BaseBalance", algo.Asset.BaseBalance)
 	}).On(bitmex.BitmexWSOrder, func(newOrders []*swagger.Order, action string) {
 		orders = bitmex.UpdateLocalOrders(orders, newOrders)
 	}).On(bitmex.BitmexWSPosition, func(positions []*swagger.Position, action string) {
 		position := positions[0]
-		quantity = float64(position.CurrentQty)
-		if math.Abs(quantity) > 0 && position.AvgCostPrice > 0 {
-			averageCost = position.AvgCostPrice
+		algo.Asset.Quantity = float64(position.CurrentQty)
+		if math.Abs(algo.Asset.Quantity) > 0 && position.AvgCostPrice > 0 {
+			algo.Asset.AverageCost = position.AvgCostPrice
 		} else if position.CurrentQty == 0 {
-			averageCost = 0
+			algo.Asset.AverageCost = 0
 		}
-		log.Println("AvgCostPrice", averageCost, "Quantity", quantity)
+		log.Println("AvgCostPrice", algo.Asset.AverageCost, "Quantity", algo.Asset.Quantity)
 	}).On(bitmex.BitmexWSQuoteBin1m, func(bins []*swagger.Quote, action string) {
 		for _, bin := range bins {
 			log.Println(bin.BidPrice)
-			price = bin.BidPrice
-			buyOrders, sellOrders := rebalance(price, averageCost, quantity)
-			b.PlaceOrdersOnBook(config.Symbol, buyOrders, sellOrders, orders)
+			algo.rebalance(bin.BidPrice)
+			b.PlaceOrdersOnBook(config.Symbol, algo.BuyOrders, algo.SellOrders, orders)
 			updateAlgo(fireDB, "mm")
 		}
 	})
