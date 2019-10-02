@@ -16,7 +16,7 @@ func connect(settingsFile string, secret bool) {
 	algo := Algo{
 		Asset: Asset{
 			BaseBalance: 1.0,
-			Quantity:    220.0,
+			Quantity:    0,
 			AverageCost: 0.0,
 			MaxOrders:   10,
 			MaxLeverage: 0.2,
@@ -69,6 +69,8 @@ func connect(settingsFile string, secret bool) {
 		for _, bin := range bins {
 			log.Println(bin.BidPrice)
 			algo.rebalance(bin.BidPrice)
+			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, algo.Asset.Buying*algo.Asset.Quantity)
+			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, algo.Asset.Selling*algo.Asset.Quantity)
 			b.PlaceOrdersOnBook(config.Symbol, algo.BuyOrders, algo.SellOrders, orders)
 			updateAlgo(fireDB, "mm")
 		}
