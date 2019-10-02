@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"math"
 
 	"github.com/block26/exchanges/models"
@@ -13,11 +12,13 @@ type Asset struct {
 	AverageCost float64
 	Profit      float64
 	Fee         float64
-	MinTickSize float64
+	TickSize    float64
 	Delta       float64
 	Buying      float64
 	Selling     float64
 	MaxOrders   int32
+	Leverage    float64
+	MaxLeverage float64
 }
 
 type Algo struct {
@@ -33,41 +34,40 @@ type Algo struct {
 	ExitSpread      float64
 	ExitConfidence  float64
 	Liquidity       float64
-	MaxLeverage     float64
 }
 
 func (a *Algo) rebalance(price float64) {
-	liquid := 0.05 //Defined as btc but will be % in the future
 	// Create Buy Orders
-	a.Asset.Buying = liquid * price
+	a.Asset.Buying = a.Liquidity * a.Asset.BaseBalance // * price
 	if a.Asset.Quantity < 0 {
-		a.Asset.Buying = a.Asset.Buying + math.Abs(a.Asset.Quantity)
+		a.Asset.Buying = a.Asset.Buying + (math.Abs(a.Asset.Quantity) / price)
 		startBuyPrice := price
-		if a.Asset.AverageCost < price {
-			startBuyPrice = a.Asset.AverageCost
+		if a.Asset.Leverage < a.Asset.MaxLeverage {
+			if a.Asset.AverageCost < price {
+				startBuyPrice = a.Asset.AverageCost
+			}
 		}
-		a.BuyOrders = createSpread(1, 2, startBuyPrice, 0.005, 2, a.Asset.MaxOrders)
+		a.BuyOrders = createSpread(1, a.ExitConfidence, startBuyPrice, a.ExitSpread, a.Asset.TickSize, a.Asset.MaxOrders)
 	} else {
-		a.BuyOrders = createSpread(1, 2, price, 0.01, 2, a.Asset.MaxOrders)
+		a.BuyOrders = createSpread(1, a.EntryConfidence, price, a.EntrySpread, a.Asset.TickSize, a.Asset.MaxOrders)
 	}
-	log.Println("Placing", a.Asset.Buying, "on bid")
-	a.BuyOrders.Quantity = mulArr(a.BuyOrders.Quantity, a.Asset.Buying)
+	// buyOrders.Quantity = mulArr(buyOrders.Quantity, buying)
 
 	// Create Sell orders
-	a.Asset.Selling = liquid * price
+	a.Asset.Selling = a.Liquidity * a.Asset.BaseBalance // * price
 	if a.Asset.Quantity > 0 {
-		a.Asset.Selling = a.Asset.Selling + a.Asset.Quantity
+		a.Asset.Selling = a.Asset.Selling + (a.Asset.Quantity / price)
 		startSellPrice := price
-		if a.Asset.AverageCost > price {
-			startSellPrice = a.Asset.AverageCost
+		if a.Asset.Leverage < a.Asset.MaxLeverage {
+			if a.Asset.AverageCost > price {
+				startSellPrice = a.Asset.AverageCost
+			}
 		}
-		a.SellOrders = createSpread(-1, 0.1, startSellPrice, 0.005, 2, a.Asset.MaxOrders)
+		a.SellOrders = createSpread(-1, a.ExitConfidence, startSellPrice, a.ExitSpread, a.Asset.TickSize, a.Asset.MaxOrders)
 	} else {
-		a.SellOrders = createSpread(-1, 2, price, 0.01, 2, a.Asset.MaxOrders)
+		a.SellOrders = createSpread(-1, a.EntryConfidence, price, a.EntrySpread, a.Asset.TickSize, a.Asset.MaxOrders)
 	}
 
-	log.Println("Placing", a.Asset.Selling, "on ask")
-	a.SellOrders.Quantity = mulArr(a.SellOrders.Quantity, a.Asset.Selling)
+	// sellOrders.Quantity = mulArr(sellOrders.Quantity, selling)
 
-	// return a.BuyOrders, a.SellOrders
 }

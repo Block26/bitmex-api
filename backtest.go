@@ -16,7 +16,6 @@ import (
 )
 
 var history models.History
-var algo Algo
 
 // var minimumOrderSize = 25
 
@@ -64,16 +63,19 @@ func runBacktest() {
 	algo := Algo{
 		Asset: Asset{
 			BaseBalance: 1.0,
-			Quantity:    220.0,
+			Quantity:    0,
 			AverageCost: 0.0,
 			MaxOrders:   15,
+			MaxLeverage: 0.2,
+			TickSize:    2,
 		},
+		Debug:           true,
+		Futures:         true,
 		EntrySpread:     0.05,
 		EntryConfidence: 1,
-		ExitSpread:      0.03,
-		ExitConfidence:  0.1,
+		ExitSpread:      0.005,
+		ExitConfidence:  1,
 		Liquidity:       0.1,
-		MaxLeverage:     0.2,
 	}
 	// entrySpread=0.005012, exitSpread=0.029661, entryConfidence=1.610416, exitConfidence=0.444074, liquidity=0.249863
 
@@ -89,7 +91,7 @@ func runBacktest() {
 }
 
 func print(index string, msg string) {
-	if algo.Debug {
+	if false {
 		fmt.Println(index, msg)
 	}
 }
@@ -112,44 +114,16 @@ func runSingleTest(data []*models.Bar, algo Algo) float64 {
 		algo.rebalance(bar.Open)
 		//Check which buys filled
 		pricesFilled, ordersFilled := getFilledBidOrders(algo.BuyOrders.Price, algo.BuyOrders.Quantity, bar.Low)
-		fillCost, fillPercentage := getCostAverage(pricesFilled, ordersFilled)
-		updateBalance(fillCost, algo.Asset.Buying*fillPercentage)
+		fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
+		algo.updateBalance(fillCost, algo.Asset.Buying*fillPercentage)
 
 		//Check which sells filled
 		pricesFilled, ordersFilled = getFilledAskOrders(algo.SellOrders.Price, algo.SellOrders.Quantity, bar.High)
-		fillCost, fillPercentage = getCostAverage(pricesFilled, ordersFilled)
-		updateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
-
-		// liquidPerBar := algo.Liquidity * algo.Asset.BaseBalance
-		// // Delta Target Strategy
-		// targetDelta := 0.6
-		// pValue := algo.Asset.Quantity * algo.Asset.AverageCost
-		// delta := pValue / (algo.Asset.BaseBalance + pValue)
-
-		// buyOrders := createSpread(1, algo.EntryConfidence, bar.Open, algo.EntrySpread, algo.MinTickSize, algo.MaxOrders)
-		// buying := liquidPerBar
-		// if delta < targetDelta {
-		// 	buying = buying + (targetDelta - delta)
-		// }
-		// // print(index, fmt.Sprintf("buying %0.4f", buying))
-		// buying = buying / bar.Open
-		// pricesFilled, ordersFilled := getFilledBidOrders(buyOrders.Price, buyOrders.Quantity, bar.Low)
-		// fillCost, fillPercentage := getCostAverage(pricesFilled, ordersFilled)
-		// updateBalance(fillCost, buying*fillPercentage)
-
-		// sellOrders := createSpread(-1, algo.EntryConfidence, bar.Open, algo.EntrySpread, algo.MinTickSize, algo.MaxOrders)
-		// selling := liquidPerBar
-		// if delta > targetDelta {
-		// 	selling = selling + (delta - targetDelta)
-		// }
-		// // print(index, fmt.Sprintf("selling %0.4f", selling))
-		// selling = selling / bar.Open
-		// pricesFilled, ordersFilled = getFilledAskOrders(sellOrders.Price, sellOrders.Quantity, bar.High)
-		// fillCost, fillPercentage = getCostAverage(pricesFilled, ordersFilled)
-		// updateBalance(fillCost, selling*-fillPercentage)
+		fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
+		algo.updateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
 
 		// updateBalanceXBTStrat(bar)
-		logState(bar.Open)
+		algo.logState(bar.Open)
 		// history.Balance[len(history.Balance)-1], == portfolio value
 		portfolioValue := history.Balance[len(history.Balance)-1]
 		print(index, fmt.Sprintf("Balance %.2f | Delta %0.2f | BTC %0.2f | DCR %.2f | Price %.5f - Cost %.5f", portfolioValue, algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, bar.Open, algo.Asset.AverageCost))
@@ -178,7 +152,7 @@ func runSingleTest(data []*models.Bar, algo Algo) float64 {
 	return history.Balance[len(history.Balance)-1] / (maxLeverage + 1)
 }
 
-func logState(price float64) {
+func (algo *Algo) logState(price float64) {
 	if algo.Futures {
 		history.Balance = append(history.Balance, algo.Asset.BaseBalance)
 	} else {
@@ -190,11 +164,11 @@ func logState(price float64) {
 
 	leverage := (math.Abs(algo.Asset.Quantity) / price) / algo.Asset.BaseBalance
 	history.Leverage = append(history.Leverage, leverage)
-	algo.Asset.Profit = currentProfit(price) * leverage
+	algo.Asset.Profit = algo.currentProfit(price) * leverage
 	history.Profit = append(history.Profit, algo.Asset.Profit)
 }
 
-func currentProfit(price float64) float64 {
+func (algo *Algo) currentProfit(price float64) float64 {
 	if algo.Asset.Quantity < 0 {
 		return calculateDifference(algo.Asset.AverageCost, price)
 	} else {
@@ -202,7 +176,7 @@ func currentProfit(price float64) float64 {
 	}
 }
 
-func updateBalance(fillCost float64, fillAmount float64) {
+func (algo *Algo) updateBalance(fillCost float64, fillAmount float64) {
 	if math.Abs(fillAmount) > 0 {
 		newQuantity := fillCost * fillAmount
 		// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
@@ -251,7 +225,7 @@ func calculateDifference(x float64, y float64) float64 {
 	return (x - y) / y
 }
 
-func getCostAverage(pricesFilled []float64, ordersFilled []float64) (float64, float64) {
+func (algo *Algo) getCostAverage(pricesFilled []float64, ordersFilled []float64) (float64, float64) {
 	// print(len(prices), len(orders), len(index_arr[0]))
 	percentageFilled := sumArr(ordersFilled)
 	if percentageFilled > 0 {

@@ -19,13 +19,13 @@ func connect(settingsFile string, secret bool) {
 			Quantity:    220.0,
 			AverageCost: 0.0,
 			MaxOrders:   10,
+			MaxLeverage: 0.2,
 		},
 		EntrySpread:     0.05,
 		EntryConfidence: 1,
 		ExitSpread:      0.03,
 		ExitConfidence:  0.1,
 		Liquidity:       0.1,
-		MaxLeverage:     0.2,
 	}
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	fireDB := setupFirebase()
