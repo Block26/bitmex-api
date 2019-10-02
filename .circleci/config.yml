@@ -41,7 +41,7 @@ workflows:
           dockerfile: ~/project/build/Dockerfile
           path: ~/project/build
           profile-name: b26
-          repo: mm-test
+          repo: mm
           tag: '${CIRCLE_SHA1}'
       - aws-ecs/deploy-service-update:
           context: AWS-ECS
@@ -49,7 +49,8 @@ workflows:
             - aws-ecr/build-and-push-image
           family: "MM-service"
           cluster-name: "MM-cluster"
-          container-image-name-updates: "container=MM-Latest,image=mm-test,tag=${CIRCLE_SHA1}"
+          container-image-name-updates: "container=MM-Latest,image=mm,tag=${CIRCLE_SHA1}"
+          verify-revision-is-deployed: true
 
 
 
