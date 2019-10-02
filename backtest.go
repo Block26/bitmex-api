@@ -19,7 +19,7 @@ var history models.History
 
 // var minimumOrderSize = 25
 
-func runBacktest() {
+func (algo *Algo) runBacktest() {
 	log.Println("Loading Data... ")
 	dataFile, err := os.OpenFile("./1m.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
@@ -60,23 +60,6 @@ func runBacktest() {
 	// }
 
 	//DCRBTC
-	algo := Algo{
-		Asset: Asset{
-			BaseBalance: 1.0,
-			Quantity:    0,
-			AverageCost: 0.0,
-			MaxOrders:   15,
-			MaxLeverage: 0.2,
-			TickSize:    2,
-		},
-		Debug:           true,
-		Futures:         true,
-		EntrySpread:     0.05,
-		EntryConfidence: 1,
-		ExitSpread:      0.005,
-		ExitConfidence:  1,
-		Liquidity:       0.1,
-	}
 	// entrySpread=0.005012, exitSpread=0.029661, entryConfidence=1.610416, exitConfidence=0.444074, liquidity=0.249863
 
 	// algo := MMConfig{BaseBalance:1,Quantity:0,AverageCost:0, MaxOrders:20,
@@ -96,7 +79,7 @@ func print(index string, msg string) {
 	}
 }
 
-func runSingleTest(data []*models.Bar, algo Algo) float64 {
+func runSingleTest(data []*models.Bar, algo *Algo) float64 {
 	start := time.Now()
 	// starting_algo.Asset.BaseBalance := 0
 	index := ""
@@ -144,7 +127,6 @@ func runSingleTest(data []*models.Bar, algo Algo) float64 {
 	drawdown, maxProfit := MinMax(history.Profit)
 	log.Printf("Max Profit %0.4f \n", maxProfit)
 	log.Printf("Max Drawdown %0.4f \n", drawdown)
-
 	log.Println("Execution Speed", elapsed)
 	config, _ := json.Marshal(algo)
 	log.Println(string(config))

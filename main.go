@@ -10,16 +10,34 @@ import (
 )
 
 func main() {
+	algo := Algo{
+		Asset: Asset{
+			BaseBalance: 1.0,
+			Quantity:    0,
+			AverageCost: 0.0,
+			MaxOrders:   15,
+			MaxLeverage: 0.2,
+			TickSize:    2,
+		},
+		Debug:           true,
+		Futures:         true,
+		EntrySpread:     0.05,
+		EntryConfidence: 1,
+		ExitSpread:      0.01,
+		ExitConfidence:  1,
+		Liquidity:       0.1,
+	}
+
 	if len(os.Args) > 1 {
 		if os.Args[1] == "live" {
-			connect("settings/sample_config.json", false)
+			algo.connect("settings/sample_config.json", false)
 			// connect("dev/mm/testnet", true)
 		} else {
 			log.Println("RUN A BACKTEST")
-			runBacktest()
+			algo.runBacktest()
 		}
 	} else {
 		log.Println("RUN A BACKTEST")
-		runBacktest()
+		algo.runBacktest()
 	}
 }
