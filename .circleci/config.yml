@@ -41,7 +41,7 @@ workflows:
           dockerfile: ~/project/build/Dockerfile
           path: ~/project/build
           profile-name: b26
-          repo: mm
+          repo: mm-test
           tag: '${CIRCLE_SHA1}'
       - aws-ecs/deploy-service-update:
           context: AWS-ECS
