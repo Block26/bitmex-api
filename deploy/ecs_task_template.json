@@ -1,0 +1,33 @@
+{
+    "family": "ALGO_NAME-service",
+    "taskRoleArn": "arn:aws:iam::911053277385:role/ecsTaskExecutionRole",
+    "executionRoleArn": "arn:aws:iam::911053277385:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "volumes": [],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "512",
+    "memory": "1024",
+    "containerDefinitions": [
+        {
+            "name": "MM-Latest",
+            "image": "mm:latest",
+            "cpu": 512,
+            "portMappings": [],
+            "essential": true,
+            "environment": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/MM-service",
+                    "awslogs-region": "us-west-1",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            }
+        }
+    ]
+}
