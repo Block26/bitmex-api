@@ -49,7 +49,7 @@ workflows:
             - aws-ecr/build-and-push-image
           family: "MM-service"
           cluster-name: "MM-cluster"
-          container-image-name-updates: "container=MM-Latest,tag=${CIRCLE_SHA1}"
+          container-image-name-updates: "container=MM-Latest,image=mm-test,tag=${CIRCLE_SHA1}"
 
 
 
