@@ -38,7 +38,7 @@ func (algo *Algo) connect(settingsFile string, secret bool) {
 	}
 
 	b.On(bitmex.BitmexWSWallet, func(wallet []*swagger.Wallet, action string) {
-		algo.Asset.BaseBalance = float64(wallet[len(wallet)-1].Amount)
+		algo.Asset.BaseBalance = float64(wallet[len(wallet)-1].Amount) * 0.00000001
 		log.Println("algo.Asset.BaseBalance", algo.Asset.BaseBalance)
 	}).On(bitmex.BitmexWSOrder, func(newOrders []*swagger.Order, action string) {
 		orders = bitmex.UpdateLocalOrders(orders, newOrders)
