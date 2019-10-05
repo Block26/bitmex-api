@@ -54,12 +54,6 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo)) {
 
 }
 
-func print(index string, msg string) {
-	if false {
-		fmt.Println(index, msg)
-	}
-}
-
 func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
 	start := time.Now()
 	// starting_algo.Asset.BaseBalance := 0
@@ -89,8 +83,7 @@ func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)
 		// updateBalanceXBTStrat(bar)
 		algo.logState(bar.Open)
 		// history.Balance[len(history.Balance)-1], == portfolio value
-		portfolioValue := history.Balance[len(history.Balance)-1]
-		print(index, fmt.Sprintf("Balance %.2f | Delta %0.2f | BTC %0.2f | DCR %.2f | Price %.5f - Cost %.5f", portfolioValue, algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, bar.Open, algo.Asset.AverageCost))
+		// portfolioValue := history.Balance[len(history.Balance)-1]
 	}
 
 	elapsed := time.Since(start)
@@ -125,10 +118,13 @@ func (algo *Algo) logState(price float64) {
 	history.Quantity = append(history.Quantity, algo.Asset.Quantity)
 	history.AverageCost = append(history.AverageCost, algo.Asset.AverageCost)
 
-	leverage := (math.Abs(algo.Asset.Quantity) / price) / algo.Asset.BaseBalance
-	history.Leverage = append(history.Leverage, leverage)
-	algo.Asset.Profit = algo.CurrentProfit(price) * leverage
+	algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity) / price) / algo.Asset.BaseBalance
+	history.Leverage = append(history.Leverage, algo.Asset.Leverage)
+	algo.Asset.Profit = algo.CurrentProfit(price) * algo.Asset.Leverage
 	history.Profit = append(history.Profit, algo.Asset.Profit)
+	if algo.Debug {
+		fmt.Print(fmt.Sprintf("Delta %0.2f | BTC %0.2f | USD %.2f | Price %.5f - Cost %.5f \n", algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, price, algo.Asset.AverageCost))
+	}
 }
 
 func (algo *Algo) CurrentProfit(price float64) float64 {
