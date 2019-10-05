@@ -41,6 +41,10 @@ github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/block26/exchanges v0.0.0-20190920200622-23118f98fdc4 h1:6l38JHzcFNg+r/kV8Z7QnPkNgAkJyIJvOSPdS23QK2s=
 github.com/block26/exchanges v0.0.0-20190920200622-23118f98fdc4/go.mod h1:QygvAnTSh896ndSTnwDnchuPozCCIygmohs1z8D3hLo=
+github.com/block26/tradeapi v0.0.0-20191004154604-072d1fafa4f8 h1:nr1h8s0vyp3ssyTDIt/VJO5aBdKToeIiIFv0kwTsdWc=
+github.com/block26/tradeapi v0.0.0-20191004154604-072d1fafa4f8/go.mod h1:IwubLGutoAhgazOqvuaL8456pW6CPK75p6fy8GOZV5w=
+github.com/block26/tradeapi v0.0.0-20191005224055-91ceba7c8ec2 h1:cZtROwT1xMcCk9xPBBJx0eStWX8AVAnCsu1CGo4dHpA=
+github.com/block26/tradeapi v0.0.0-20191005224055-91ceba7c8ec2/go.mod h1:8iR4pxfDD3CfAx5eSEnmUejXWX3Huol7km+rNf/pjrk=
 github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9 h1:xz6Nv3zcwO2Lila35hcb0QloCQsc38Al13RNEzWRpX4=
 github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9/go.mod h1:2wSM9zJkl1UQEFZgSd68NfCgRz1VL1jzy/RjCg+ULrs=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
@@ -190,8 +194,6 @@ github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c/go.mod h1:lB8K/P019DLNhe
 github.com/xdg/stringprep v1.0.0/go.mod h1:Jhud4/sHMO4oL310DaZAKk9ZaJ08SJfe+sJh0HrGL1Y=
 github.com/zmxv/bitmexgo v0.0.0-20190804192702-ee6830406f7e h1:mZUgnCW3KQt7zbkEw6xF2lN1gL9QGENFCie8x26Ol3I=
 github.com/zmxv/bitmexgo v0.0.0-20190804192702-ee6830406f7e/go.mod h1:k3T33JLcW8imXOjtI57kw6HI53Q2yB9ld2cLlocc8Mk=
-gitlab.com/raedah/tradeapi v0.0.0-20191004154604-072d1fafa4f8 h1:nr1h8s0vyp3ssyTDIt/VJO5aBdKToeIiIFv0kwTsdWc=
-gitlab.com/raedah/tradeapi v0.0.0-20191004154604-072d1fafa4f8/go.mod h1:IwubLGutoAhgazOqvuaL8456pW6CPK75p6fy8GOZV5w=
 go.opencensus.io v0.20.1/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.20.2/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.21.0 h1:mU6zScU4U1YAFPHEHYk+3JC4SY7JxgkqS10ZOSyksNg=

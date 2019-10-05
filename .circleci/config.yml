@@ -15,7 +15,6 @@ jobs:
       - run: printf "[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig
       - run: printf "[url \"git@gitlab.com:\"]\n\tinsteadOf = https://gitlab.com/" >> /root/.gitconfig
       - run: export GOPRIVATE=github.com/block26/*
-      - run: export GOPRIVATE=gitlab.com/raedah/*
       - run: go mod download
       - run: CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
       - persist_to_workspace:

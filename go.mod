@@ -8,6 +8,7 @@ require (
 	firebase.google.com/go v3.9.0+incompatible
 	github.com/aws/aws-sdk-go v1.24.0
 	github.com/block26/exchanges v0.0.0-20190920200622-23118f98fdc4
+	github.com/block26/tradeapi v0.0.0-20191005224055-91ceba7c8ec2 // indirect
 	github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gocarina/gocsv v0.0.0-20190821091544-020a928c6f4e
@@ -17,7 +18,6 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/stretchr/testify v1.4.0 // indirect
 	github.com/tidwall/gjson v1.3.2
-	gitlab.com/raedah/tradeapi v0.0.0-20191004154604-072d1fafa4f8 // indirect
 	go.opencensus.io v0.22.1 // indirect
 	golang.org/x/exp v0.0.0-20190912063710-ac5d2bfcbfe0 // indirect
 	golang.org/x/net v0.0.0-20190918130420-a8b05e9114ab
