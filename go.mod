@@ -17,6 +17,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/stretchr/testify v1.4.0 // indirect
 	github.com/tidwall/gjson v1.3.2
+	gitlab.com/raedah/tradeapi v0.0.0-20191004154604-072d1fafa4f8 // indirect
 	go.opencensus.io v0.22.1 // indirect
 	golang.org/x/exp v0.0.0-20190912063710-ac5d2bfcbfe0 // indirect
 	golang.org/x/net v0.0.0-20190918130420-a8b05e9114ab
@@ -27,6 +28,7 @@ require (
 	google.golang.org/appengine v1.6.2 // indirect
 	google.golang.org/genproto v0.0.0-20190916214212-f660b8655731 // indirect
 	google.golang.org/grpc v1.23.1 // indirect
+
 )
 
 //replace github.com/block26/exchanges => ../../block26/exchanges

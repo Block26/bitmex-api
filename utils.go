@@ -1,4 +1,4 @@
-package main
+package algo
 
 import (
 	"encoding/json"
@@ -29,7 +29,7 @@ func loadConfiguration(file string, secret bool) settings.Config {
 	}
 }
 
-func createSpread(weight int32, confidence float64, price float64, spread float64, tickSize float64, maxOrders int32) models.OrderArray {
+func CreateSpread(weight int32, confidence float64, price float64, spread float64, tickSize float64, maxOrders int32) models.OrderArray {
 	xStart := 0.0
 	if weight == 1 {
 		xStart = price - (price * spread)

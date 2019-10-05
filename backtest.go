@@ -1,4 +1,4 @@
-package main
+package algo
 
 import (
 	"fmt"
@@ -19,9 +19,14 @@ var history models.History
 
 // var minimumOrderSize = 25
 
-func (algo *Algo) runBacktest() {
+func RunBacktest(a Algo, rebalance func(float64, *Algo)) {
 	log.Println("Loading Data... ")
-	dataFile, err := os.OpenFile("./1m.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(dir + "/1m.csv")
+	dataFile, err := os.OpenFile(dir+"/1m.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
@@ -43,31 +48,7 @@ func (algo *Algo) runBacktest() {
 	}
 	fmt.Printf("barSize %.2f \n", barSize)
 
-	// {"BaseBalance":133.19306310441956,"Quantity":150586.2208447658,"AverageCost":10416.870228463727,"MaxOrders":20,"EntrySpread":0.007091541970168746,"EntryConfidence":2.8463638315235507,"ExitSpread":0.028536544770263263,"ExitConfidence":0.5240603560083594,"Liquidity":0.21034473882199728}
-
-	// XBTUSD
-	// algo := models.MMConfig{
-	// 	BaseBalance: 1.0,
-	// 	Quantity: 0.0,
-	// 	AverageCost: 0.0,
-	// 	MaxOrders: 15.0,
-	// 	EntrySpread: 0.02,
-	// 	EntryConfidence: 2,
-	// 	ExitSpread: 0.02,
-	// 	ExitConfidence: 0.1,
-	// 	Liquidity: 0.03,
-	// 	MaxLeverage: 0.2,
-	// }
-
-	//DCRBTC
-	// entrySpread=0.005012, exitSpread=0.029661, entryConfidence=1.610416, exitConfidence=0.444074, liquidity=0.249863
-
-	// algo := MMConfig{BaseBalance:1,Quantity:0,AverageCost:0, MaxOrders:20,
-	// 	EntrySpread:0.005012,EntryConfidence:1.610416,
-	// 	ExitSpread:0.029661,ExitConfidence:0.444074,
-	// 	Liquidity:0.249863}
-
-	score := runSingleTest(bars, algo)
+	score := runSingleTest(bars, a, rebalance)
 	log.Println("Score", score)
 	// optimize(bars)
 
@@ -79,7 +60,7 @@ func print(index string, msg string) {
 	}
 }
 
-func runSingleTest(data []*models.Bar, algo *Algo) float64 {
+func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
 	start := time.Now()
 	// starting_algo.Asset.BaseBalance := 0
 	index := ""
@@ -94,16 +75,16 @@ func runSingleTest(data []*models.Bar, algo *Algo) float64 {
 		}
 		index = bar.Timestamp
 
-		algo.rebalance(bar.Open)
+		rebalance(bar.Open, &algo)
 		//Check which buys filled
 		pricesFilled, ordersFilled := getFilledBidOrders(algo.BuyOrders.Price, algo.BuyOrders.Quantity, bar.Low)
 		fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
-		algo.updateBalance(fillCost, algo.Asset.Buying*fillPercentage)
+		algo.UpdateBalance(fillCost, algo.Asset.Buying*fillPercentage)
 
 		//Check which sells filled
 		pricesFilled, ordersFilled = getFilledAskOrders(algo.SellOrders.Price, algo.SellOrders.Quantity, bar.High)
 		fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
-		algo.updateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
+		algo.UpdateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
 
 		// updateBalanceXBTStrat(bar)
 		algo.logState(bar.Open)
@@ -146,11 +127,11 @@ func (algo *Algo) logState(price float64) {
 
 	leverage := (math.Abs(algo.Asset.Quantity) / price) / algo.Asset.BaseBalance
 	history.Leverage = append(history.Leverage, leverage)
-	algo.Asset.Profit = algo.currentProfit(price) * leverage
+	algo.Asset.Profit = algo.CurrentProfit(price) * leverage
 	history.Profit = append(history.Profit, algo.Asset.Profit)
 }
 
-func (algo *Algo) currentProfit(price float64) float64 {
+func (algo *Algo) CurrentProfit(price float64) float64 {
 	if algo.Asset.Quantity < 0 {
 		return calculateDifference(algo.Asset.AverageCost, price)
 	} else {
@@ -158,7 +139,8 @@ func (algo *Algo) currentProfit(price float64) float64 {
 	}
 }
 
-func (algo *Algo) updateBalance(fillCost float64, fillAmount float64) {
+func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
+	// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		newQuantity := fillCost * fillAmount
 		// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)

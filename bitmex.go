@@ -1,4 +1,4 @@
-package main
+package algo
 
 import (
 	"log"
@@ -11,7 +11,7 @@ import (
 
 var config settings.Config
 
-func (algo Algo) connect(settingsFile string, secret bool) {
+func (algo Algo) Connect(settingsFile string, secret bool, rebalance func(float64, Algo) Algo) {
 	config = loadConfiguration(settingsFile, secret)
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	fireDB := setupFirebase()
@@ -54,7 +54,7 @@ func (algo Algo) connect(settingsFile string, secret bool) {
 	}).On(bitmex.BitmexWSQuoteBin1m, func(bins []*swagger.Quote, action string) {
 		for _, bin := range bins {
 			log.Println(bin.BidPrice)
-			algo.rebalance(bin.BidPrice)
+			algo = rebalance(bin.BidPrice, algo)
 			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * bin.BidPrice))
 			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * bin.BidPrice))
 			b.PlaceOrdersOnBook(config.Symbol, algo.BuyOrders, algo.SellOrders, orders)
