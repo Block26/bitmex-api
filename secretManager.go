@@ -17,7 +17,7 @@ func getSecret(secretName string) string {
 	// region := "us-west-1"
 
 	//Create a Secrets Manager client
-	svc := secretsmanager.New(session.New())
+	svc := secretsmanager.New(session.New(), aws.NewConfig().WithRegion("us-west-1"))
 	input := &secretsmanager.GetSecretValueInput{
 		SecretId:     aws.String(secretName),
 		VersionStage: aws.String("AWSCURRENT"), // VersionStage defaults to AWSCURRENT if unspecified
