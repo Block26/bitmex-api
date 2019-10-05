@@ -11,7 +11,7 @@ import (
 
 var config settings.Config
 
-func (algo *Algo) connect(settingsFile string, secret bool) {
+func (algo Algo) connect(settingsFile string, secret bool) {
 	config = loadConfiguration(settingsFile, secret)
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	fireDB := setupFirebase()
