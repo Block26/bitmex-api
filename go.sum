@@ -41,10 +41,6 @@ github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/block26/exchanges v0.0.0-20190920200622-23118f98fdc4 h1:6l38JHzcFNg+r/kV8Z7QnPkNgAkJyIJvOSPdS23QK2s=
 github.com/block26/exchanges v0.0.0-20190920200622-23118f98fdc4/go.mod h1:QygvAnTSh896ndSTnwDnchuPozCCIygmohs1z8D3hLo=
-github.com/block26/tradeapi v0.0.0-20191004154604-072d1fafa4f8 h1:nr1h8s0vyp3ssyTDIt/VJO5aBdKToeIiIFv0kwTsdWc=
-github.com/block26/tradeapi v0.0.0-20191004154604-072d1fafa4f8/go.mod h1:IwubLGutoAhgazOqvuaL8456pW6CPK75p6fy8GOZV5w=
-github.com/block26/tradeapi v0.0.0-20191005224055-91ceba7c8ec2 h1:cZtROwT1xMcCk9xPBBJx0eStWX8AVAnCsu1CGo4dHpA=
-github.com/block26/tradeapi v0.0.0-20191005224055-91ceba7c8ec2/go.mod h1:8iR4pxfDD3CfAx5eSEnmUejXWX3Huol7km+rNf/pjrk=
 github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9 h1:xz6Nv3zcwO2Lila35hcb0QloCQsc38Al13RNEzWRpX4=
 github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9/go.mod h1:2wSM9zJkl1UQEFZgSd68NfCgRz1VL1jzy/RjCg+ULrs=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
