@@ -3,11 +3,19 @@ package algo
 import (
 	"context"
 	"log"
+	"runtime"
 	"time"
+
+	"path/filepath"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/db"
 	"google.golang.org/api/option"
+)
+
+var (
+	_, b, _, _ = runtime.Caller(0)
+	basepath   = filepath.Dir(b)
 )
 
 type AlgoInfo struct {

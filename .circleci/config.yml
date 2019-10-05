@@ -30,29 +30,6 @@ workflows:
   build_test_deploy:
     jobs: 
       - build
-      - aws-ecr/build-and-push-image:
-          context: AWS-ECS
-          pre-steps:
-            - attach_workspace:
-                at: ~/project/build
-          requires:
-            - build
-          checkout: false
-          create-repo: true
-          account-url: AWS_MM_ECR_ACCOUNT_URL
-          dockerfile: ~/project/build/Dockerfile
-          path: ~/project/build
-          profile-name: b26
-          repo: mm
-          tag: '${CIRCLE_SHA1}'
-      - aws-ecs/deploy-service-update:
-          context: AWS-ECS
-          requires:
-            - aws-ecr/build-and-push-image
-          family: "MM-service"
-          cluster-name: "MM-cluster"
-          container-image-name-updates: "container=MM-Latest,tag=${CIRCLE_SHA1}"
-          verify-revision-is-deployed: true
 
 
 
