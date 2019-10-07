@@ -58,6 +58,11 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			rebalance(bin.BidPrice, &algo)
 			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * bin.BidPrice))
 			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * bin.BidPrice))
+
+			// log.Println("algo.BuyOrders.Quantity", algo.BuyOrders.Quantity)
+			// log.Println("algo.SellOrders.Quantity", algo.SellOrders.Quantity)
+			log.Println("Local order length", len(orders))
+			log.Println("New order length", len(algo.BuyOrders.Quantity), len(algo.SellOrders.Quantity))
 			b.PlaceOrdersOnBook(config.Symbol, algo.BuyOrders, algo.SellOrders, orders)
 			algo.logState(bin.BidPrice)
 			updateAlgo(fireDB, "mm")
