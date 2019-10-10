@@ -39,8 +39,14 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	}
 
 	b.On(bitmex.BitmexWSWallet, func(wallet []*swagger.Wallet, action string) {
-		algo.Asset.BaseBalance = float64(wallet[len(wallet)-1].Amount) * 0.00000001
-		log.Println("algo.Asset.BaseBalance", algo.Asset.BaseBalance)
+		walletAmount := float64(wallet[len(wallet)-1].Amount)
+		if walletAmount > 0 {
+			algo.Asset.BaseBalance = walletAmount * 0.00000001
+			log.Println("algo.Asset.BaseBalance", algo.Asset.BaseBalance)
+		} else {
+			// TODO if it returns zero, query again after a set amount of time
+			log.Println("Error with wallet amount, Wallet returned 0")
+		}
 	}).On(bitmex.BitmexWSOrder, func(newOrders []*swagger.Order, action string) {
 		orders = bitmex.UpdateLocalOrders(orders, newOrders)
 	}).On(bitmex.BitmexWSPosition, func(positions []*swagger.Position, action string) {
@@ -58,6 +64,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			rebalance(bin.BidPrice, &algo)
 			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * bin.BidPrice))
 			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * bin.BidPrice))
+			log.Println("algo.Asset.BaseBalance", algo.Asset.BaseBalance)
 			log.Println("Total Buy BTC", (algo.Asset.Buying))
 			log.Println("Total Buy USD", (algo.Asset.Buying * bin.BidPrice))
 			log.Println("Total Sell BTC", (algo.Asset.Selling))
