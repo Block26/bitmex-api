@@ -29,6 +29,14 @@ func loadConfiguration(file string, secret bool) settings.Config {
 	}
 }
 
+func (a *Algo) SetLiquidity(percentage float64) float64 {
+	if a.Futures {
+		return percentage * a.Asset.BaseBalance
+	} else {
+		return percentage * ((a.Asset.BaseBalance * a.Asset.Price) + a.Asset.Quantity)
+	}
+}
+
 func CreateSpread(weight int32, confidence float64, price float64, spread float64, tickSize float64, maxOrders int32) models.OrderArray {
 	xStart := 0.0
 	if weight == 1 {
@@ -36,20 +44,29 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	} else {
 		xStart = price
 	}
+	xStart = Round(xStart, tickSize)
 
 	xEnd := xStart + (xStart * spread)
+	xEnd = Round(xEnd, tickSize)
+
 	diff := xEnd - xStart
 
 	if diff/tickSize >= float64(maxOrders) {
-		tickSize = diff / (float64(maxOrders) - 1)
+		newTickSize := diff / (float64(maxOrders) - 1)
+		tickSize = Round(newTickSize, tickSize)
 	}
 
-	priceArr := arange(xStart, xEnd, float64(int32(tickSize)))
+	var priceArr []float64
+
+	if weight == 1 {
+		priceArr = arange(xStart, xEnd-float64(tickSize), float64(tickSize))
+	} else {
+		priceArr = arange(xStart, xEnd, float64(tickSize))
+	}
+
 	temp := divArr(priceArr, xStart)
-	// temp := (priceArr/xStart)-1
 
 	dist := expArr(temp, confidence)
-
 	normalizer := 1 / sumArr(dist)
 	orderArr := mulArr(dist, normalizer)
 	if weight == 1 {
@@ -57,6 +74,10 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	}
 
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
+}
+
+func Round(x, unit float64) float64 {
+	return math.Round(x/unit) * unit
 }
 
 func reverseArr(a []float64) []float64 {
@@ -70,7 +91,7 @@ func reverseArr(a []float64) []float64 {
 func arange(min float64, max float64, step float64) []float64 {
 	a := make([]float64, int32((max-min)/step)+1)
 	for i := range a {
-		a[i] = float64(int32(min+step)) + (float64(i) * step)
+		a[i] = float64(min+step) + (float64(i) * step)
 	}
 	return a
 }
@@ -78,7 +99,11 @@ func arange(min float64, max float64, step float64) []float64 {
 func expArr(arr []float64, exp float64) []float64 {
 	a := make([]float64, len(arr))
 	for i := range arr {
-		a[i] = exponent(arr[i]-1, exp)
+		if arr[i] > 1 {
+			a[i] = exponent(arr[i]-1, exp)
+		} else {
+			a[i] = exponent(arr[i], exp) - 1
+		}
 	}
 	return a
 }

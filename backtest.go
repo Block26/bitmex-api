@@ -68,7 +68,7 @@ func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)
 			}
 		}
 		index = bar.Timestamp
-
+		algo.Asset.Price = bar.Open
 		rebalance(bar.Open, &algo)
 		//Check which buys filled
 		pricesFilled, ordersFilled := getFilledBidOrders(algo.BuyOrders.Price, algo.BuyOrders.Quantity, bar.Low)
@@ -111,19 +111,21 @@ func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)
 func (algo *Algo) logState(price float64) {
 	if algo.Futures {
 		history.Balance = append(history.Balance, algo.Asset.BaseBalance)
+		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity) / price) / algo.Asset.BaseBalance
 	} else {
 		balance := algo.Asset.BaseBalance + (algo.Asset.Quantity * price)
+		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
+		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity)) / (algo.Asset.BaseBalance * algo.Asset.Price)
 		history.Balance = append(history.Balance, balance)
 	}
 	history.Quantity = append(history.Quantity, algo.Asset.Quantity)
 	history.AverageCost = append(history.AverageCost, algo.Asset.AverageCost)
 
-	algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity) / price) / algo.Asset.BaseBalance
 	history.Leverage = append(history.Leverage, algo.Asset.Leverage)
 	algo.Asset.Profit = algo.CurrentProfit(price) * algo.Asset.Leverage
 	history.Profit = append(history.Profit, algo.Asset.Profit)
 	if algo.Debug {
-		fmt.Print(fmt.Sprintf("Delta %0.2f | BTC %0.2f | USD %.2f | Price %.5f - Cost %.5f \n", algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, price, algo.Asset.AverageCost))
+		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Asset.BaseBalance*price+(algo.Asset.Quantity), algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, price, algo.Asset.AverageCost))
 	}
 }
 

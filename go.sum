@@ -190,6 +190,8 @@ github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c/go.mod h1:lB8K/P019DLNhe
 github.com/xdg/stringprep v1.0.0/go.mod h1:Jhud4/sHMO4oL310DaZAKk9ZaJ08SJfe+sJh0HrGL1Y=
 github.com/zmxv/bitmexgo v0.0.0-20190804192702-ee6830406f7e h1:mZUgnCW3KQt7zbkEw6xF2lN1gL9QGENFCie8x26Ol3I=
 github.com/zmxv/bitmexgo v0.0.0-20190804192702-ee6830406f7e/go.mod h1:k3T33JLcW8imXOjtI57kw6HI53Q2yB9ld2cLlocc8Mk=
+gitlab.com/raedah/tradeapi v0.0.0-20191012230305-2229330ff6c7 h1:DrkuFlDDE1OggoUUPoSb0y7VP0eStuGD9QBW9hPJzRM=
+gitlab.com/raedah/tradeapi v0.0.0-20191012230305-2229330ff6c7/go.mod h1:vOoJJN+fC4ayp6EYdke3YYeMquAHrU+IvWqc+4X09jM=
 go.opencensus.io v0.20.1/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.20.2/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.21.0 h1:mU6zScU4U1YAFPHEHYk+3JC4SY7JxgkqS10ZOSyksNg=

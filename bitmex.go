@@ -11,7 +11,7 @@ import (
 
 var config settings.Config
 
-func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo)) {
+func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo)) {
 	config = loadConfiguration(settingsFile, secret)
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	log.Println(config)
@@ -61,6 +61,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	}).On(bitmex.BitmexWSQuoteBin1m, func(bins []*swagger.Quote, action string) {
 		for _, bin := range bins {
 			log.Println(bin.BidPrice)
+			algo.Asset.Price = bin.BidPrice
 			rebalance(bin.BidPrice, &algo)
 			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * bin.BidPrice))
 			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * bin.BidPrice))

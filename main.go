@@ -9,18 +9,21 @@ import (
 )
 
 type Asset struct {
-	BaseBalance float64
-	Quantity    float64
-	AverageCost float64
-	Profit      float64
-	Fee         float64
-	TickSize    float64
-	Delta       float64
-	Buying      float64
-	Selling     float64
-	MaxOrders   int32
-	Leverage    float64
-	MaxLeverage float64
+	Symbol           string
+	BaseBalance      float64
+	Quantity         float64
+	AverageCost      float64
+	Price            float64
+	Profit           float64
+	Fee              float64
+	TickSize         float64
+	Delta            float64
+	Buying           float64
+	Selling          float64
+	MaxOrders        int32
+	Leverage         float64
+	MaxLeverage      float64
+	MinimumOrderSize float64
 }
 
 type Algo struct {
