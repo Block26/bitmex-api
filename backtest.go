@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"encoding/json"
 	"unsafe"
 
 	"github.com/block26/TheAlgoV2/models"
@@ -15,11 +14,11 @@ import (
 	"github.com/gocarina/gocsv"
 )
 
-var history models.History
+var history []models.History
 
 // var minimumOrderSize = 25
 
-func RunBacktest(a Algo, rebalance func(float64, *Algo)) {
+func RunBacktest(a Algo, rebalance func(float64, *Algo), setup func(*Algo, []*models.Bar)) {
 	log.Println("Loading Data... ")
 	dir, err := os.Getwd()
 	if err != nil {
@@ -47,7 +46,7 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo)) {
 
 	}
 	fmt.Printf("barSize %.2f \n", barSize)
-
+	setup(&a, bars)
 	score := runSingleTest(bars, a, rebalance)
 	log.Println("Score", score)
 	// optimize(bars)
@@ -57,17 +56,19 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo)) {
 func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
 	start := time.Now()
 	// starting_algo.Asset.BaseBalance := 0
-	index := ""
+	timestamp := ""
+	idx := 0
 	log.Println("Running", len(data), "bars")
 	for _, bar := range data {
-		if index == "" {
+		if timestamp == "" {
 			log.Println("Start Timestamp", bar.Timestamp)
 			// 	//Set average cost if starting with a quote balance
 			if algo.Asset.Quantity > 0 {
 				algo.Asset.AverageCost = bar.Close
 			}
 		}
-		index = bar.Timestamp
+		timestamp = bar.Timestamp
+		algo.Index = idx
 		algo.Asset.Price = bar.Open
 		rebalance(bar.Open, &algo)
 		//Check which buys filled
@@ -81,51 +82,79 @@ func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)
 		algo.UpdateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
 
 		// updateBalanceXBTStrat(bar)
-		algo.logState(bar.Open)
+		algo.logState(timestamp)
 		// history.Balance[len(history.Balance)-1], == portfolio value
 		// portfolioValue := history.Balance[len(history.Balance)-1]
+		idx += 1
 	}
 
 	elapsed := time.Since(start)
-	log.Println("End Timestamp", index)
-	min, max := MinMax(history.Quantity)
-	_, maxLeverage := MinMax(history.Leverage)
+	log.Println("End Timestamp", timestamp)
+	minProfit, maxProfit, _, maxLeverage := MinMaxStats(history)
 
-	log.Printf("Balance %0.4f \n", history.Balance[len(history.Balance)-1])
-	log.Printf("Cost %0.4f \n", history.AverageCost[len(history.AverageCost)-1])
-	log.Printf("Quantity %0.4f \n", history.Quantity[len(history.Quantity)-1])
-	log.Printf("Max Long Exposure %0.4f \n", max)
-	log.Printf("Max Short Exposure %0.4f \n", min)
+	log.Printf("Balance %0.4f \n", history[len(history)-1].Balance)
+	log.Printf("Cost %0.4f \n", history[len(history)-1].AverageCost)
+	log.Printf("Quantity %0.4f \n", history[len(history)-1].Quantity)
 	log.Printf("Max Leverage %0.4f \n", maxLeverage)
 
-	drawdown, maxProfit := MinMax(history.Profit)
 	log.Printf("Max Profit %0.4f \n", maxProfit)
-	log.Printf("Max Drawdown %0.4f \n", drawdown)
+	log.Printf("Max Drawdown %0.4f \n", minProfit)
 	log.Println("Execution Speed", elapsed)
-	config, _ := json.Marshal(algo)
-	log.Println(string(config))
 	//Very primitive score, how much leverage did I need to achieve this balance
-	return history.Balance[len(history.Balance)-1] / (maxLeverage + 1)
+
+	historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	defer historyFile.Close()
+
+	balanceHistory := getBalanceHistory(history)
+	err = gocsv.MarshalFile(&balanceHistory, historyFile) // Use this to save the CSV back to the file
+	if err != nil {
+		panic(err)
+	}
+
+	return 1 //history.Balance[len(history.Balance)-1] / (maxLeverage + 1)
 }
 
-func (algo *Algo) logState(price float64) {
+func getBalanceHistory(history []models.History) []models.BalanceHistory {
+	balance := make([]models.BalanceHistory, len(history))
+	for i := range history {
+		balance[i] = models.BalanceHistory{Timestamp: history[i].Timestamp, Balance: history[i].Balance}
+	}
+	return balance
+}
+
+func (algo *Algo) logState(timestamp string) {
+	// history.Timestamp = append(history.Timestamp, timestamp)
+	var balance float64
 	if algo.Futures {
-		history.Balance = append(history.Balance, algo.Asset.BaseBalance)
-		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity) / price) / algo.Asset.BaseBalance
+		balance = algo.Asset.BaseBalance
+		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity) / algo.Asset.Price) / algo.Asset.BaseBalance
 	} else {
-		balance := algo.Asset.BaseBalance + (algo.Asset.Quantity * price)
+		balance = algo.Asset.BaseBalance + (algo.Asset.Quantity * algo.Asset.Price)
 		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
 		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity)) / (algo.Asset.BaseBalance * algo.Asset.Price)
-		history.Balance = append(history.Balance, balance)
+		// history.Balance = append(history.Balance, balance)
 	}
-	history.Quantity = append(history.Quantity, algo.Asset.Quantity)
-	history.AverageCost = append(history.AverageCost, algo.Asset.AverageCost)
+	// history.Quantity = append(history.Quantity, algo.Asset.Quantity)
+	// history.AverageCost = append(history.AverageCost, algo.Asset.AverageCost)
 
-	history.Leverage = append(history.Leverage, algo.Asset.Leverage)
-	algo.Asset.Profit = algo.CurrentProfit(price) * algo.Asset.Leverage
-	history.Profit = append(history.Profit, algo.Asset.Profit)
+	// history.Leverage = append(history.Leverage, algo.Asset.Leverage)
+	algo.Asset.Profit = algo.CurrentProfit(algo.Asset.Price) * algo.Asset.Leverage
+	// history.Profit = append(history.Profit, algo.Asset.Profit)
+
+	history = append(history, models.History{
+		Timestamp:   timestamp,
+		Balance:     balance,
+		Quantity:    algo.Asset.Quantity,
+		AverageCost: algo.Asset.AverageCost,
+		Leverage:    algo.Asset.Leverage,
+		Profit:      algo.Asset.Profit,
+	})
+
 	if algo.Debug {
-		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Asset.BaseBalance*price+(algo.Asset.Quantity), algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, price, algo.Asset.AverageCost))
+		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Asset.BaseBalance*algo.Asset.Price+(algo.Asset.Quantity), algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, algo.Asset.Price, algo.Asset.AverageCost))
 	}
 }
 
@@ -188,7 +217,7 @@ func calculateDifference(x float64, y float64) float64 {
 }
 
 func (algo *Algo) getCostAverage(pricesFilled []float64, ordersFilled []float64) (float64, float64) {
-	// print(len(prices), len(orders), len(index_arr[0]))
+	// print(len(prices), len(orders), len(timestamp_arr[0]))
 	percentageFilled := sumArr(ordersFilled)
 	if percentageFilled > 0 {
 		normalizer := 1 / percentageFilled
@@ -200,18 +229,28 @@ func (algo *Algo) getCostAverage(pricesFilled []float64, ordersFilled []float64)
 	return 0.0, 0.0
 }
 
-func MinMax(array []float64) (float64, float64) {
-	var max float64 = array[0]
-	var min float64 = array[0]
-	for _, value := range array {
-		if max < value {
-			max = value
+func MinMaxStats(history []models.History) (float64, float64, float64, float64) {
+	var maxProfit float64 = history[0].Profit
+	var minProfit float64 = history[0].Profit
+
+	var maxLeverage float64 = history[0].Leverage
+	var minLeverage float64 = history[0].Leverage
+	for _, row := range history {
+		if maxProfit < row.Profit {
+			maxProfit = row.Profit
 		}
-		if min > value {
-			min = value
+		if minProfit > row.Profit {
+			minProfit = row.Profit
+		}
+
+		if maxLeverage < row.Leverage {
+			maxLeverage = row.Leverage
+		}
+		if minLeverage > row.Leverage {
+			minLeverage = row.Leverage
 		}
 	}
-	return min, max
+	return minProfit, maxProfit, minLeverage, maxLeverage
 }
 
 func getFilledBidOrders(prices []float64, orders []float64, price float64) ([]float64, []float64) {

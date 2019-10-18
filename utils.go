@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 
+	algoModels "github.com/block26/TheAlgoV2/models"
 	"github.com/block26/TheAlgoV2/settings"
 	"github.com/block26/exchanges/models"
 )
@@ -74,6 +75,20 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	}
 
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
+}
+
+func GetOHLCBars(bars []*algoModels.Bar) ([]float64, []float64, []float64, []float64) {
+	open := make([]float64, len(bars))
+	high := make([]float64, len(bars))
+	low := make([]float64, len(bars))
+	close := make([]float64, len(bars))
+	for i := range bars {
+		open[i] = bars[i].Open
+		high[i] = bars[i].High
+		low[i] = bars[i].Low
+		close[i] = bars[i].Close
+	}
+	return open, high, low, close
 }
 
 func Round(x, unit float64) float64 {

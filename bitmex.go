@@ -76,7 +76,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 			// log.Println("Sells", algo.SellOrders.Quantity)
 			// log.Println("New order length", len(algo.BuyOrders.Price), len(algo.SellOrders.Price))
 			b.PlaceOrdersOnBook(config.Symbol, algo.BuyOrders, algo.SellOrders, orders)
-			algo.logState(bin.BidPrice)
+			algo.logState("")
 			updateAlgo(fireDB, "mm")
 		}
 	})

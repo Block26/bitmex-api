@@ -33,6 +33,7 @@ type Algo struct {
 	Debug      bool
 	BuyOrders  models.OrderArray
 	SellOrders models.OrderArray
+	Index      int
 	//Custom
 	EntrySpread     float64
 	EntryConfidence float64
