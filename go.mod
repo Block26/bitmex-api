@@ -12,7 +12,7 @@ require (
 	github.com/gocarina/gocsv v0.0.0-20190821091544-020a928c6f4e
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/stretchr/testify v1.4.0 // indirect
-	gitlab.com/raedah/tradeapi v0.0.0-20191012230305-2229330ff6c7
+	// gitlab.com/raedah/tradeapi v0.0.0-20191012230305-2229330ff6c7
 	go.opencensus.io v0.22.1 // indirect
 	golang.org/x/exp v0.0.0-20190912063710-ac5d2bfcbfe0 // indirect
 	golang.org/x/sys v0.0.0-20190916202348-b4ddaad3f8a3 // indirect
