@@ -147,6 +147,7 @@ func (algo *Algo) logState(timestamp string) {
 	history = append(history, models.History{
 		Timestamp:   timestamp,
 		Balance:     balance,
+		UBalance:    balance + (balance * algo.Asset.Profit),
 		Quantity:    algo.Asset.Quantity,
 		AverageCost: algo.Asset.AverageCost,
 		Leverage:    algo.Asset.Leverage,
