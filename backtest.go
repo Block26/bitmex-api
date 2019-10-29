@@ -10,6 +10,10 @@ import (
 	"unsafe"
 
 	"github.com/block26/TheAlgoV2/models"
+	"github.com/block26/tantra-plot/tantraplot"
+	"github.com/block26/tantra-plot/plotting"
+	"github.com/block26/tantra-plot/gui"
+	"github.com/block26/tantra-plot/timestamp"
 
 	"github.com/gocarina/gocsv"
 )
@@ -52,6 +56,71 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setup func(*Algo, []*mo
 	// optimize(bars)
 
 }
+
+
+func PlotHistory(windowsize int, scrollspeed int) error {
+	env := gui.Environment{nil, nil, nil, nil, 0, 0, false, 0, false, 0, 0, 0}
+
+	balance := plotting.LinePlot{nil, nil, 0, 0, 0.05, 0.05, 0.45, 0.28, 0, 0xff7700,
+																 "Timestamp", "Balance", "Balance", "%2.2f", 5, "%2.2f",
+																 3, 6, 2, 0, scrollspeed, windowsize}
+  quantity:= plotting.LinePlot{nil, nil, 0, 0, 0.38, 0.05, 0.45, 0.28, 0, 0xff7700,
+															   "Timestamp", "Quantity", "Quantity", "%2.2f", 5, "%2.2f",
+															   3, 6, 2, 0, scrollspeed, windowsize}
+  avgcost := plotting.LinePlot{nil, nil, 0, 0, 0.71, 0.05, 0.45, 0.28, 0, 0xff7700,
+															 	 "Timestamp", "Avg Cost", "Average Cost", "%2.2f", 5, "%2.2f",
+															 	 3, 6, 2, 0, scrollspeed, windowsize}
+  leverage:= plotting.LinePlot{nil, nil, 0, 0, 0.05, 0.55, 0.45, 0.28, 0, 0xff7700,
+															   "Timestamp", "Leverage", "Leverage", "%2.2f", 5, "%2.2f",
+															   3, 6, 2, 0, scrollspeed, windowsize}
+  profit  := plotting.LinePlot{nil, nil, 0, 0, 0.71, 0.55, 0.45, 0.28, 0, 0xff7700,
+															   "Timestamp", "Profit", "Profit", "%2.2f", 5, "%2.2f",
+															   3, 6, 2, 0, scrollspeed, windowsize}
+
+	var timestamps []timestamp.Timestamp
+	var balances   []float32
+	var quantities []float32
+	var avgcosts   []float32
+	var leverages  []float32
+	var profits    []float32
+	for i := 0; i < len(history); i++ {
+		timestamp, err := timestamp.ParseTimeStamp(history[i].Timestamp)
+		if err != nil {
+			return err
+		}
+		timestamps = append(timestamps, timestamp)
+		balances   = append(balances  , float32(history[i].Balance    ))
+		quantities = append(quantities, float32(history[i].Quantity   ))
+		avgcosts   = append(avgcosts  , float32(history[i].AverageCost))
+		leverages  = append(leverages , float32(history[i].Leverage   ))
+		profits    = append(profits   , float32(history[i].Profit     ))
+	}
+
+	env.InsertLinePlot(balance)
+	env.InsertLinePlot(quantity)
+	env.InsertLinePlot(avgcost)
+	env.InsertLinePlot(leverage)
+	env.InsertLinePlot(profit)
+
+	env.InsertLineData(timestamps, balances  , 0)
+	env.InsertLineData(timestamps, quantities, 1)
+	env.InsertLineData(timestamps, avgcosts  , 2)
+	env.InsertLineData(timestamps, leverages , 3)
+	env.InsertLineData(timestamps, profits   , 4)
+
+	w, err := tantraplot.MakeWindowWithEnv(&env, true)
+	if err != nil {
+		return err
+	}
+
+	cont := true
+	for cont {
+		cont = w.StepWindow()
+	}
+
+	return nil
+}
+
 
 func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
 	start := time.Now()
