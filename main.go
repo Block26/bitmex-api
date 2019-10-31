@@ -15,7 +15,8 @@ type Asset struct {
 	AverageCost      float64
 	Price            float64
 	Profit           float64
-	Fee              float64
+	MakerFee         float64
+	TakerFee         float64
 	TickSize         float64
 	Delta            float64
 	Buying           float64

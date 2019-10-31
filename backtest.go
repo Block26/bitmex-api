@@ -47,14 +47,12 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setup func(*Algo, []*mo
 	for _, bar := range bars {
 		barSize = barSize + float64(unsafe.Sizeof(bar))
 		// fmt.Println(int())
-
 	}
 	fmt.Printf("barSize %.2f \n", barSize)
 	setup(&a, bars)
 	score := runSingleTest(bars, a, rebalance)
 	log.Println("Score", score)
 	// optimize(bars)
-
 }
 
 
@@ -157,7 +155,7 @@ func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)
 		algo.logState(timestamp)
 		// history.Balance[len(history.Balance)-1], == portfolio value
 		// portfolioValue := history.Balance[len(history.Balance)-1]
-		idx += 1
+		idx++
 	}
 
 	elapsed := time.Since(start)
@@ -180,21 +178,12 @@ func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)
 	}
 	defer historyFile.Close()
 
-	balanceHistory := getBalanceHistory(history)
-	err = gocsv.MarshalFile(&balanceHistory, historyFile) // Use this to save the CSV back to the file
+	err = gocsv.MarshalFile(&history, historyFile) // Use this to save the CSV back to the file
 	if err != nil {
 		panic(err)
 	}
 
 	return 1 //history.Balance[len(history.Balance)-1] / (maxLeverage + 1)
-}
-
-func getBalanceHistory(history []models.History) []models.BalanceHistory {
-	balance := make([]models.BalanceHistory, len(history))
-	for i := range history {
-		balance[i] = models.BalanceHistory{Timestamp: history[i].Timestamp, Balance: history[i].Balance}
-	}
-	return balance
 }
 
 func (algo *Algo) logState(timestamp string) {
@@ -219,6 +208,7 @@ func (algo *Algo) logState(timestamp string) {
 	history = append(history, models.History{
 		Timestamp:   timestamp,
 		Balance:     balance,
+		UBalance:    balance + (balance * algo.Asset.Profit),
 		Quantity:    algo.Asset.Quantity,
 		AverageCost: algo.Asset.AverageCost,
 		Leverage:    algo.Asset.Leverage,
@@ -243,7 +233,8 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 	// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		newQuantity := fillCost * fillAmount
-		// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
+		fee := math.Abs(fillAmount) * algo.Asset.MakerFee
+		// log.Printf("fillCost %.2f -> fillAmount %.2f -> Fee %.2f \n", fillCost, fillCost*fillAmount, fee)
 		currentCost := (algo.Asset.Quantity * algo.Asset.AverageCost)
 		totalQuantity := algo.Asset.Quantity + newQuantity
 		newCost := fillCost * newQuantity
@@ -278,6 +269,7 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 			algo.Asset.BaseBalance = algo.Asset.BaseBalance - newCost
 			algo.Asset.Quantity = algo.Asset.Quantity + newQuantity
 		}
+		algo.Asset.BaseBalance = algo.Asset.BaseBalance - fee
 	}
 }
 
@@ -296,7 +288,6 @@ func (algo *Algo) getCostAverage(pricesFilled []float64, ordersFilled []float64)
 		normalizer := 1 / percentageFilled
 		norm := mulArr(ordersFilled, normalizer)
 		costAverage := sumArr(mulArrs(pricesFilled, norm))
-		costAverage = costAverage - (costAverage * algo.Asset.Fee)
 		return costAverage, percentageFilled
 	}
 	return 0.0, 0.0
