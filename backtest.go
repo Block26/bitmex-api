@@ -59,21 +59,21 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setup func(*Algo, []*mo
 
 
 func PlotHistory(windowsize int, scrollspeed int) error {
-	env := gui.Environment{nil, nil, nil, nil, 0, 0, false, 0, false, 0, 0, 0}
+	env := gui.Environment{nil, nil, nil, nil, nil, 0, 0, false, 0, false, 0, 0, 0}
 
-	balance := plotting.LinePlot{nil, nil, 0, 0, 0.05, 0.05, 0.45, 0.28, 0, 0xff7700,
+	balance := plotting.LinePlot {nil, nil, 0, 0, 0.05, 0.05, 0.45, 0.28, 0, 0xff7700,
 																 "Timestamp", "Balance", "Balance", "%2.2f", 5, "%2.2f",
 																 3, 6, 2, 0, scrollspeed, windowsize}
-  quantity:= plotting.LinePlot{nil, nil, 0, 0, 0.38, 0.05, 0.45, 0.28, 0, 0xff7700,
+  quantity:= plotting.LinePlot {nil, nil, 0, 0, 0.38, 0.05, 0.45, 0.28, 0, 0xff7700,
 															   "Timestamp", "Quantity", "Quantity", "%2.2f", 5, "%2.2f",
 															   3, 6, 2, 0, scrollspeed, windowsize}
-  avgcost := plotting.LinePlot{nil, nil, 0, 0, 0.71, 0.05, 0.45, 0.28, 0, 0xff7700,
-															 	 "Timestamp", "Avg Cost", "Average Cost", "%2.2f", 5, "%2.2f",
+  avgcost := plotting.MultiPlot{nil, nil, 0, 0, 0, 0.71, 0.05, 0.45, 0.28, 0,
+															 	 "Timestamp", "Cost", "Average Cost", "%2.2f", 5, "%2.2f",
 															 	 3, 6, 2, 0, scrollspeed, windowsize}
-  leverage:= plotting.LinePlot{nil, nil, 0, 0, 0.05, 0.55, 0.45, 0.28, 0, 0xff7700,
+  leverage:= plotting.LinePlot {nil, nil, 0, 0, 0.05, 0.55, 0.45, 0.28, 0, 0xff7700,
 															   "Timestamp", "Leverage", "Leverage", "%2.2f", 5, "%2.2f",
 															   3, 6, 2, 0, scrollspeed, windowsize}
-  profit  := plotting.LinePlot{nil, nil, 0, 0, 0.71, 0.55, 0.45, 0.28, 0, 0xff7700,
+  profit  := plotting.LinePlot {nil, nil, 0, 0, 0.71, 0.55, 0.45, 0.28, 0, 0xff7700,
 															   "Timestamp", "Profit", "Profit", "%2.2f", 5, "%2.2f",
 															   3, 6, 2, 0, scrollspeed, windowsize}
 
@@ -83,6 +83,7 @@ func PlotHistory(windowsize int, scrollspeed int) error {
 	var avgcosts   []float32
 	var leverages  []float32
 	var profits    []float32
+	var prices     []float32
 	for i := 0; i < len(history); i++ {
 		timestamp, err := timestamp.ParseTimeStamp(history[i].Timestamp)
 		if err != nil {
@@ -94,19 +95,21 @@ func PlotHistory(windowsize int, scrollspeed int) error {
 		avgcosts   = append(avgcosts  , float32(history[i].AverageCost))
 		leverages  = append(leverages , float32(history[i].Leverage   ))
 		profits    = append(profits   , float32(history[i].Profit     ))
+		prices     = append(prices    , float32(history[i].Price      ))
 	}
 
-	env.InsertLinePlot(balance)
-	env.InsertLinePlot(quantity)
-	env.InsertLinePlot(avgcost)
-	env.InsertLinePlot(leverage)
-	env.InsertLinePlot(profit)
+	env.InsertLinePlot (balance)
+	env.InsertLinePlot (quantity)
+	env.InsertMultiPlot(avgcost)
+	env.InsertLinePlot (leverage)
+	env.InsertLinePlot (profit)
 
-	env.InsertLineData(timestamps, balances  , 0)
-	env.InsertLineData(timestamps, quantities, 1)
-	env.InsertLineData(timestamps, avgcosts  , 2)
-	env.InsertLineData(timestamps, leverages , 3)
-	env.InsertLineData(timestamps, profits   , 4)
+	env.InsertLineData (timestamps, balances  , 0)
+	env.InsertLineData (timestamps, quantities, 1)
+	env.InsertLineData (timestamps, leverages , 2)
+	env.InsertLineData (timestamps, profits   , 3)
+
+	env.InsertMultiData(timestamps, []plotting.Line{plotting.Line{avgcosts, 0xff7700}, plotting.Line{prices, 0x0077ff}}, 0)
 
 	w, err := tantraplot.MakeWindowWithEnv(&env, true)
 	if err != nil {
@@ -220,6 +223,7 @@ func (algo *Algo) logState(timestamp string) {
 		AverageCost: algo.Asset.AverageCost,
 		Leverage:    algo.Asset.Leverage,
 		Profit:      algo.Asset.Profit,
+		Price:       algo.Asset.Price,
 	})
 
 	if algo.Debug {
