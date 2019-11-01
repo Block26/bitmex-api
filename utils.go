@@ -30,10 +30,14 @@ func loadConfiguration(file string, secret bool) settings.Config {
 	}
 }
 
-func (a *Algo) SetLiquidity(percentage float64) float64 {
+func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 	if a.Futures {
 		return percentage * a.Asset.BaseBalance
 	} else {
+		if side == "buy" {
+			return percentage * a.Asset.Quantity
+		}
+		log.Println(a.Asset.BaseBalance, a.Asset.Price, a.Asset.Quantity)
 		return percentage * ((a.Asset.BaseBalance * a.Asset.Price) + a.Asset.Quantity)
 	}
 }

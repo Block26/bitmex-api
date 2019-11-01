@@ -18,7 +18,7 @@ var history []models.History
 
 // var minimumOrderSize = 25
 
-func RunBacktest(a Algo, rebalance func(float64, *Algo), setup func(*Algo, []*models.Bar)) {
+func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func([]*models.Bar, *Algo)) {
 	log.Println("Loading Data... ")
 	dir, err := os.Getwd()
 	if err != nil {
@@ -45,7 +45,7 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setup func(*Algo, []*mo
 		// fmt.Println(int())
 	}
 	fmt.Printf("barSize %.2f \n", barSize)
-	setup(&a, bars)
+	setupData(bars, &a)
 	score := runSingleTest(bars, a, rebalance)
 	log.Println("Score", score)
 	// optimize(bars)
