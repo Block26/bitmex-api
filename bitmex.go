@@ -13,7 +13,7 @@ import (
 
 var config settings.Config
 
-func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo), setupData func([]models.Bar, *Algo)) {
+func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) {
 	config = loadConfiguration(settingsFile, secret)
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	log.Println(config)
@@ -68,7 +68,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 			log.Println(bin.BidPrice)
 			algo.Asset.Price = bin.BidPrice
 			localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
-			setupData(localBars, &algo)
+			setupData(&localBars, &algo)
 			rebalance(bin.BidPrice, &algo)
 			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * bin.BidPrice))
 			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * bin.BidPrice))

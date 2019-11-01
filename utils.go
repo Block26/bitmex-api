@@ -81,7 +81,7 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
 }
 
-func GetOHLCBars(bars []*algoModels.Bar) ([]float64, []float64, []float64, []float64) {
+func GetOHLCBars(bars []algoModels.Bar) ([]float64, []float64, []float64, []float64) {
 	open := make([]float64, len(bars))
 	high := make([]float64, len(bars))
 	low := make([]float64, len(bars))

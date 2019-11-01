@@ -18,7 +18,7 @@ var history []models.History
 
 // var minimumOrderSize = 25
 
-func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func([]*models.Bar, *Algo)) {
+func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) {
 	log.Println("Loading Data... ")
 	dir, err := os.Getwd()
 	if err != nil {
@@ -32,7 +32,7 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func([]*model
 	defer dataFile.Close()
 	log.Println("Done Loading Data... ")
 
-	bars := []*models.Bar{}
+	bars := []models.Bar{}
 
 	if err := gocsv.UnmarshalFile(dataFile, &bars); err != nil { // Load bars from file
 		panic(err)
@@ -45,19 +45,19 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func([]*model
 		// fmt.Println(int())
 	}
 	fmt.Printf("barSize %.2f \n", barSize)
-	setupData(bars, &a)
-	score := runSingleTest(bars, a, rebalance)
+	setupData(&bars, &a)
+	score := runSingleTest(&bars, a, rebalance)
 	log.Println("Score", score)
 	// optimize(bars)
 }
 
-func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
+func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
 	start := time.Now()
 	// starting_algo.Asset.BaseBalance := 0
 	timestamp := ""
 	idx := 0
-	log.Println("Running", len(data), "bars")
-	for _, bar := range data {
+	log.Println("Running", len(*data), "bars")
+	for _, bar := range *data {
 		if timestamp == "" {
 			log.Println("Start Timestamp", bar.Timestamp)
 			// 	//Set average cost if starting with a quote balance
