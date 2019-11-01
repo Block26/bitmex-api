@@ -22,7 +22,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 	var orders []*swagger.Order
 	var b *bitmex.BitMEX
 
-	localBars := data.GetData("XBTUSD", "1m", 100)
+	localBars := data.GetData("XBTUSD", "1m", algo.DataLength)
 	log.Println(len(localBars), "downloaded")
 
 	if config.TestNet {

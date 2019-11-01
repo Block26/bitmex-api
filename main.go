@@ -35,6 +35,8 @@ type Algo struct {
 	BuyOrders  models.OrderArray
 	SellOrders models.OrderArray
 	Index      int
+	DataLength int
+
 	//Custom
 	EntrySpread     float64
 	EntryConfidence float64

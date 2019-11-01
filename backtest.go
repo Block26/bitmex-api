@@ -66,23 +66,25 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 			}
 		}
 		timestamp = bar.Timestamp
-		algo.Index = idx
-		algo.Asset.Price = bar.Open
-		rebalance(bar.Open, &algo)
-		//Check which buys filled
-		pricesFilled, ordersFilled := getFilledBidOrders(algo.BuyOrders.Price, algo.BuyOrders.Quantity, bar.Low)
-		fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
-		algo.UpdateBalance(fillCost, algo.Asset.Buying*fillPercentage)
-
-		//Check which sells filled
-		pricesFilled, ordersFilled = getFilledAskOrders(algo.SellOrders.Price, algo.SellOrders.Quantity, bar.High)
-		fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
-		algo.UpdateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
-
-		// updateBalanceXBTStrat(bar)
-		algo.logState(timestamp)
-		// history.Balance[len(history.Balance)-1], == portfolio value
-		// portfolioValue := history.Balance[len(history.Balance)-1]
+		if idx > algo.DataLength {
+			algo.Index = idx
+			algo.Asset.Price = bar.Open
+			rebalance(bar.Open, &algo)
+			//Check which buys filled
+			pricesFilled, ordersFilled := getFilledBidOrders(algo.BuyOrders.Price, algo.BuyOrders.Quantity, bar.Low)
+			fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
+			algo.UpdateBalance(fillCost, algo.Asset.Buying*fillPercentage)
+	
+			//Check which sells filled
+			pricesFilled, ordersFilled = getFilledAskOrders(algo.SellOrders.Price, algo.SellOrders.Quantity, bar.High)
+			fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
+			algo.UpdateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
+	
+			// updateBalanceXBTStrat(bar)
+			algo.logState(timestamp)
+			// history.Balance[len(history.Balance)-1], == portfolio value
+			// portfolioValue := history.Balance[len(history.Balance)-1]
+		}
 		idx++
 	}
 
