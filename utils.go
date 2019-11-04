@@ -30,10 +30,14 @@ func loadConfiguration(file string, secret bool) settings.Config {
 	}
 }
 
-func (a *Algo) SetLiquidity(percentage float64) float64 {
+func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 	if a.Futures {
 		return percentage * a.Asset.BaseBalance
 	} else {
+		if side == "buy" {
+			return percentage * a.Asset.Quantity
+		}
+		log.Println(a.Asset.BaseBalance, a.Asset.Price, a.Asset.Quantity)
 		return percentage * ((a.Asset.BaseBalance * a.Asset.Price) + a.Asset.Quantity)
 	}
 }
@@ -77,7 +81,7 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
 }
 
-func GetOHLCBars(bars []*algoModels.Bar) ([]float64, []float64, []float64, []float64) {
+func GetOHLCBars(bars []algoModels.Bar) ([]float64, []float64, []float64, []float64) {
 	open := make([]float64, len(bars))
 	high := make([]float64, len(bars))
 	low := make([]float64, len(bars))

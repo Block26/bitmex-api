@@ -4,6 +4,8 @@ import (
 	"log"
 	"math"
 
+	"github.com/block26/TheAlgoV2/data"
+	"github.com/block26/TheAlgoV2/models"
 	"github.com/block26/TheAlgoV2/settings"
 	"github.com/block26/exchanges/bitmex"
 	"github.com/block26/exchanges/bitmex/swagger"
@@ -11,7 +13,7 @@ import (
 
 var config settings.Config
 
-func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo)) {
+func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) {
 	config = loadConfiguration(settingsFile, secret)
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	log.Println(config)
@@ -19,6 +21,9 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 
 	var orders []*swagger.Order
 	var b *bitmex.BitMEX
+
+	localBars := data.GetData("XBTUSD", "1m", algo.DataLength)
+	log.Println(len(localBars), "downloaded")
 
 	if config.TestNet {
 		b = bitmex.New(bitmex.HostTestnet, config.APIKey, config.APISecret)
@@ -62,6 +67,8 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 		for _, bin := range bins {
 			log.Println(bin.BidPrice)
 			algo.Asset.Price = bin.BidPrice
+			localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
+			setupData(&localBars, &algo)
 			rebalance(bin.BidPrice, &algo)
 			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * bin.BidPrice))
 			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * bin.BidPrice))

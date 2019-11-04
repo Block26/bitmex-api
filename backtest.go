@@ -22,7 +22,7 @@ var history []models.History
 
 // var minimumOrderSize = 25
 
-func RunBacktest(a Algo, rebalance func(float64, *Algo), setup func(*Algo, []*models.Bar)) {
+func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) {
 	log.Println("Loading Data... ")
 	dir, err := os.Getwd()
 	if err != nil {
@@ -36,7 +36,7 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setup func(*Algo, []*mo
 	defer dataFile.Close()
 	log.Println("Done Loading Data... ")
 
-	bars := []*models.Bar{}
+	bars := []models.Bar{}
 
 	if err := gocsv.UnmarshalFile(dataFile, &bars); err != nil { // Load bars from file
 		panic(err)
@@ -49,8 +49,8 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setup func(*Algo, []*mo
 		// fmt.Println(int())
 	}
 	fmt.Printf("barSize %.2f \n", barSize)
-	setup(&a, bars)
-	score := runSingleTest(bars, a, rebalance)
+	setupData(&bars, &a)
+	score := runSingleTest(&bars, a, rebalance)
 	log.Println("Score", score)
 	// optimize(bars)
 }
@@ -123,13 +123,13 @@ func PlotHistory(windowsize int, scrollspeed int) error {
 }
 
 
-func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
+func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
 	start := time.Now()
 	// starting_algo.Asset.BaseBalance := 0
 	timestamp := ""
 	idx := 0
-	log.Println("Running", len(data), "bars")
-	for _, bar := range data {
+	log.Println("Running", len(*data), "bars")
+	for _, bar := range *data {
 		if timestamp == "" {
 			log.Println("Start Timestamp", bar.Timestamp)
 			// 	//Set average cost if starting with a quote balance
@@ -138,23 +138,25 @@ func runSingleTest(data []*models.Bar, algo Algo, rebalance func(float64, *Algo)
 			}
 		}
 		timestamp = bar.Timestamp
-		algo.Index = idx
-		algo.Asset.Price = bar.Open
-		rebalance(bar.Open, &algo)
-		//Check which buys filled
-		pricesFilled, ordersFilled := getFilledBidOrders(algo.BuyOrders.Price, algo.BuyOrders.Quantity, bar.Low)
-		fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
-		algo.UpdateBalance(fillCost, algo.Asset.Buying*fillPercentage)
+		if idx > algo.DataLength {
+			algo.Index = idx
+			algo.Asset.Price = bar.Open
+			rebalance(bar.Open, &algo)
+			//Check which buys filled
+			pricesFilled, ordersFilled := getFilledBidOrders(algo.BuyOrders.Price, algo.BuyOrders.Quantity, bar.Low)
+			fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
+			algo.UpdateBalance(fillCost, algo.Asset.Buying*fillPercentage)
 
-		//Check which sells filled
-		pricesFilled, ordersFilled = getFilledAskOrders(algo.SellOrders.Price, algo.SellOrders.Quantity, bar.High)
-		fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
-		algo.UpdateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
+			//Check which sells filled
+			pricesFilled, ordersFilled = getFilledAskOrders(algo.SellOrders.Price, algo.SellOrders.Quantity, bar.High)
+			fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
+			algo.UpdateBalance(fillCost, algo.Asset.Selling*-fillPercentage)
 
-		// updateBalanceXBTStrat(bar)
-		algo.logState(timestamp)
-		// history.Balance[len(history.Balance)-1], == portfolio value
-		// portfolioValue := history.Balance[len(history.Balance)-1]
+			// updateBalanceXBTStrat(bar)
+			algo.logState(timestamp)
+			// history.Balance[len(history.Balance)-1], == portfolio value
+			// portfolioValue := history.Balance[len(history.Balance)-1]
+		}
 		idx++
 	}
 
