@@ -24,6 +24,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 
 	localBars := data.GetData("XBTUSD", "1m", algo.DataLength)
 	log.Println(len(localBars), "downloaded")
+	log.Println("build ")
 
 	if config.TestNet {
 		b = bitmex.New(bitmex.HostTestnet, config.APIKey, config.APISecret)

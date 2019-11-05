@@ -8,7 +8,6 @@ require (
 	firebase.google.com/go v3.9.0+incompatible
 	github.com/aws/aws-sdk-go v1.24.0
 	github.com/block26/exchanges v0.0.0-20190920200622-23118f98fdc4
-	github.com/block26/tantra-plot v0.0.0-00010101000000-000000000000
 	github.com/carterjones/signalr v0.3.5 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gocarina/gocsv v0.0.0-20190821091544-020a928c6f4e
@@ -28,8 +27,8 @@ require (
 
 )
 
-replace github.com/block26/tantra-plot => ../../block26/tantra-plot
+// replace github.com/block26/tantra-plot => ../../block26/tantra-plot
 
-replace github.com/block26/exchanges => ../../block26/exchanges
+// replace github.com/block26/exchanges => ../../block26/exchanges
 
 //replace gitlab.com/raedah/tradeapi => ../../../gitlab.com/raedah/tradeapi
