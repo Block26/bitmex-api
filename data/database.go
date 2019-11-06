@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/block26/TheAlgoV2/models"
+	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )

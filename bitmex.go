@@ -4,11 +4,11 @@ import (
 	"log"
 	"math"
 
-	"github.com/block26/TheAlgoV2/data"
-	"github.com/block26/TheAlgoV2/models"
-	"github.com/block26/TheAlgoV2/settings"
-	"github.com/block26/exchanges/bitmex"
-	"github.com/block26/exchanges/bitmex/swagger"
+	"github.com/tantralabs/TheAlgoV2/data"
+	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/TheAlgoV2/settings"
+	"github.com/tantralabs/exchanges/bitmex"
+	"github.com/tantralabs/exchanges/bitmex/swagger"
 )
 
 var config settings.Config

@@ -1,7 +1,7 @@
 package data
 
 import (
-	"github.com/block26/TheAlgoV2/models"
+	"github.com/tantralabs/TheAlgoV2/models"
 )
 
 func UpdateLocalBars(localBars []models.Bar, newBars []models.Bar) []models.Bar {

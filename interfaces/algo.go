@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	"github.com/block26/exchanges/models"
+	"github.com/tantralabs/exchanges/models"
 )
 
 type Algo interface {

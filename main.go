@@ -1,11 +1,11 @@
 //export GOPATH=/Users/russell/git/go && export PATH=$PATH:$(go env GOPATH)/bin
-//go install github.com/block26/TheAlgoV2 && TheAlgoV2
+//go install github.com/tantralabs/TheAlgoV2 && TheAlgoV2
 // export GPG_TTY=$(tty)
 
 package algo
 
 import (
-	"github.com/block26/exchanges/models"
+	"github.com/tantralabs/exchanges/models"
 )
 
 type Asset struct {

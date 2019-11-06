@@ -6,9 +6,9 @@ import (
 	"math"
 	"os"
 
-	algoModels "github.com/block26/TheAlgoV2/models"
-	"github.com/block26/TheAlgoV2/settings"
-	"github.com/block26/exchanges/models"
+	algoModels "github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/TheAlgoV2/settings"
+	"github.com/tantralabs/exchanges/models"
 )
 
 func loadConfiguration(file string, secret bool) settings.Config {

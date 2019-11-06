@@ -9,7 +9,7 @@ import (
 
 	"unsafe"
 
-	"github.com/block26/TheAlgoV2/models"
+	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/gocarina/gocsv"
 )
 

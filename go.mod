@@ -1,4 +1,4 @@
-module github.com/block26/TheAlgoV2
+module github.com/tantralabs/TheAlgoV2
 
 go 1.13
 
@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/storage v1.0.0 // indirect
 	firebase.google.com/go v3.9.0+incompatible
 	github.com/aws/aws-sdk-go v1.24.0
-	github.com/block26/exchanges v0.0.0-20190920200622-23118f98fdc4
+	github.com/tantralabs/exchanges v0.0.0-20190920200622-23118f98fdc4
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gocarina/gocsv v0.0.0-20190821091544-020a928c6f4e
 	github.com/hashicorp/golang-lru v0.5.3 // indirect

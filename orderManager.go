@@ -3,7 +3,7 @@ package algo
 import (
 	"log"
 
-	"github.com/block26/exchanges/bitmex/swagger"
+	"github.com/tantralabs/exchanges/bitmex/swagger"
 	"gitlab.com/raedah/tradeapi/iex"
 )
 
