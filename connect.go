@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"gitlab.com/raedah/tradeapi"
-	"gitlab.com/raedah/tradeapi/iex"
+	"github.com/tantralabs/tradeapi"
+	"github.com/tantralabs/tradeapi/iex"
 )
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo)) {

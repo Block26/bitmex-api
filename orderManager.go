@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/tantralabs/exchanges/bitmex/swagger"
-	"gitlab.com/raedah/tradeapi/iex"
+	"github.com/tantralabs/tradeapi/iex"
 )
 
 func (a *Algo) PlaceOrdersOnBook(openOrders iex.OpenOrders) ([]iex.Order, []string) {

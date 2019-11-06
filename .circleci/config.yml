@@ -11,11 +11,8 @@ jobs:
     steps:
       - run: apk add --no-cache git mercurial
       - run: apk add --no-cache openssh
-      - add_ssh_keys
       - checkout
-      - run: ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts
       - run: printf "\n[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig
-      - run: printf "\n[url \"git@gitlab.com:\"]\n\tinsteadOf = https://gitlab.com/" >> /root/.gitconfig
       - run: go mod download
       - run: CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
       - persist_to_workspace:
