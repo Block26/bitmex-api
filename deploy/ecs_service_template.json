@@ -8,6 +8,7 @@
     },
     "networkConfiguration": {
         "awsvpcConfiguration": {
+            "assignPublicIp": "ENABLED",
             "subnets": [
                 "subnet-8ff7cfd4"
             ],
