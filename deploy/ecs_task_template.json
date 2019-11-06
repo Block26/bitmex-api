@@ -12,8 +12,8 @@
     "memory": "1024",
     "containerDefinitions": [
         {
-            "name": "MM-Latest",
-            "image": "mm:latest",
+            "name": "ALGO_NAME-Latest",
+            "image": "ALGO_NAME:latest",
             "cpu": 512,
             "portMappings": [],
             "essential": true,
@@ -23,7 +23,7 @@
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
-                    "awslogs-group": "/ecs/MM-service",
+                    "awslogs-group": "/ecs/ALGO_NAME-service",
                     "awslogs-region": "us-west-1",
                     "awslogs-stream-prefix": "ecs"
                 }
