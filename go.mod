@@ -9,7 +9,9 @@ go 1.13
 require (
 	firebase.google.com/go v3.10.0+incompatible
 	github.com/aws/aws-sdk-go v1.25.28
+	github.com/fatih/structs v1.1.0
 	github.com/gocarina/gocsv v0.0.0-20190927101021-3ecffd272576
+	github.com/influxdata/influxdb-client-go v0.1.4
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.2.0
 	github.com/tantralabs/exchanges v0.0.0-20191106215748-4d3dd77e096e

@@ -1,10 +1,16 @@
 package algo
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/fatih/structs"
+	"github.com/influxdata/influxdb-client-go"
 
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
@@ -12,6 +18,15 @@ import (
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo)) {
 	config = loadConfiguration(settingsFile, secret)
+
+	influx, err := influxdb.New("https://us-west-2-1.aws.cloud2.influxdata.com",
+		"xskhvPlukzR2jXsKO2jbfcW_g6ekxpMKrfTx5Ui400iKjeG-bTQTeQf_fgjT_dH0jYQbls0b_F_sDgITQVn4hA==",
+		influxdb.WithHTTPClient(http.DefaultClient))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	log.Println(config)
 	// fireDB := setupFirebase()
@@ -63,6 +78,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		TradeBinChan: make(chan []iex.TradeBin, 2),
 	}
 
+	LogStatus(influx, &algo)
 	// Start the websocket.
 	err = ex.StartWS(&iex.WsConfig{Host: "", Streams: subscribeInfos, Channels: channels})
 	if err != nil {
@@ -95,5 +111,19 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	log.Println(toCreate)
 	log.Println(toCancel)
 	algo.logState("")
+	influx.Close()
 	// updateAlgo(fireDB, "mm")
+}
+
+func LogStatus(influx *influxdb.Client, algo *Algo) {
+
+	myMetrics := []influxdb.Metric{
+		influxdb.NewRowMetric(structs.Map(algo.Asset), "asset", map[string]string{"algo_name": algo.Name}, time.Now()),
+		influxdb.NewRowMetric(algo.State, "state", map[string]string{"algo_name": algo.Name}, time.Now()),
+	}
+
+	// The actual write..., this method can be called concurrently.
+	if _, err := influx.Write(context.Background(), "algos", "Tantra Labs", myMetrics...); err != nil {
+		log.Fatal(err) // as above use your own error handling here.
+	}
 }

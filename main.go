@@ -10,6 +10,8 @@ import (
 
 type Asset struct {
 	Symbol           string
+	Exchange         string
+	ExchangeURL      string
 	BaseBalance      float64
 	Quantity         float64
 	AverageCost      float64
@@ -29,7 +31,9 @@ type Asset struct {
 
 type Algo struct {
 	//Required
+	Name       string
 	Asset      Asset
+	State      map[string]interface{}
 	Futures    bool
 	Debug      bool
 	BuyOrders  models.OrderArray
