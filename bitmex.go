@@ -22,7 +22,11 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 	var orders []*swagger.Order
 	var b *bitmex.BitMEX
 
-	localBars := data.GetData("XBTUSD", "1m", algo.DataLength)
+	if algo.Asset.Symbol == "" {
+		log.Fatal("Asset Symbol not set")
+	}
+
+	localBars := data.GetData(algo.Asset.Symbol, "1m", algo.DataLength)
 	log.Println(len(localBars), "downloaded")
 	log.Println("build ")
 
@@ -33,9 +37,9 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 	}
 
 	subscribeInfos := []bitmex.SubscribeInfo{
-		{Op: bitmex.BitmexWSOrder, Param: config.Symbol},
-		{Op: bitmex.BitmexWSPosition, Param: config.Symbol},
-		{Op: bitmex.BitmexWSQuoteBin1m, Param: config.Symbol},
+		{Op: bitmex.BitmexWSOrder, Param: algo.Asset.Symbol},
+		{Op: bitmex.BitmexWSPosition, Param: algo.Asset.Symbol},
+		{Op: bitmex.BitmexWSQuoteBin1m, Param: algo.Asset.Symbol},
 		{Op: bitmex.BitmexWSWallet},
 	}
 
