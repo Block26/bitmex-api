@@ -16,6 +16,15 @@ import (
 var config settings.Config
 
 func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) {
+
+	if algo.Name == "" {
+		log.Fatal("Name not set")
+	}
+
+	if algo.Asset.Symbol == "" {
+		log.Fatal("Asset Symbol not set")
+	}
+
 	config = loadConfiguration(settingsFile, secret)
 
 	influx, err := influxdb.New("https://us-west-2-1.aws.cloud2.influxdata.com",
@@ -31,10 +40,6 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 
 	var orders []*swagger.Order
 	var b *bitmex.BitMEX
-
-	if algo.Asset.Symbol == "" {
-		log.Fatal("Asset Symbol not set")
-	}
 
 	localBars := data.GetData(algo.Asset.Symbol, "1m", algo.DataLength)
 	log.Println(len(localBars), "downloaded")
