@@ -3,7 +3,9 @@ package algo
 import (
 	"log"
 	"math"
+	"net/http"
 
+	"github.com/influxdata/influxdb-client-go"
 	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/TheAlgoV2/settings"
@@ -15,6 +17,14 @@ var config settings.Config
 
 func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) {
 	config = loadConfiguration(settingsFile, secret)
+
+	influx, err := influxdb.New("https://us-west-2-1.aws.cloud2.influxdata.com",
+		"xskhvPlukzR2jXsKO2jbfcW_g6ekxpMKrfTx5Ui400iKjeG-bTQTeQf_fgjT_dH0jYQbls0b_F_sDgITQVn4hA==",
+		influxdb.WithHTTPClient(http.DefaultClient))
+
+	if err != nil {
+		log.Fatal(err)
+	}
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	log.Println(config)
 	fireDB := setupFirebase()
@@ -28,7 +38,6 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 
 	localBars := data.GetData(algo.Asset.Symbol, "1m", algo.DataLength)
 	log.Println(len(localBars), "downloaded")
-	log.Println("build ")
 
 	if config.TestNet {
 		b = bitmex.New(bitmex.HostTestnet, config.APIKey, config.APISecret)
@@ -43,7 +52,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 		{Op: bitmex.BitmexWSWallet},
 	}
 
-	err := b.Subscribe(subscribeInfos)
+	err = b.Subscribe(subscribeInfos)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -88,6 +97,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 			// log.Println("Sells", algo.SellOrders.Quantity)
 			// log.Println("New order length", len(algo.BuyOrders.Price), len(algo.SellOrders.Price))
 			b.PlaceOrdersOnBook(config.Symbol, algo.BuyOrders, algo.SellOrders, orders)
+			LogStatus(influx, &algo)
 			algo.logState("")
 			updateAlgo(fireDB, "mm")
 		}

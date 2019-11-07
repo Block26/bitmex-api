@@ -119,7 +119,7 @@ func LogStatus(influx *influxdb.Client, algo *Algo) {
 
 	myMetrics := []influxdb.Metric{
 		influxdb.NewRowMetric(structs.Map(algo.Asset), "asset", map[string]string{"algo_name": algo.Name}, time.Now()),
-		influxdb.NewRowMetric(algo.State, "state", map[string]string{"algo_name": algo.Name}, time.Now()),
+		// influxdb.NewRowMetric(algo.State, "state", map[string]string{"algo_name": algo.Name}, time.Now()),
 	}
 
 	// The actual write..., this method can be called concurrently.
