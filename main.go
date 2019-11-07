@@ -8,6 +8,8 @@ import (
 	"github.com/tantralabs/exchanges/models"
 )
 
+var commitHash string
+
 type Asset struct {
 	Symbol           string
 	Exchange         string

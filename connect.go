@@ -14,6 +14,9 @@ import (
 
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
+
+	"gopkg.in/src-d/go-git.v4"
+	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo)) {
@@ -27,9 +30,13 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		log.Fatal(err)
 	}
 
-	// settings = loadConfiguration("dev/mm/testnet", true)
-	log.Println(config)
-	// fireDB := setupFirebase()
+	// We instantiate a new repository targeting the given path (the .git folder)
+	r, err := git.PlainOpen(".")
+	CheckIfError(err)
+	// ... retrieving the HEAD reference
+	ref, err := r.Head()
+	commitHash = ref.Hash().String()
+	CheckIfError(err)
 
 	exchangeVars := iex.ExchangeConf{
 		Exchange:       "binance",
@@ -118,11 +125,11 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 func LogStatus(influx *influxdb.Client, algo *Algo) {
 
 	myMetrics := []influxdb.Metric{
-		influxdb.NewRowMetric(structs.Map(algo.Asset), "asset", map[string]string{"algo_name": algo.Name}, time.Now()),
+		influxdb.NewRowMetric(structs.Map(algo.Asset), "asset", map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}, time.Now()),
 	}
 
 	if algo.State != nil {
-		myMetrics = append(myMetrics, influxdb.NewRowMetric(algo.State, "state", map[string]string{"algo_name": algo.Name}, time.Now()))
+		myMetrics = append(myMetrics, influxdb.NewRowMetric(algo.State, "state", map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}, time.Now()))
 	}
 
 	// The actual write..., this method can be called concurrently.

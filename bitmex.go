@@ -11,6 +11,8 @@ import (
 	"github.com/tantralabs/TheAlgoV2/settings"
 	"github.com/tantralabs/exchanges/bitmex"
 	"github.com/tantralabs/exchanges/bitmex/swagger"
+	"gopkg.in/src-d/go-git.v4"
+	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
 var config settings.Config
@@ -30,6 +32,14 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 	influx, err := influxdb.New("https://us-west-2-1.aws.cloud2.influxdata.com",
 		"xskhvPlukzR2jXsKO2jbfcW_g6ekxpMKrfTx5Ui400iKjeG-bTQTeQf_fgjT_dH0jYQbls0b_F_sDgITQVn4hA==",
 		influxdb.WithHTTPClient(http.DefaultClient))
+
+	// We instantiate a new repository targeting the given path (the .git folder)
+	r, err := git.PlainOpen(".")
+	CheckIfError(err)
+	// ... retrieving the HEAD reference
+	ref, err := r.Head()
+	commitHash = ref.Hash().String()
+	CheckIfError(err)
 
 	if err != nil {
 		log.Fatal(err)
