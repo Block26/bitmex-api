@@ -23,6 +23,7 @@
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
+                    "awslogs-create-group": "true",
                     "awslogs-group": "/ecs/ALGO_NAME-service",
                     "awslogs-region": "us-west-1",
                     "awslogs-stream-prefix": "ecs"

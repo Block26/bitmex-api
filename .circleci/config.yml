@@ -15,6 +15,9 @@ jobs:
       - run: printf "\n[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig
       - run: go mod download
       - run: CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+      - run: apk add --no-cache wget
+      - run: wget https://dl.influxdata.com/telegraf/releases/telegraf-1.12.4_linux_amd64.tar.gz
+      - run: tar xf telegraf-1.12.4_linux_amd64.tar.gz
       - persist_to_workspace:
           root: /tmp/project
           paths: 

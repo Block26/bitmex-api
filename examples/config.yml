@@ -1,0 +1,61 @@
+version: 2.1
+orbs:
+  aws-ecr: circleci/aws-ecr@6.2.0
+  aws-ecs: circleci/aws-ecs@0.0.10
+
+jobs:
+  build:
+    docker: 
+      - image: golang:1.13-alpine
+    working_directory: /tmp/project
+    steps:
+      - run: apk add --no-cache git mercurial
+      - run: apk add --no-cache openssh
+      - add_ssh_keys
+      - checkout
+      - run: printf "\n[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig
+      - run: printf "\n[url \"git@gitlab.com:\"]\n\tinsteadOf = https://gitlab.com/" >> /root/.gitconfig
+      - run: ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts
+      - run: go mod download
+      - run: go mod vendor
+      - run: mv /tmp/project/vendor/github.com/tantralabs/TheAlgoV2/settings /tmp/project/settings
+      - run: mv /tmp/project/vendor/github.com/tantralabs/TheAlgoV2/ca-certificates.crt /tmp/project/ca-certificates.crt
+      - run: CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+      - persist_to_workspace:
+          root: /tmp/project
+          paths: 
+            - settings/*
+            - ca-certificates.crt
+            - main
+            - Dockerfile
+
+workflows:
+  build_test_deploy:
+    jobs: 
+      - build
+      - aws-ecr/build-and-push-image:
+          context: AWS-ECS
+          pre-steps:
+            - attach_workspace:
+                at: ~/project/build
+          requires:
+            - build
+          checkout: false
+          create-repo: true
+          account-url: AWS_MM_ECR_ACCOUNT_URL
+          dockerfile: ~/project/build/Dockerfile
+          path: ~/project/build
+          profile-name: b26
+          repo: ALGO_NAME
+          tag: '${CIRCLE_SHA1}'
+      - aws-ecs/deploy-service-update:
+          context: AWS-ECS
+          requires:
+            - aws-ecr/build-and-push-image
+          family: "ALGO_NAME-service"
+          cluster-name: "MM-cluster"
+          container-image-name-updates: "container=ALGO_NAME-Latest,tag=${CIRCLE_SHA1}"
+          verify-revision-is-deployed: true
+
+
+
