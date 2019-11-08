@@ -3,9 +3,7 @@ package algo
 import (
 	"log"
 	"math"
-	"net/http"
 
-	"github.com/influxdata/influxdb-client-go"
 	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/TheAlgoV2/settings"
@@ -28,10 +26,6 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 	}
 
 	config = loadConfiguration(settingsFile, secret)
-
-	influx, err := influxdb.New("https://us-west-2-1.aws.cloud2.influxdata.com",
-		"xskhvPlukzR2jXsKO2jbfcW_g6ekxpMKrfTx5Ui400iKjeG-bTQTeQf_fgjT_dH0jYQbls0b_F_sDgITQVn4hA==",
-		influxdb.WithHTTPClient(http.DefaultClient))
 
 	// We instantiate a new repository targeting the given path (the .git folder)
 	r, err := git.PlainOpen(".")
@@ -112,7 +106,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 			// log.Println("Sells", algo.SellOrders.Quantity)
 			// log.Println("New order length", len(algo.BuyOrders.Price), len(algo.SellOrders.Price))
 			b.PlaceOrdersOnBook(config.Symbol, algo.BuyOrders, algo.SellOrders, orders)
-			LogStatus(influx, &algo)
+			LogStatus(&algo)
 			algo.logState("")
 			updateAlgo(fireDB, "mm")
 		}

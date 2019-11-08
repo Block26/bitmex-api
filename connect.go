@@ -1,17 +1,14 @@
 package algo
 
 import (
-	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/fatih/structs"
-	"github.com/influxdata/influxdb-client-go"
-
+	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 
@@ -21,14 +18,6 @@ import (
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo)) {
 	config = loadConfiguration(settingsFile, secret)
-
-	influx, err := influxdb.New("https://us-west-2-1.aws.cloud2.influxdata.com",
-		"xskhvPlukzR2jXsKO2jbfcW_g6ekxpMKrfTx5Ui400iKjeG-bTQTeQf_fgjT_dH0jYQbls0b_F_sDgITQVn4hA==",
-		influxdb.WithHTTPClient(http.DefaultClient))
-
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// We instantiate a new repository targeting the given path (the .git folder)
 	r, err := git.PlainOpen(".")
@@ -85,7 +74,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		TradeBinChan: make(chan []iex.TradeBin, 2),
 	}
 
-	LogStatus(influx, &algo)
+	LogStatus(&algo)
 	// Start the websocket.
 	err = ex.StartWS(&iex.WsConfig{Host: "", Streams: subscribeInfos, Channels: channels})
 	if err != nil {
@@ -118,22 +107,45 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	log.Println(toCreate)
 	log.Println(toCancel)
 	algo.logState("")
-	influx.Close()
 	// updateAlgo(fireDB, "mm")
 }
 
-func LogStatus(influx *influxdb.Client, algo *Algo) {
+func LogStatus(algo *Algo) {
+	influx, err := client.NewHTTPClient(client.HTTPConfig{
+		Addr:     "http://ec2-54-219-145-3.us-west-1.compute.amazonaws.com:8086",
+		Username: "russell",
+		Password: "KNW(12nAS921D",
+	})
+	CheckIfError(err)
 
-	myMetrics := []influxdb.Metric{
-		influxdb.NewRowMetric(structs.Map(algo.Asset), "asset", map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}, time.Now()),
-	}
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+		Database:  "algos",
+		Precision: "us",
+	})
+
+	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}
+	fields := structs.Map(algo.Asset)
+
+	pt, err := client.NewPoint(
+		"asset",
+		tags,
+		fields,
+		time.Now(),
+	)
+	bp.AddPoint(pt)
 
 	if algo.State != nil {
-		myMetrics = append(myMetrics, influxdb.NewRowMetric(algo.State, "state", map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}, time.Now()))
+		pt, err := client.NewPoint(
+			"state",
+			tags,
+			algo.State,
+			time.Now(),
+		)
+		CheckIfError(err)
+		bp.AddPoint(pt)
 	}
 
-	// The actual write..., this method can be called concurrently.
-	if _, err := influx.Write(context.Background(), "algos", "Tantra Labs", myMetrics...); err != nil {
-		log.Fatal(err) // as above use your own error handling here.
-	}
+	err = client.Client.Write(influx, bp)
+	CheckIfError(err)
+	influx.Close()
 }
