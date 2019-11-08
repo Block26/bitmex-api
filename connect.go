@@ -122,10 +122,26 @@ func LogStatus(algo *Algo) {
 	})
 
 	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}
+
 	fields := structs.Map(algo.Asset)
 
 	pt, err := client.NewPoint(
 		"asset",
+		tags,
+		fields,
+		time.Now(),
+	)
+	bp.AddPoint(pt)
+
+	fields = map[string]interface{}{
+		"buy_quantity":  algo.BuyOrders.Quantity,
+		"buy_price":     algo.BuyOrders.Price,
+		"sell_quantity": algo.SellOrders.Quantity,
+		"sell_price":    algo.SellOrders.Price,
+	}
+
+	pt, err = client.NewPoint(
+		"orders",
 		tags,
 		fields,
 		time.Now(),
