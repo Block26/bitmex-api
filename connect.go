@@ -133,20 +133,33 @@ func LogStatus(algo *Algo) {
 	)
 	bp.AddPoint(pt)
 
-	fields = map[string]interface{}{
-		"buy_quantity":  algo.BuyOrders.Quantity,
-		"buy_price":     algo.BuyOrders.Price,
-		"sell_quantity": algo.SellOrders.Quantity,
-		"sell_price":    algo.SellOrders.Price,
+	for index := 0; index < len(algo.BuyOrders.Quantity); index++ {
+
+		fields = map[string]interface{}{
+			fmt.Sprintf("%0.2f", algo.BuyOrders.Price[index]): algo.BuyOrders.Quantity[index],
+		}
+
+		pt, err = client.NewPoint(
+			"buy_orders",
+			tags,
+			fields,
+			time.Now(),
+		)
+		bp.AddPoint(pt)
 	}
 
-	pt, err = client.NewPoint(
-		"orders",
-		tags,
-		fields,
-		time.Now(),
-	)
-	bp.AddPoint(pt)
+	for index := 0; index < len(algo.SellOrders.Quantity); index++ {
+		fields = map[string]interface{}{
+			fmt.Sprintf("%0.2f", algo.SellOrders.Price[index]): algo.SellOrders.Quantity[index],
+		}
+		pt, err = client.NewPoint(
+			"sell_orders",
+			tags,
+			fields,
+			time.Now(),
+		)
+		bp.AddPoint(pt)
+	}
 
 	if algo.State != nil {
 		pt, err := client.NewPoint(
