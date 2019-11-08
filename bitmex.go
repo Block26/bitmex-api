@@ -9,8 +9,7 @@ import (
 	"github.com/tantralabs/TheAlgoV2/settings"
 	"github.com/tantralabs/exchanges/bitmex"
 	"github.com/tantralabs/exchanges/bitmex/swagger"
-	"gopkg.in/src-d/go-git.v4"
-	. "gopkg.in/src-d/go-git.v4/_examples"
+	// . "gopkg.in/src-d/go-git.v4/_examples"
 )
 
 var config settings.Config
@@ -28,16 +27,16 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 	config = loadConfiguration(settingsFile, secret)
 
 	// We instantiate a new repository targeting the given path (the .git folder)
-	r, err := git.PlainOpen(".")
-	CheckIfError(err)
+	// r, err := git.PlainOpen(".")
+	// CheckIfError(err)
 	// ... retrieving the HEAD reference
-	ref, err := r.Head()
-	commitHash = ref.Hash().String()
-	CheckIfError(err)
+	// ref, err := r.Head()
+	commitHash = "test" //ef.Hash().String()
+	// CheckIfError(err)
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 	// settings = loadConfiguration("dev/mm/testnet", true)
 	log.Println(config)
 	fireDB := setupFirebase()
@@ -61,7 +60,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 		{Op: bitmex.BitmexWSWallet},
 	}
 
-	err = b.Subscribe(subscribeInfos)
+	err := b.Subscribe(subscribeInfos)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -11,8 +11,6 @@ import (
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
-
-	"gopkg.in/src-d/go-git.v4"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
@@ -20,12 +18,12 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	config = loadConfiguration(settingsFile, secret)
 
 	// We instantiate a new repository targeting the given path (the .git folder)
-	r, err := git.PlainOpen(".")
-	CheckIfError(err)
+	// r, err := git.PlainOpen(".")
+	// CheckIfError(err)
 	// ... retrieving the HEAD reference
-	ref, err := r.Head()
-	commitHash = ref.Hash().String()
-	CheckIfError(err)
+	// ref, err := r.Head()
+	commitHash = "test" //ref.Hash().String()
+	// CheckIfError(err)
 
 	exchangeVars := iex.ExchangeConf{
 		Exchange:       "binance",
