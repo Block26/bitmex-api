@@ -41,7 +41,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 	log.Println(config)
 	fireDB := setupFirebase()
 
-	var orders []*swagger.Order
+	var localOrders []*swagger.Order
 	var b *bitmex.BitMEX
 
 	localBars := data.GetData(algo.Asset.Symbol, "1m", algo.DataLength)
@@ -75,7 +75,7 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 			log.Println("Error with wallet amount, Wallet returned 0")
 		}
 	}).On(bitmex.BitmexWSOrder, func(newOrders []*swagger.Order, action string) {
-		orders = bitmex.UpdateLocalOrders(orders, newOrders)
+		localOrders = bitmex.UpdateLocalOrders(localOrders, newOrders)
 	}).On(bitmex.BitmexWSPosition, func(positions []*swagger.Position, action string) {
 		position := positions[0]
 		algo.Asset.Quantity = float64(position.CurrentQty)
@@ -99,12 +99,12 @@ func ConnectToBitmex(settingsFile string, secret bool, algo Algo, rebalance func
 			log.Println("Total Buy USD", (algo.Asset.Buying * bin.BidPrice))
 			log.Println("Total Sell BTC", (algo.Asset.Selling))
 			log.Println("Total Sell USD", (algo.Asset.Selling * bin.BidPrice))
-			log.Println("Local order length", len(orders))
+			log.Println("Local order length", len(localOrders))
 			log.Println("New order length", len(algo.BuyOrders.Quantity), len(algo.SellOrders.Quantity))
 			// log.Println("Buys", algo.BuyOrders.Quantity)
 			// log.Println("Sells", algo.SellOrders.Quantity)
 			// log.Println("New order length", len(algo.BuyOrders.Price), len(algo.SellOrders.Price))
-			b.PlaceOrdersOnBook(config.Symbol, algo.BuyOrders, algo.SellOrders, orders)
+			b.PlaceOrdersOnBook(config.Symbol, algo.BuyOrders, algo.SellOrders, localOrders)
 			LogStatus(&algo)
 			algo.logState("")
 			updateAlgo(fireDB, "mm")

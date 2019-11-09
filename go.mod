@@ -4,7 +4,7 @@ go 1.13
 
 // replace github.com/tantralabs/exchanges => ../../tantralabs/exchanges
 
-// replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
+replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
 
 require (
 	firebase.google.com/go v3.10.0+incompatible
