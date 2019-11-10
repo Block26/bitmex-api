@@ -6,6 +6,7 @@ package algo
 
 import (
 	"github.com/tantralabs/exchanges/models"
+	algoModels "github.com/tantralabs/TheAlgoV2/models"
 )
 
 var commitHash string
@@ -42,6 +43,7 @@ type Algo struct {
 	SellOrders models.OrderArray
 	Index      int
 	DataLength int
+	History    []algoModels.History
 
 	//Custom
 	EntrySpread     float64

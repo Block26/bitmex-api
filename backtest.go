@@ -1,6 +1,7 @@
 package algo
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
@@ -9,16 +10,54 @@ import (
 
 	"unsafe"
 
-	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/c-bata/goptuna"
+	"github.com/c-bata/goptuna/tpe"
 	"github.com/gocarina/gocsv"
+	"github.com/tantralabs/TheAlgoV2/models"
+	"golang.org/x/sync/errgroup"
 )
-
-var history []models.History
 
 // var minimumOrderSize = 25
 
-func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) {
-	log.Println("Loading Data... ")
+func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
+	study, err := goptuna.CreateStudy(
+		"optmm",
+		goptuna.StudyOptionSampler(tpe.NewSampler()),
+		goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMinimize),
+	)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// err = study.Optimize(objective, episodes)
+
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	//Multithread - memory leak
+	eg, ctx := errgroup.WithContext(context.Background())
+	study.WithContext(ctx)
+	for i := 0; i < 5; i++ {
+		eg.Go(func() error {
+			return study.Optimize(objective, episodes/5)
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		log.Fatal(err)
+	}
+
+	// Print the best evaluation value and the parameters.
+	// Mathematically, argmin F(x1, x2) is (x1, x2) = (+2, -5).
+	v, _ := study.GetBestValue()
+	p, _ := study.GetBestParams()
+	log.Printf("Best evaluation value=%f", v)
+	log.Println(p)
+}
+
+func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) float64 {
+	// log.Println("Loading Data... ")
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
@@ -29,7 +68,7 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]model
 		panic(err)
 	}
 	defer dataFile.Close()
-	log.Println("Done Loading Data... ")
+	// log.Println("Done Loading Data... ")
 
 	bars := []models.Bar{}
 
@@ -48,6 +87,7 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]model
 	score := runSingleTest(&bars, a, rebalance)
 	log.Println("Score", score)
 	// optimize(bars)
+	return score
 }
 
 func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
@@ -81,19 +121,19 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 
 			// updateBalanceXBTStrat(bar)
 			algo.logState(timestamp)
-			// history.Balance[len(history.Balance)-1], == portfolio value
-			// portfolioValue := history.Balance[len(history.Balance)-1]
+			// algo.History.Balance[len(algo.History.Balance)-1], == portfolio value
+			// portfolioValue := algo.History.Balance[len(algo.History.Balance)-1]
 		}
 		idx++
 	}
 
 	elapsed := time.Since(start)
 	log.Println("End Timestamp", timestamp)
-	minProfit, maxProfit, _, maxLeverage := MinMaxStats(history)
+	minProfit, maxProfit, _, maxLeverage := MinMaxStats(algo.History)
 
-	log.Printf("Balance %0.4f \n", history[len(history)-1].Balance)
-	log.Printf("Cost %0.4f \n", history[len(history)-1].AverageCost)
-	log.Printf("Quantity %0.4f \n", history[len(history)-1].Quantity)
+	log.Printf("Balance %0.4f \n", algo.History[len(algo.History)-1].Balance)
+	log.Printf("Cost %0.4f \n", algo.History[len(algo.History)-1].AverageCost)
+	log.Printf("Quantity %0.4f \n", algo.History[len(algo.History)-1].Quantity)
 	log.Printf("Max Leverage %0.4f \n", maxLeverage)
 
 	log.Printf("Max Profit %0.4f \n", maxProfit)
@@ -101,22 +141,24 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 	log.Println("Execution Speed", elapsed)
 	//Very primitive score, how much leverage did I need to achieve this balance
 
-	historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
-	if err != nil {
-		panic(err)
-	}
-	defer historyFile.Close()
+	// algo.HistoryFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer algo.HistoryFile.Close()
 
-	err = gocsv.MarshalFile(&history, historyFile) // Use this to save the CSV back to the file
-	if err != nil {
-		panic(err)
-	}
+	// err = gocsv.MarshalFile(&algo.History, algo.HistoryFile) // Use this to save the CSV back to the file
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	return 1 //history.Balance[len(history.Balance)-1] / (maxLeverage + 1)
+	// score := algo.History[len(algo.History)-1].Balance - (maxLeverage * 10) - minProfit // maximize
+	score := ((math.Abs(minProfit) / algo.History[len(algo.History)-1].Balance) + maxLeverage) - algo.History[len(algo.History)-1].Balance // minimize
+	return score                                                                                                                           //algo.History.Balance[len(algo.History.Balance)-1] / (maxLeverage + 1)
 }
 
 func (algo *Algo) logState(timestamp string) {
-	// history.Timestamp = append(history.Timestamp, timestamp)
+	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
 	var balance float64
 	if algo.Futures {
 		balance = algo.Asset.BaseBalance
@@ -125,16 +167,16 @@ func (algo *Algo) logState(timestamp string) {
 		balance = algo.Asset.BaseBalance + (algo.Asset.Quantity * algo.Asset.Price)
 		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
 		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity)) / (algo.Asset.BaseBalance * algo.Asset.Price)
-		// history.Balance = append(history.Balance, balance)
+		// algo.History.Balance = append(algo.History.Balance, balance)
 	}
-	// history.Quantity = append(history.Quantity, algo.Asset.Quantity)
-	// history.AverageCost = append(history.AverageCost, algo.Asset.AverageCost)
+	// algo.History.Quantity = append(algo.History.Quantity, algo.Asset.Quantity)
+	// algo.History.AverageCost = append(algo.History.AverageCost, algo.Asset.AverageCost)
 
-	// history.Leverage = append(history.Leverage, algo.Asset.Leverage)
+	// algo.History.Leverage = append(algo.History.Leverage, algo.Asset.Leverage)
 	algo.Asset.Profit = algo.CurrentProfit(algo.Asset.Price) * algo.Asset.Leverage
-	// history.Profit = append(history.Profit, algo.Asset.Profit)
+	// algo.History.Profit = append(algo.History.Profit, algo.Asset.Profit)
 
-	history = append(history, models.History{
+	algo.History = append(algo.History, models.History{
 		Timestamp:   timestamp,
 		Balance:     balance,
 		UBalance:    balance + (balance * algo.Asset.Profit),
