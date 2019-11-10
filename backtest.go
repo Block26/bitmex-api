@@ -1,7 +1,6 @@
 package algo
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"math"
@@ -14,7 +13,6 @@ import (
 	"github.com/c-bata/goptuna/tpe"
 	"github.com/gocarina/gocsv"
 	"github.com/tantralabs/TheAlgoV2/models"
-	"golang.org/x/sync/errgroup"
 )
 
 // var minimumOrderSize = 25
@@ -23,30 +21,31 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	study, err := goptuna.CreateStudy(
 		"optmm",
 		goptuna.StudyOptionSampler(tpe.NewSampler()),
-		goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMinimize),
+		goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMaximize),
+		// goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMinimize),
 	)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// err = study.Optimize(objective, episodes)
+	err = study.Optimize(objective, episodes)
 
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	//Multithread - memory leak
-	eg, ctx := errgroup.WithContext(context.Background())
-	study.WithContext(ctx)
-	for i := 0; i < 5; i++ {
-		eg.Go(func() error {
-			return study.Optimize(objective, episodes/5)
-		})
-	}
-	if err := eg.Wait(); err != nil {
+	if err != nil {
 		log.Fatal(err)
 	}
+
+	//Multithread - memory leak
+	// eg, ctx := errgroup.WithContext(context.Background())
+	// study.WithContext(ctx)
+	// for i := 0; i < 5; i++ {
+	// 	eg.Go(func() error {
+	// 		return study.Optimize(objective, episodes/5)
+	// 	})
+	// }
+	// if err := eg.Wait(); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// Print the best evaluation value and the parameters.
 	// Mathematically, argmin F(x1, x2) is (x1, x2) = (+2, -5).
@@ -152,9 +151,9 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 	// 	panic(err)
 	// }
 
-	// score := algo.History[len(algo.History)-1].Balance - (maxLeverage * 10) - minProfit // maximize
-	score := ((math.Abs(minProfit) / algo.History[len(algo.History)-1].Balance) + maxLeverage) - algo.History[len(algo.History)-1].Balance // minimize
-	return score                                                                                                                           //algo.History.Balance[len(algo.History.Balance)-1] / (maxLeverage + 1)
+	score := (algo.History[len(algo.History)-1].Balance - 1) + (minProfit * maxLeverage) // maximize
+	// score := ((math.Abs(minProfit) / algo.History[len(algo.History)-1].Balance) + maxLeverage) - algo.History[len(algo.History)-1].Balance // minimize
+	return score //algo.History.Balance[len(algo.History.Balance)-1] / (maxLeverage + 1)
 }
 
 func (algo *Algo) logState(timestamp string) {
