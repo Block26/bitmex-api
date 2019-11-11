@@ -2,11 +2,12 @@ package algo
 
 import (
 	"log"
+	"time"
 
 	"github.com/tantralabs/tradeapi/iex"
 )
 
-func (a *Algo) PlaceOrdersOnBook(openOrders []iex.WSOrder) ([]iex.Order, []iex.WSOrder) {
+func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]iex.Order, []iex.WSOrder) {
 	var orders []iex.Order
 	totalQty := 0.0
 	for i, qty := range a.BuyOrders.Quantity {
@@ -17,7 +18,7 @@ func (a *Algo) PlaceOrdersOnBook(openOrders []iex.WSOrder) ([]iex.Order, []iex.W
 				Market: a.Asset.Symbol,
 				Amount: totalQty,
 				Rate:   orderPrice,
-				Type:   "Limit",
+				Type:   "Buy",
 			}
 			orders = append(orders, order)
 			totalQty = 0.0
@@ -33,7 +34,7 @@ func (a *Algo) PlaceOrdersOnBook(openOrders []iex.WSOrder) ([]iex.Order, []iex.W
 				Market: a.Asset.Symbol,
 				Amount: totalQty,
 				Rate:   orderPrice,
-				Type:   "Limit",
+				Type:   "Sell",
 			}
 			orders = append(orders, order)
 			totalQty = 0.0
@@ -46,15 +47,50 @@ func (a *Algo) PlaceOrdersOnBook(openOrders []iex.WSOrder) ([]iex.Order, []iex.W
 		if newOrder.Type != "Market" {
 			orderFound := false
 			for _, oldOrder := range openOrders {
-				// If we are trying to place the same order then just leave the current one
 				if !orderFound && oldOrder.Price == newOrder.Rate && oldOrder.OrderQty == newOrder.Amount {
+					// If we are trying to place the same order then just leave the current one
 					orderFound = true
 					orderToPlace = append(orderToPlace, newOrder.Rate)
+					break
+				} else if !orderFound && oldOrder.Price == newOrder.Rate {
+					// If we are trying to place the same order with a different quantity
+					// then we should cancel it and place the new order
+					orderFound = true
+					orderToPlace = append(orderToPlace, newOrder.Rate)
+					err := ex.CancelOrder(iex.CancelOrderF{
+						Market: oldOrder.Symbol,
+						Uuid:   oldOrder.OrderID,
+					})
+					if err != nil {
+						log.Fatal(err)
+					}
+					log.Println("Canceled", oldOrder.OrderID)
+					time.Sleep(1 * time.Second)
+					if newOrder.Type == "Buy" {
+						uuid, err := ex.BuyLimit(newOrder)
+						if err != nil {
+							log.Fatal(err)
+						} else {
+							log.Println("Placed", uuid)
+						}
+					} else {
+						uuid, err := ex.SellLimit(newOrder)
+						if err != nil {
+							log.Fatal(err)
+						} else {
+							log.Println("Placed", uuid)
+						}
+					}
 					break
 				}
 			}
 			if !orderFound {
-				toCreate = append(toCreate, newOrder)
+				// toCreate = append(toCreate, newOrder)
+				if newOrder.Type == "Buy" {
+					ex.BuyLimit(newOrder)
+				} else {
+					ex.SellLimit(newOrder)
+				}
 				orderToPlace = append(orderToPlace, newOrder.Rate)
 			}
 		}
@@ -70,17 +106,22 @@ func (a *Algo) PlaceOrdersOnBook(openOrders []iex.WSOrder) ([]iex.Order, []iex.W
 			}
 		}
 		if !found {
-			toCancel = append(toCancel, oldOrder)
+			// toCancel = append(toCancel, oldOrder)
+			err := ex.CancelOrder(iex.CancelOrderF{
+				Market: oldOrder.Symbol,
+				Uuid:   oldOrder.OrderID,
+			})
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Println("Canceled", oldOrder.OrderID)
+			time.Sleep(1 * time.Second)
 		}
 	}
 
-	// return toCreate, toAmend, toCancel
-	// Cancel first?
-	// Should consider cancel/create in 10 order blocks so cancel 10 then create the 10 to replace
-	// b.CancelOrders(toCancel, 0)
-	// b.CreateOrders(toCreate, 0)
-	log.Println(len(toCreate), "toCreate")
-	log.Println(len(toCancel), "toCancel")
+	// log.Println(len(toCreate), "toCreate")
+	// log.Println(len(toCancel), "toCancel")
+
 	return toCreate, toCancel
 }
 

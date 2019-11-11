@@ -3,18 +3,20 @@ package algo
 import (
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
-func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo)) {
+func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) {
 	config = loadConfiguration(settingsFile, secret)
 
 	// We instantiate a new repository targeting the given path (the .git folder)
@@ -42,42 +44,41 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		fmt.Println(err)
 	}
 
-	//Get base and quote balances
-	// baseCurrencyBalance, err := ex.GetBalance(base_currency)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// fmt.Printf("base_currency balance: %+v \n", baseCurrencyBalance.Available)
-
-	// algo.Asset.BaseBalance = baseCurrencyBalance.Available
-
-	// quoteCurrencyBalance, err := ex.GetBalance(quote_currency)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// fmt.Printf("quote_currency balance: %+v \n", quoteCurrencyBalance.Available)
-	// algo.Asset.Quantity = quoteCurrencyBalance.Available
-
-	// mkt, err := ex.GetMarketSummary(quote_currency, base_currency)
-	// fmt.Printf("markets: %+v \n", mkt)
-
 	// channels to subscribe to
 	symbol := strings.ToLower(quote_currency + base_currency)
 
+	bal, err := ex.GetBalance("XBTUSD")
+	fmt.Printf("Balance: %+v \n", bal)
+
+	uuid, err := ex.BuyLimit(iex.Order{
+		Market: strings.ToUpper(symbol),
+		Rate:   7000.0,
+		Amount: 10,
+		Type:   "Buy",
+	})
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	log.Println(uuid)
+
+	//Ordering is important, get wallet and position first then market info
 	subscribeInfos := []iex.WSSubscribeInfo{
-		{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol},
 		{Name: iex.WS_WALLET, Symbol: symbol},
 		{Name: iex.WS_ORDER, Symbol: symbol},
+		{Name: iex.WS_POSITION, Symbol: symbol},
+		{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol},
 	}
 
 	// Channels for recieving websocket response.
 	channels := &iex.WSChannels{
+		PositionChan: make(chan []iex.WsPosition, 2),
 		TradeBinChan: make(chan []iex.TradeBin, 2),
 		WalletChan:   make(chan *iex.WSWallet, 2),
 		OrderChan:    make(chan []iex.WSOrder, 2),
 	}
 
-	// LogStatus(&algo)
 	// Start the websocket.
 	err = ex.StartWS(&iex.WsConfig{Host: "testnet.bitmex.com", //"stream.binance.us:9443",
 		Streams:   subscribeInfos,
@@ -95,15 +96,25 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 
 	for {
 		select {
+		case positions := <-channels.PositionChan:
+			log.Println("Position Update:", positions)
+			position := positions[0]
+			algo.Asset.Quantity = float64(position.CurrentQty)
+			if math.Abs(algo.Asset.Quantity) > 0 && position.AvgCostPrice > 0 {
+				algo.Asset.AverageCost = position.AvgCostPrice
+			} else if position.CurrentQty == 0 {
+				algo.Asset.AverageCost = 0
+			}
+			log.Println("AvgCostPrice", algo.Asset.AverageCost, "Quantity", algo.Asset.Quantity)
 		case trade := <-channels.TradeBinChan:
 			log.Println("Trade Update:", trade)
 			algo.Asset.Price = trade[0].Close
 			rebalance(trade[0].Close, &algo)
-			algo.PlaceOrdersOnBook(localOrders)
+			algo.PlaceOrdersOnBook(ex, localOrders)
 		case newOrders := <-channels.OrderChan:
 			localOrders = UpdateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
-			walletAmount := float64(update.Balance[0].Amount)
+			walletAmount := float64(update.Balance[0].Balance)
 			if walletAmount > 0 {
 				algo.Asset.BaseBalance = walletAmount * 0.00000001
 				fmt.Printf("BaseBalance: %+v \n", algo.Asset.BaseBalance)
