@@ -2,7 +2,6 @@ package algo
 
 import (
 	"log"
-	"time"
 
 	"github.com/tantralabs/tradeapi/iex"
 )
@@ -10,6 +9,7 @@ import (
 func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]iex.Order, []iex.WSOrder) {
 	var orders []iex.Order
 	totalQty := 0.0
+	//TODO
 	for i, qty := range a.BuyOrders.Quantity {
 		totalQty = totalQty + qty
 		if totalQty > a.Asset.MinimumOrderSize {
@@ -43,6 +43,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 
 	var toCreate []iex.Order
 	var orderToPlace []float64
+
 	for _, newOrder := range orders {
 		if newOrder.Type != "Market" {
 			orderFound := false
@@ -57,40 +58,11 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 					// then we should cancel it and place the new order
 					orderFound = true
 					orderToPlace = append(orderToPlace, newOrder.Rate)
-					err := ex.CancelOrder(iex.CancelOrderF{
-						Market: oldOrder.Symbol,
-						Uuid:   oldOrder.OrderID,
-					})
-					if err != nil {
-						log.Fatal(err)
-					}
-					log.Println("Canceled", oldOrder.OrderID)
-					time.Sleep(1 * time.Second)
-					if newOrder.Type == "Buy" {
-						uuid, err := ex.BuyLimit(newOrder)
-						if err != nil {
-							log.Fatal(err)
-						} else {
-							log.Println("Placed", uuid)
-						}
-					} else {
-						uuid, err := ex.SellLimit(newOrder)
-						if err != nil {
-							log.Fatal(err)
-						} else {
-							log.Println("Placed", uuid)
-						}
-					}
 					break
 				}
 			}
 			if !orderFound {
-				// toCreate = append(toCreate, newOrder)
-				if newOrder.Type == "Buy" {
-					ex.BuyLimit(newOrder)
-				} else {
-					ex.SellLimit(newOrder)
-				}
+				toCreate = append(toCreate, newOrder)
 				orderToPlace = append(orderToPlace, newOrder.Rate)
 			}
 		}
@@ -106,16 +78,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 			}
 		}
 		if !found {
-			// toCancel = append(toCancel, oldOrder)
-			err := ex.CancelOrder(iex.CancelOrderF{
-				Market: oldOrder.Symbol,
-				Uuid:   oldOrder.OrderID,
-			})
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Println("Canceled", oldOrder.OrderID)
-			time.Sleep(1 * time.Second)
+			toCancel = append(toCancel, oldOrder)
 		}
 	}
 
