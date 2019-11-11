@@ -47,21 +47,21 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	// channels to subscribe to
 	symbol := strings.ToLower(quote_currency + base_currency)
 
-	bal, err := ex.GetBalance("XBTUSD")
-	fmt.Printf("Balance: %+v \n", bal)
+	// bal, err := ex.GetBalance("XBTUSD")
+	// fmt.Printf("Balance: %+v \n", bal)
 
-	uuid, err := ex.BuyLimit(iex.Order{
-		Market: strings.ToUpper(symbol),
-		Rate:   7000.0,
-		Amount: 10,
-		Type:   "Buy",
-	})
+	// uuid, err := ex.BuyLimit(iex.Order{
+	// 	Market: strings.ToUpper(symbol),
+	// 	Rate:   7000.0,
+	// 	Amount: 10,
+	// 	Type:   "Limit",
+	// })
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	log.Println(uuid)
+	// log.Println(uuid)
 
 	//Ordering is important, get wallet and position first then market info
 	subscribeInfos := []iex.WSSubscribeInfo{
