@@ -11,6 +11,8 @@ import (
 	"github.com/tantralabs/exchanges/models"
 )
 
+// Load a config file containing sensitive information from a local
+// json file or from an amazon secrets file
 func loadConfiguration(file string, secret bool) settings.Config {
 	var config settings.Config
 	if secret {
@@ -30,6 +32,7 @@ func loadConfiguration(file string, secret bool) settings.Config {
 	}
 }
 
+//Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
 func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 	if a.Futures {
 		return percentage * a.Asset.BaseBalance
@@ -42,6 +45,7 @@ func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 	}
 }
 
+//Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
 func CreateSpread(weight int32, confidence float64, price float64, spread float64, tickSize float64, maxOrders int32) models.OrderArray {
 	xStart := 0.0
 	if weight == 1 {
@@ -81,6 +85,7 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
 }
 
+// Break down the bars into open, high, low, close arrays that are easier to manipulate.
 func GetOHLCBars(bars []algoModels.Bar) ([]float64, []float64, []float64, []float64) {
 	open := make([]float64, len(bars))
 	high := make([]float64, len(bars))
@@ -115,6 +120,7 @@ func arange(min float64, max float64, step float64) []float64 {
 	return a
 }
 
+// Apply an exponent to a slice
 func expArr(arr []float64, exp float64) []float64 {
 	a := make([]float64, len(arr))
 	for i := range arr {
@@ -127,6 +133,7 @@ func expArr(arr []float64, exp float64) []float64 {
 	return a
 }
 
+// Multiply a slice by another slice of the same length
 func mulArrs(a []float64, b []float64) []float64 {
 	n := make([]float64, len(a))
 	for i := range a {
@@ -135,6 +142,7 @@ func mulArrs(a []float64, b []float64) []float64 {
 	return n
 }
 
+// Multiply a slice by a float
 func mulArr(arr []float64, multiple float64) []float64 {
 	a := make([]float64, len(arr))
 	for i := range arr {
@@ -143,6 +151,7 @@ func mulArr(arr []float64, multiple float64) []float64 {
 	return a
 }
 
+// Divide all elements of a slice by a float
 func divArr(arr []float64, divisor float64) []float64 {
 	a := make([]float64, len(arr))
 	for i := range arr {
@@ -151,6 +160,7 @@ func divArr(arr []float64, divisor float64) []float64 {
 	return a
 }
 
+// Get the sum of all elements in a slice
 func sumArr(arr []float64) float64 {
 	sum := 0.0
 	for i := range arr {
