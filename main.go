@@ -5,16 +5,19 @@
 package algo
 
 import (
-	"github.com/tantralabs/exchanges/models"
 	algoModels "github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/exchanges/models"
 )
 
 var commitHash string
 
 type Asset struct {
 	Symbol           string
+	Market           string
+	Currency         string
 	Exchange         string
 	ExchangeURL      string
+	WSStream         string
 	BaseBalance      float64
 	Quantity         float64
 	AverageCost      float64

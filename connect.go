@@ -36,16 +36,13 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		OutputResponse: false,
 	}
 
-	base_currency := "USD"
-	quote_currency := "XBT"
-
 	ex, err := tradeapi.New(exchangeVars)
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	// channels to subscribe to
-	symbol := strings.ToLower(quote_currency + base_currency)
+	symbol := strings.ToLower(algo.Asset.Market + algo.Asset.Currency)
 
 	// bal, err := ex.GetBalance("XBTUSD")
 	// fmt.Printf("Balance: %+v \n", bal)
@@ -80,7 +77,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	}
 
 	// Start the websocket.
-	err = ex.StartWS(&iex.WsConfig{Host: "testnet.bitmex.com", //"stream.binance.us:9443",
+	err = ex.StartWS(&iex.WsConfig{Host: algo.Asset.WSStream, //"testnet.bitmex.com", //"stream.binance.us:9443",
 		Streams:   subscribeInfos,
 		Channels:  channels,
 		ApiSecret: config.APISecret,

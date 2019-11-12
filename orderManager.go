@@ -9,16 +9,17 @@ import (
 func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]iex.Order, []iex.WSOrder) {
 	var orders []iex.Order
 	totalQty := 0.0
-	//TODO
 	for i, qty := range a.BuyOrders.Quantity {
 		totalQty = totalQty + qty
 		if totalQty > a.Asset.MinimumOrderSize {
 			orderPrice := a.BuyOrders.Price[i]
 			order := iex.Order{
-				Market: a.Asset.Symbol,
-				Amount: float64(int(totalQty)),
-				Rate:   orderPrice,
-				Type:   "Buy",
+				Market:   a.Asset.Market,
+				Currency: a.Asset.Currency,
+				Amount:   float64(int(totalQty)),
+				Rate:     orderPrice,
+				Type:     "Limit",
+				Side:     "Buy",
 			}
 			orders = append(orders, order)
 			totalQty = 0.0
@@ -31,10 +32,12 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 		if totalQty > a.Asset.MinimumOrderSize {
 			orderPrice := a.SellOrders.Price[i]
 			order := iex.Order{
-				Market: a.Asset.Symbol,
-				Amount: float64(int(totalQty)),
-				Rate:   orderPrice,
-				Type:   "Sell",
+				Market:   a.Asset.Market,
+				Currency: a.Asset.Currency,
+				Amount:   float64(int(totalQty)),
+				Rate:     orderPrice,
+				Type:     "Limit",
+				Side:     "Sell",
 			}
 			orders = append(orders, order)
 			totalQty = 0.0
@@ -43,7 +46,6 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 
 	var toCreate []iex.Order
 	var orderToPlace []float64
-
 	for _, newOrder := range orders {
 		if newOrder.Type != "Market" {
 			orderFound := false
@@ -52,11 +54,11 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 					// If we are trying to place the same order then just leave the current one
 					orderFound = true
 					orderToPlace = append(orderToPlace, newOrder.Rate)
-					log.Println("Found an order for that already")
 					break
 				} else if !orderFound && oldOrder.Price == newOrder.Rate {
 					// If we are trying to place the same order with a different quantity
 					// then we should cancel it and place the new order
+					log.Println("Cancel then place")
 					orderFound = true
 					orderToPlace = append(orderToPlace, newOrder.Rate)
 					log.Println(iex.CancelOrderF{
@@ -68,41 +70,24 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 						Uuid:   oldOrder.OrderID,
 					})
 					if err != nil {
-						log.Fatal(err)
+						log.Println("Error:", err)
 					}
-					if newOrder.Type == "Buy" {
-						uuid, err := ex.BuyLimit(newOrder)
-						if err != nil {
-							log.Fatal(err)
-						} else {
-							log.Println("Placed BUY", uuid)
-						}
+					log.Println("Canceled", oldOrder.OrderID)
+					uuid, err := ex.PlaceOrder(newOrder)
+					if err != nil {
+						log.Println("Error:", err)
 					} else {
-						uuid, err := ex.SellLimit(newOrder)
-						if err != nil {
-							log.Fatal(err)
-						} else {
-							log.Println("Placed SELL", uuid)
-						}
+						log.Println("Placed order:", newOrder, uuid)
 					}
 					break
 				}
 			}
 			if !orderFound {
-				if newOrder.Type == "Buy" {
-					uuid, err := ex.BuyLimit(newOrder)
-					if err != nil {
-						log.Fatal(err)
-					} else {
-						log.Println("Placed BUY", uuid)
-					}
+				uuid, err := ex.PlaceOrder(newOrder)
+				if err != nil {
+					log.Println("Error:", err)
 				} else {
-					uuid, err := ex.SellLimit(newOrder)
-					if err != nil {
-						log.Fatal(err)
-					} else {
-						log.Println("Placed SELL", uuid)
-					}
+					log.Println("Placed order:", newOrder, uuid)
 				}
 				orderToPlace = append(orderToPlace, newOrder.Rate)
 			}
@@ -130,7 +115,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 				Uuid:   oldOrder.OrderID,
 			})
 			if err != nil {
-				log.Fatal(err)
+				log.Println("Error:", err)
 			}
 			log.Println("Canceled", oldOrder.OrderID)
 		}
