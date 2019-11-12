@@ -56,10 +56,10 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	// 	Amount: 10,
 	// 	Type:   "Limit",
 	// })
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	os.Exit(1)
+	// }
 
 	// log.Println(uuid)
 
@@ -110,6 +110,8 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			log.Println("Trade Update:", trade)
 			algo.Asset.Price = trade[0].Close
 			rebalance(trade[0].Close, &algo)
+			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * algo.Asset.Price))
+			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * algo.Asset.Price))
 			algo.PlaceOrdersOnBook(ex, localOrders)
 		case newOrders := <-channels.OrderChan:
 			localOrders = UpdateLocalOrders(localOrders, newOrders)

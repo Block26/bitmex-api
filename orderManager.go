@@ -16,7 +16,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 			orderPrice := a.BuyOrders.Price[i]
 			order := iex.Order{
 				Market: a.Asset.Symbol,
-				Amount: totalQty,
+				Amount: float64(int(totalQty)),
 				Rate:   orderPrice,
 				Type:   "Buy",
 			}
@@ -32,7 +32,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 			orderPrice := a.SellOrders.Price[i]
 			order := iex.Order{
 				Market: a.Asset.Symbol,
-				Amount: totalQty,
+				Amount: float64(int(totalQty)),
 				Rate:   orderPrice,
 				Type:   "Sell",
 			}
@@ -52,17 +52,58 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 					// If we are trying to place the same order then just leave the current one
 					orderFound = true
 					orderToPlace = append(orderToPlace, newOrder.Rate)
+					log.Println("Found an order for that already")
 					break
 				} else if !orderFound && oldOrder.Price == newOrder.Rate {
 					// If we are trying to place the same order with a different quantity
 					// then we should cancel it and place the new order
 					orderFound = true
 					orderToPlace = append(orderToPlace, newOrder.Rate)
+					log.Println(iex.CancelOrderF{
+						Market: oldOrder.Symbol,
+						Uuid:   oldOrder.OrderID,
+					})
+					err := ex.CancelOrder(iex.CancelOrderF{
+						Market: oldOrder.Symbol,
+						Uuid:   oldOrder.OrderID,
+					})
+					if err != nil {
+						log.Fatal(err)
+					}
+					if newOrder.Type == "Buy" {
+						uuid, err := ex.BuyLimit(newOrder)
+						if err != nil {
+							log.Fatal(err)
+						} else {
+							log.Println("Placed BUY", uuid)
+						}
+					} else {
+						uuid, err := ex.SellLimit(newOrder)
+						if err != nil {
+							log.Fatal(err)
+						} else {
+							log.Println("Placed SELL", uuid)
+						}
+					}
 					break
 				}
 			}
 			if !orderFound {
-				toCreate = append(toCreate, newOrder)
+				if newOrder.Type == "Buy" {
+					uuid, err := ex.BuyLimit(newOrder)
+					if err != nil {
+						log.Fatal(err)
+					} else {
+						log.Println("Placed BUY", uuid)
+					}
+				} else {
+					uuid, err := ex.SellLimit(newOrder)
+					if err != nil {
+						log.Fatal(err)
+					} else {
+						log.Println("Placed SELL", uuid)
+					}
+				}
 				orderToPlace = append(orderToPlace, newOrder.Rate)
 			}
 		}
@@ -78,7 +119,20 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 			}
 		}
 		if !found {
-			toCancel = append(toCancel, oldOrder)
+			// toCancel = append(toCancel, oldOrder)
+			log.Println("Trying to cancel", oldOrder.OrderID)
+			log.Println(iex.CancelOrderF{
+				Market: oldOrder.Symbol,
+				Uuid:   oldOrder.OrderID,
+			})
+			err := ex.CancelOrder(iex.CancelOrderF{
+				Market: oldOrder.Symbol,
+				Uuid:   oldOrder.OrderID,
+			})
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Println("Canceled", oldOrder.OrderID)
 		}
 	}
 
@@ -90,7 +144,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) ([]
 
 func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.WSOrder {
 	var updatedOrders []iex.WSOrder
-	log.Println(len(newOrders), "new orders")
+	// log.Println(len(newOrders), "new orders")
 	for _, oldOrder := range oldOrders {
 		found := false
 		// log.Println("oldOrder.OrdStatus", oldOrder.OrdStatus)
@@ -101,7 +155,7 @@ func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.W
 					log.Println(newOrder.OrdStatus, oldOrder.OrderID)
 				} else {
 					updatedOrders = append(updatedOrders, newOrder)
-					log.Println("Updated Order", newOrder.OrderID, newOrder.OrdStatus)
+					// log.Println("Updated Order", newOrder.OrderID, newOrder.OrdStatus)
 				}
 			}
 		}
@@ -109,7 +163,7 @@ func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.W
 			if oldOrder.OrdStatus == "Canceled" || oldOrder.OrdStatus == "Filled" || oldOrder.OrdStatus == "Rejected" {
 				log.Println(oldOrder.OrdStatus, oldOrder.OrderID)
 			} else {
-				log.Println("Old Order", oldOrder.OrderID)
+				// log.Println("Old Order", oldOrder.OrderID)
 				updatedOrders = append(updatedOrders, oldOrder)
 			}
 		}
@@ -124,10 +178,10 @@ func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.W
 		}
 		if !found {
 			updatedOrders = append(updatedOrders, newOrder)
-			log.Println("Adding Order", newOrder.OrderID, newOrder.OrdStatus)
+			// log.Println("Adding Order", newOrder.OrderID, newOrder.OrdStatus)
 		}
 	}
 
-	log.Println(len(updatedOrders), "orders")
+	// log.Println(len(updatedOrders), "orders")
 	return updatedOrders
 }
