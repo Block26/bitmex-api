@@ -110,6 +110,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * algo.Asset.Price))
 			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * algo.Asset.Price))
 			algo.PlaceOrdersOnBook(ex, localOrders)
+			LogStatus(&algo)
 		case newOrders := <-channels.OrderChan:
 			localOrders = UpdateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
