@@ -169,6 +169,10 @@ func sumArr(arr []float64) float64 {
 	return sum
 }
 
+func fixFloat(x float64) float64 {
+	return math.Round(x*1000) / 1000
+}
+
 func exponent(x, y float64) float64 {
 	return math.Pow(x, y)
 }

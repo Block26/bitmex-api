@@ -1,18 +1,20 @@
 package algo
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
 	"os"
 	"time"
 
-	"unsafe"
-
 	"github.com/c-bata/goptuna"
 	"github.com/c-bata/goptuna/tpe"
 	"github.com/gocarina/gocsv"
+	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
+	"golang.org/x/sync/errgroup"
+	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
 // var minimumOrderSize = 25
@@ -36,16 +38,16 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	}
 
 	//Multithread - memory leak
-	// eg, ctx := errgroup.WithContext(context.Background())
-	// study.WithContext(ctx)
-	// for i := 0; i < 5; i++ {
-	// 	eg.Go(func() error {
-	// 		return study.Optimize(objective, episodes/5)
-	// 	})
-	// }
-	// if err := eg.Wait(); err != nil {
-	// 	log.Fatal(err)
-	// }
+	eg, ctx := errgroup.WithContext(context.Background())
+	study.WithContext(ctx)
+	for i := 0; i < 5; i++ {
+		eg.Go(func() error {
+			return study.Optimize(objective, episodes/5)
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		log.Fatal(err)
+	}
 
 	// Print the best evaluation value and the parameters.
 	// Mathematically, argmin F(x1, x2) is (x1, x2) = (+2, -5).
@@ -61,8 +63,8 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]model
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(dir + "/1m.csv")
-	dataFile, err := os.OpenFile(dir+"/1m.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	fmt.Println(dir + "/1m_all.csv")
+	dataFile, err := os.OpenFile(dir+"/1m_all.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
@@ -76,12 +78,6 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]model
 	}
 
 	// fmt.Println(unsafe.Sizeof(bars))
-	var barSize = 0.0
-	for _, bar := range bars {
-		barSize = barSize + float64(unsafe.Sizeof(bar))
-		// fmt.Println(int())
-	}
-	fmt.Printf("barSize %.2f \n", barSize)
 	setupData(&bars, &a)
 	score := runSingleTest(&bars, a, rebalance)
 	log.Println("Score", score)
@@ -128,7 +124,8 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 
 	elapsed := time.Since(start)
 	log.Println("End Timestamp", timestamp)
-	minProfit, maxProfit, _, maxLeverage := MinMaxStats(algo.History)
+	//TODO do this during test instead of after the test
+	minProfit, maxProfit, _, maxLeverage, drawdown := MinMaxStats(algo.History)
 
 	log.Printf("Balance %0.4f \n", algo.History[len(algo.History)-1].Balance)
 	log.Printf("Cost %0.4f \n", algo.History[len(algo.History)-1].AverageCost)
@@ -138,6 +135,17 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 	log.Printf("Max Profit %0.4f \n", maxProfit)
 	log.Printf("Max Drawdown %0.4f \n", minProfit)
 	log.Println("Execution Speed", elapsed)
+	score := (algo.History[len(algo.History)-1].Balance - 1) + (minProfit * maxLeverage) - drawdown // maximize
+
+	algo.Result = map[string]interface{}{
+		"balance":             fixFloat(algo.History[len(algo.History)-1].UBalance),
+		"max_leverage":        fixFloat(maxLeverage),
+		"max_position_profit": fixFloat(maxProfit),
+		"max_position_dd":     fixFloat(minProfit),
+		"max_dd":              fixFloat(drawdown),
+		"params":              algo.Params,
+		"score":               fixFloat(score),
+	}
 	//Very primitive score, how much leverage did I need to achieve this balance
 
 	// algo.HistoryFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
@@ -151,7 +159,7 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 	// 	panic(err)
 	// }
 
-	score := (algo.History[len(algo.History)-1].Balance - 1) + (minProfit * maxLeverage) // maximize
+	LogBacktest(&algo)
 	// score := ((math.Abs(minProfit) / algo.History[len(algo.History)-1].Balance) + maxLeverage) - algo.History[len(algo.History)-1].Balance // minimize
 	return score //algo.History.Balance[len(algo.History.Balance)-1] / (maxLeverage + 1)
 }
@@ -265,18 +273,30 @@ func (algo *Algo) getCostAverage(pricesFilled []float64, ordersFilled []float64)
 	return 0.0, 0.0
 }
 
-func MinMaxStats(history []models.History) (float64, float64, float64, float64) {
+func MinMaxStats(history []models.History) (float64, float64, float64, float64, float64) {
 	var maxProfit float64 = history[0].Profit
 	var minProfit float64 = history[0].Profit
 
 	var maxLeverage float64 = history[0].Leverage
 	var minLeverage float64 = history[0].Leverage
+
+	var drawdown float64 = 0.0
+	var highestBalance float64 = 0.0
+
 	for _, row := range history {
 		if maxProfit < row.Profit {
 			maxProfit = row.Profit
 		}
 		if minProfit > row.Profit {
 			minProfit = row.Profit
+		}
+
+		if row.UBalance > highestBalance {
+			highestBalance = row.UBalance
+		}
+
+		if drawdown > row.UBalance-highestBalance {
+			drawdown = row.UBalance - highestBalance
 		}
 
 		if maxLeverage < row.Leverage {
@@ -286,7 +306,7 @@ func MinMaxStats(history []models.History) (float64, float64, float64, float64) 
 			minLeverage = row.Leverage
 		}
 	}
-	return minProfit, maxProfit, minLeverage, maxLeverage
+	return minProfit, maxProfit, minLeverage, maxLeverage, drawdown
 }
 
 func getFilledBidOrders(prices []float64, orders []float64, price float64) ([]float64, []float64) {
@@ -311,4 +331,32 @@ func getFilledAskOrders(prices []float64, orders []float64, price float64) ([]fl
 		}
 	}
 	return p, o
+}
+
+func LogBacktest(algo *Algo) {
+	influx, err := client.NewHTTPClient(client.HTTPConfig{
+		Addr:     "http://ec2-54-219-145-3.us-west-1.compute.amazonaws.com:8086",
+		Username: "russell",
+		Password: "KNW(12nAS921D",
+	})
+	CheckIfError(err)
+
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+		Database:  "backtests",
+		Precision: "us",
+	})
+
+	tags := map[string]string{"algo_name": algo.Name}
+
+	pt, err := client.NewPoint(
+		"result",
+		tags,
+		algo.Result,
+		time.Now(),
+	)
+	bp.AddPoint(pt)
+
+	err = client.Client.Write(influx, bp)
+	CheckIfError(err)
+	influx.Close()
 }

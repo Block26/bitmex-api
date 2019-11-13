@@ -47,6 +47,8 @@ type Algo struct {
 	Index      int
 	DataLength int
 	History    []algoModels.History
+	Params     map[string]interface{}
+	Result     map[string]interface{}
 
 	//Custom
 	EntrySpread     float64
