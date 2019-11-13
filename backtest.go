@@ -212,6 +212,8 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 			if (newQuantity >= 0 && algo.Asset.Quantity >= 0) || (newQuantity <= 0 && algo.Asset.Quantity <= 0) {
 				//Adding to position
 				algo.Asset.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
+			} else if ((newQuantity >= 0 && algo.Asset.Quantity <= 0) || (newQuantity <= 0 && algo.Asset.Quantity >= 0)) && math.Abs(newQuantity) >= math.Abs(algo.Asset.Quantity) {
+				algo.Asset.AverageCost = fillCost
 			} else {
 				var diff float64
 				if fillAmount > 0 {
