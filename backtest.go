@@ -11,6 +11,8 @@ import (
 	"github.com/c-bata/goptuna"
 	"github.com/c-bata/goptuna/tpe"
 	"github.com/gocarina/gocsv"
+	"github.com/google/uuid"
+
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"golang.org/x/sync/errgroup"
@@ -18,8 +20,10 @@ import (
 )
 
 // var minimumOrderSize = 25
+var currentRunUUID time.Time
 
 func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
+	currentRunUUID = time.Now()
 	study, err := goptuna.CreateStudy(
 		"optmm",
 		goptuna.StudyOptionSampler(tpe.NewSampler()),
@@ -339,7 +343,14 @@ func LogBacktest(algo Algo) {
 		Precision: "us",
 	})
 
-	tags := map[string]string{"algo_name": algo.Name}
+	uuid := algo.Name + "-" + uuid.New().String()
+	tags := map[string]string{
+		"algo_name":   algo.Name,
+		"run_id":      currentRunUUID.String(),
+		"backtest_id": uuid,
+	}
+
+	algo.Result["id"] = uuid
 
 	pt, err := client.NewPoint(
 		"result",

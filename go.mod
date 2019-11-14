@@ -12,6 +12,7 @@ require (
 	github.com/c-bata/goptuna v0.1.0
 	github.com/fatih/structs v1.1.0
 	github.com/gocarina/gocsv v0.0.0-20190927101021-3ecffd272576
+	github.com/google/uuid v1.1.1
 	github.com/influxdata/influxdb-client-go v0.1.4
 	github.com/influxdata/influxdb1-client v0.0.0-20190809212627-fc22c7df067e
 	github.com/jmoiron/sqlx v1.2.0
