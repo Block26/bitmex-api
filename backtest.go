@@ -13,6 +13,8 @@ import (
 	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
 
+	"gonum.org/v1/gonum/stat"
+
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"golang.org/x/sync/errgroup"
@@ -37,9 +39,9 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	//Multithread
 	eg, ctx := errgroup.WithContext(context.Background())
 	study.WithContext(ctx)
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 12; i++ {
 		eg.Go(func() error {
-			return study.Optimize(objective, episodes/4)
+			return study.Optimize(objective, episodes/12)
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -112,6 +114,9 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) 
 
 			// updateBalanceXBTStrat(bar)
 			algo.logState(timestamp)
+			if algo.Asset.BaseBalance+(algo.Asset.BaseBalance*algo.Asset.Profit) < 0 {
+				break
+			}
 			// algo.History.Balance[len(algo.History.Balance)-1], == portfolio value
 			// portfolioValue := algo.History.Balance[len(algo.History.Balance)-1]
 		}
@@ -132,16 +137,32 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) 
 	log.Printf("Max Drawdown %0.4f \n", minProfit)
 	log.Println(algo.Params)
 	log.Println("Execution Speed", elapsed)
-	score := (algo.History[len(algo.History)-1].Balance - 1) + (minProfit * maxLeverage) - drawdown // maximize
+	// score := (algo.History[len(algo.History)-1].Balance) + drawdown*3 //+ (minProfit * maxLeverage) - drawdown // maximize
+	// score := (algo.History[len(algo.History)-1].Balance) * math.Abs(1/drawdown) //+ (minProfit * maxLeverage) - drawdown // maximize
+
+	percentReturn := make([]float64, len(algo.History))
+	last := 0.0
+	for i := range algo.History {
+		if i == 0 {
+			percentReturn[i] = 0
+		} else {
+			percentReturn[i] = calculateDifference(algo.History[i].Balance, last)
+		}
+		last = algo.History[i].Balance
+	}
+
+	mean, std := stat.MeanStdDev(percentReturn, nil)
+	score := mean / std
+	score = score * math.Sqrt(365*24*60)
 
 	algo.Result = map[string]interface{}{
-		"balance":             fixFloat(algo.History[len(algo.History)-1].UBalance),
-		"max_leverage":        fixFloat(maxLeverage),
-		"max_position_profit": fixFloat(maxProfit),
-		"max_position_dd":     fixFloat(minProfit),
-		"max_dd":              fixFloat(drawdown),
+		"balance":             algo.History[len(algo.History)-1].UBalance,
+		"max_leverage":        maxLeverage,
+		"max_position_profit": maxProfit,
+		"max_position_dd":     minProfit,
+		"max_dd":              drawdown,
 		"params":              algo.Params,
-		"score":               fixFloat(score),
+		"score":               score,
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
 
