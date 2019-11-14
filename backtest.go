@@ -30,19 +30,12 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	err = study.Optimize(objective, episodes)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//Multithread - memory leak
+	//Multithread
 	eg, ctx := errgroup.WithContext(context.Background())
 	study.WithContext(ctx)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 4; i++ {
 		eg.Go(func() error {
-			return study.Optimize(objective, episodes/5)
+			return study.Optimize(objective, episodes/4)
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -50,21 +43,20 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	}
 
 	// Print the best evaluation value and the parameters.
-	// Mathematically, argmin F(x1, x2) is (x1, x2) = (+2, -5).
 	v, _ := study.GetBestValue()
 	p, _ := study.GetBestParams()
 	log.Printf("Best evaluation value=%f", v)
 	log.Println(p)
 }
 
-func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) float64 {
+func RunBacktest(a Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) float64 {
 	// log.Println("Loading Data... ")
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(dir + "/1m_all.csv")
-	dataFile, err := os.OpenFile(dir+"/1m_all.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	fmt.Println(dir + "/1m.csv")
+	dataFile, err := os.OpenFile(dir+"/1m.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
@@ -78,14 +70,14 @@ func RunBacktest(a Algo, rebalance func(float64, *Algo), setupData func(*[]model
 	}
 
 	// fmt.Println(unsafe.Sizeof(bars))
-	setupData(&bars, &a)
+	setupData(&bars, a)
 	score := runSingleTest(&bars, a, rebalance)
 	log.Println("Score", score)
 	// optimize(bars)
 	return score
 }
 
-func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)) float64 {
+func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) Algo) float64 {
 	start := time.Now()
 	// starting_algo.Asset.BaseBalance := 0
 	timestamp := ""
@@ -103,7 +95,7 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 		if idx > algo.DataLength {
 			algo.Index = idx
 			algo.Asset.Price = bar.Open
-			rebalance(bar.Open, &algo)
+			algo = rebalance(bar.Open, algo)
 			//Check which buys filled
 			pricesFilled, ordersFilled := getFilledBidOrders(algo.BuyOrders.Price, algo.BuyOrders.Quantity, bar.Low)
 			fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
@@ -134,6 +126,7 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 
 	log.Printf("Max Profit %0.4f \n", maxProfit)
 	log.Printf("Max Drawdown %0.4f \n", minProfit)
+	log.Println(algo.Params)
 	log.Println("Execution Speed", elapsed)
 	score := (algo.History[len(algo.History)-1].Balance - 1) + (minProfit * maxLeverage) - drawdown // maximize
 
@@ -159,7 +152,7 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, *Algo)
 	// 	panic(err)
 	// }
 
-	LogBacktest(&algo)
+	LogBacktest(algo)
 	// score := ((math.Abs(minProfit) / algo.History[len(algo.History)-1].Balance) + maxLeverage) - algo.History[len(algo.History)-1].Balance // minimize
 	return score //algo.History.Balance[len(algo.History.Balance)-1] / (maxLeverage + 1)
 }
@@ -333,7 +326,7 @@ func getFilledAskOrders(prices []float64, orders []float64, price float64) ([]fl
 	return p, o
 }
 
-func LogBacktest(algo *Algo) {
+func LogBacktest(algo Algo) {
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:     "http://ec2-54-219-145-3.us-west-1.compute.amazonaws.com:8086",
 		Username: "russell",

@@ -16,7 +16,7 @@ import (
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
-func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, *Algo), setupData func(*[]models.Bar, *Algo)) {
+func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) {
 	config = loadConfiguration(settingsFile, secret)
 
 	// We instantiate a new repository targeting the given path (the .git folder)
@@ -106,7 +106,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		case trade := <-channels.TradeBinChan:
 			log.Println("Trade Update:", trade)
 			algo.Asset.Price = trade[0].Close
-			rebalance(trade[0].Close, &algo)
+			algo = rebalance(trade[0].Close, algo)
 			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * algo.Asset.Price))
 			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * algo.Asset.Price))
 			algo.PlaceOrdersOnBook(ex, localOrders)
