@@ -10,6 +10,7 @@ import (
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
@@ -43,6 +44,9 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 
 	// channels to subscribe to
 	symbol := strings.ToLower(algo.Asset.Market + algo.Asset.Currency)
+
+	localBars := data.GetData(algo.Asset.Symbol, "1m", algo.DataLength)
+	log.Println(len(localBars), "downloaded")
 
 	// bal, err := ex.GetBalance("XBTUSD")
 	// fmt.Printf("Balance: %+v \n", bal)
@@ -106,6 +110,8 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		case trade := <-channels.TradeBinChan:
 			log.Println("Trade Update:", trade)
 			algo.Asset.Price = trade[0].Close
+			localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
+			setupData(&localBars, algo)
 			algo = rebalance(trade[0].Close, algo)
 			algo.BuyOrders.Quantity = mulArr(algo.BuyOrders.Quantity, (algo.Asset.Buying * algo.Asset.Price))
 			algo.SellOrders.Quantity = mulArr(algo.SellOrders.Quantity, (algo.Asset.Selling * algo.Asset.Price))
