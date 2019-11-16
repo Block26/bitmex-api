@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"os"
 	"time"
 
 	"github.com/c-bata/goptuna"
+	"github.com/c-bata/goptuna/successivehalving"
 	"github.com/c-bata/goptuna/tpe"
-	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
 
 	"gonum.org/v1/gonum/stat"
@@ -30,6 +29,7 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 		"optmm",
 		goptuna.StudyOptionSampler(tpe.NewSampler()),
 		goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMaximize),
+		goptuna.StudyOptionPruner(successivehalving.NewOptunaPruner()),
 		// goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMinimize),
 	)
 
@@ -41,7 +41,7 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	study.WithContext(ctx)
 	for i := 0; i < 12; i++ {
 		eg.Go(func() error {
-			return study.Optimize(objective, episodes/12)
+			return study.Optimize(objective, episodes)
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -55,26 +55,8 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	log.Println(p)
 }
 
-func RunBacktest(a Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) float64 {
+func RunBacktest(bars []models.Bar, a Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) float64 {
 	// log.Println("Loading Data... ")
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(dir + "/1m.csv")
-	dataFile, err := os.OpenFile(dir+"/1m.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
-	if err != nil {
-		panic(err)
-	}
-	defer dataFile.Close()
-	// log.Println("Done Loading Data... ")
-
-	bars := []models.Bar{}
-
-	if err := gocsv.UnmarshalFile(dataFile, &bars); err != nil { // Load bars from file
-		panic(err)
-	}
-
 	// fmt.Println(unsafe.Sizeof(bars))
 	setupData(&bars, a)
 	score := runSingleTest(&bars, a, rebalance)
@@ -128,14 +110,16 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) 
 	//TODO do this during test instead of after the test
 	minProfit, maxProfit, _, maxLeverage, drawdown := MinMaxStats(algo.History)
 
-	log.Printf("Balance %0.4f \n", algo.History[len(algo.History)-1].Balance)
-	log.Printf("Cost %0.4f \n", algo.History[len(algo.History)-1].AverageCost)
-	log.Printf("Quantity %0.4f \n", algo.History[len(algo.History)-1].Quantity)
-	log.Printf("Max Leverage %0.4f \n", maxLeverage)
-
-	log.Printf("Max Profit %0.4f \n", maxProfit)
-	log.Printf("Max Drawdown %0.4f \n", minProfit)
-	log.Println(algo.Params)
+	fmt.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Params: %s",
+		algo.History[len(algo.History)-1].Balance,
+		algo.History[len(algo.History)-1].AverageCost,
+		algo.History[len(algo.History)-1].Quantity,
+		maxLeverage,
+		drawdown,
+		maxProfit,
+		minProfit,
+		createKeyValuePairs(algo.Params),
+	)
 	log.Println("Execution Speed", elapsed)
 	// score := (algo.History[len(algo.History)-1].Balance) + drawdown*3 //+ (minProfit * maxLeverage) - drawdown // maximize
 	// score := (algo.History[len(algo.History)-1].Balance) * math.Abs(1/drawdown) //+ (minProfit * maxLeverage) - drawdown // maximize
