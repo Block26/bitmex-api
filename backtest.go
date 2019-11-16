@@ -182,41 +182,6 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) 
 	return score //algo.History.Balance[len(algo.History.Balance)-1] / (maxLeverage + 1)
 }
 
-func (algo *Algo) logState(timestamp string) {
-	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
-	var balance float64
-	if algo.Futures {
-		balance = algo.Asset.BaseBalance
-		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity) / algo.Asset.Price) / algo.Asset.BaseBalance
-	} else {
-		balance = algo.Asset.BaseBalance + (algo.Asset.Quantity * algo.Asset.Price)
-		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
-		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity)) / (algo.Asset.BaseBalance * algo.Asset.Price)
-		// algo.History.Balance = append(algo.History.Balance, balance)
-	}
-	// algo.History.Quantity = append(algo.History.Quantity, algo.Asset.Quantity)
-	// algo.History.AverageCost = append(algo.History.AverageCost, algo.Asset.AverageCost)
-
-	// algo.History.Leverage = append(algo.History.Leverage, algo.Asset.Leverage)
-	algo.Asset.Profit = algo.CurrentProfit(algo.Asset.Price) * algo.Asset.Leverage
-	// algo.History.Profit = append(algo.History.Profit, algo.Asset.Profit)
-
-	algo.History = append(algo.History, models.History{
-		Timestamp:   timestamp,
-		Balance:     balance,
-		UBalance:    balance + (balance * algo.Asset.Profit),
-		Quantity:    algo.Asset.Quantity,
-		AverageCost: algo.Asset.AverageCost,
-		Leverage:    algo.Asset.Leverage,
-		Profit:      algo.Asset.Profit,
-		Price:       algo.Asset.Price,
-	})
-
-	if algo.Debug {
-		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Asset.BaseBalance*algo.Asset.Price+(algo.Asset.Quantity), algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, algo.Asset.Price, algo.Asset.AverageCost))
-	}
-}
-
 func (algo *Algo) CurrentProfit(price float64) float64 {
 	if algo.Asset.Quantity < 0 {
 		return calculateDifference(algo.Asset.AverageCost, price)
