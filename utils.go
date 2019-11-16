@@ -1,14 +1,21 @@
 package algo
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"os"
+	"time"
 
+	"github.com/fatih/structs"
+	client "github.com/influxdata/influxdb1-client/v2"
 	algoModels "github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/TheAlgoV2/settings"
 	"github.com/tantralabs/exchanges/models"
+
+	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
 // Load a config file containing sensitive information from a local
@@ -43,6 +50,110 @@ func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 		log.Println(a.Asset.BaseBalance, a.Asset.Price, a.Asset.Quantity)
 		return percentage * ((a.Asset.BaseBalance * a.Asset.Price) + a.Asset.Quantity)
 	}
+}
+
+//Log the state of the algo and update variables like leverage
+func (algo *Algo) logState(timestamp ...string) {
+	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
+	var balance float64
+	if algo.Futures {
+		balance = algo.Asset.BaseBalance
+		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity) / algo.Asset.Price) / algo.Asset.BaseBalance
+	} else {
+		balance = algo.Asset.BaseBalance + (algo.Asset.Quantity * algo.Asset.Price)
+		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
+		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity)) / (algo.Asset.BaseBalance * algo.Asset.Price)
+	}
+
+	algo.Asset.Profit = algo.CurrentProfit(algo.Asset.Price) * algo.Asset.Leverage
+
+	if timestamp != nil {
+		algo.History = append(algo.History, algoModels.History{
+			Timestamp:   timestamp[0],
+			Balance:     balance,
+			UBalance:    balance + (balance * algo.Asset.Profit),
+			Quantity:    algo.Asset.Quantity,
+			AverageCost: algo.Asset.AverageCost,
+			Leverage:    algo.Asset.Leverage,
+			Profit:      algo.Asset.Profit,
+			Price:       algo.Asset.Price,
+		})
+	} else {
+		algo.LogLiveState()
+	}
+	if algo.Debug {
+		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Asset.BaseBalance*algo.Asset.Price+(algo.Asset.Quantity), algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, algo.Asset.Price, algo.Asset.AverageCost))
+	}
+}
+
+//Log the state of the algo to influx db
+func (algo *Algo) LogLiveState() {
+	influx, err := client.NewHTTPClient(client.HTTPConfig{
+		Addr:     "http://ec2-54-219-145-3.us-west-1.compute.amazonaws.com:8086",
+		Username: "russell",
+		Password: "KNW(12nAS921D",
+	})
+	CheckIfError(err)
+
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+		Database:  "algos",
+		Precision: "us",
+	})
+
+	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}
+
+	fields := structs.Map(algo.Asset)
+
+	pt, err := client.NewPoint(
+		"asset",
+		tags,
+		fields,
+		time.Now(),
+	)
+	bp.AddPoint(pt)
+
+	for index := 0; index < len(algo.BuyOrders.Quantity); index++ {
+
+		fields = map[string]interface{}{
+			fmt.Sprintf("%0.2f", algo.BuyOrders.Price[index]): algo.BuyOrders.Quantity[index],
+		}
+
+		pt, err = client.NewPoint(
+			"buy_orders",
+			tags,
+			fields,
+			time.Now(),
+		)
+		bp.AddPoint(pt)
+	}
+
+	for index := 0; index < len(algo.SellOrders.Quantity); index++ {
+		fields = map[string]interface{}{
+			fmt.Sprintf("%0.2f", algo.SellOrders.Price[index]): algo.SellOrders.Quantity[index],
+		}
+		pt, err = client.NewPoint(
+			"sell_orders",
+			tags,
+			fields,
+			time.Now(),
+		)
+		bp.AddPoint(pt)
+	}
+
+	if algo.State != nil {
+		pt, err := client.NewPoint(
+			"state",
+			tags,
+			algo.State,
+			time.Now(),
+		)
+		CheckIfError(err)
+		bp.AddPoint(pt)
+	}
+
+	err = client.Client.Write(influx, bp)
+	CheckIfError(err)
+	influx.Close()
 }
 
 //Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
@@ -175,4 +286,14 @@ func fixFloat(x float64) float64 {
 
 func exponent(x, y float64) float64 {
 	return math.Pow(x, y)
+}
+
+func createKeyValuePairs(m map[string]interface{}) string {
+	b := new(bytes.Buffer)
+	fmt.Fprint(b, "\n{\n")
+	for key, value := range m {
+		fmt.Fprint(b, " ", key, ": ", value, ",\n")
+	}
+	fmt.Fprint(b, "}\n")
+	return b.String()
 }
