@@ -42,13 +42,13 @@ func loadConfiguration(file string, secret bool) settings.Config {
 //Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
 func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 	if a.Futures {
-		return percentage * a.Asset.BaseBalance
+		return percentage * a.BaseAsset.Quantity
 	} else {
 		if side == "buy" {
-			return percentage * a.Asset.Quantity
+			return percentage * a.QuoteAsset.Quantity
 		}
-		log.Println(a.Asset.BaseBalance, a.Asset.Price, a.Asset.Quantity)
-		return percentage * ((a.Asset.BaseBalance * a.Asset.Price) + a.Asset.Quantity)
+		log.Println(a.BaseAsset.Quantity, a.Market.Price, a.QuoteAsset.Quantity)
+		return percentage * ((a.BaseAsset.Quantity * a.Market.Price) + a.QuoteAsset.Quantity)
 	}
 }
 
@@ -57,32 +57,32 @@ func (algo *Algo) logState(timestamp ...string) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
 	var balance float64
 	if algo.Futures {
-		balance = algo.Asset.BaseBalance
-		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity) / algo.Asset.Price) / algo.Asset.BaseBalance
+		balance = algo.BaseAsset.Quantity
+		algo.Market.Leverage = (math.Abs(algo.QuoteAsset.Quantity) / algo.Market.Price) / algo.BaseAsset.Quantity
 	} else {
-		balance = algo.Asset.BaseBalance + (algo.Asset.Quantity * algo.Asset.Price)
+		balance = algo.BaseAsset.Quantity + (algo.QuoteAsset.Quantity * algo.Market.Price)
 		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
-		algo.Asset.Leverage = (math.Abs(algo.Asset.Quantity)) / (algo.Asset.BaseBalance * algo.Asset.Price)
+		algo.Market.Leverage = (math.Abs(algo.QuoteAsset.Quantity)) / (algo.BaseAsset.Quantity * algo.Market.Price)
 	}
 
-	algo.Asset.Profit = algo.CurrentProfit(algo.Asset.Price) * algo.Asset.Leverage
+	algo.Market.Profit = algo.CurrentProfit(algo.Market.Price) * algo.Market.Leverage
 
 	if timestamp != nil {
 		algo.History = append(algo.History, algoModels.History{
 			Timestamp:   timestamp[0],
 			Balance:     balance,
-			UBalance:    balance + (balance * algo.Asset.Profit),
-			Quantity:    algo.Asset.Quantity,
-			AverageCost: algo.Asset.AverageCost,
-			Leverage:    algo.Asset.Leverage,
-			Profit:      algo.Asset.Profit,
-			Price:       algo.Asset.Price,
+			UBalance:    balance + (balance * algo.Market.Profit),
+			Quantity:    algo.QuoteAsset.Quantity,
+			AverageCost: algo.Market.AverageCost,
+			Leverage:    algo.Market.Leverage,
+			Profit:      algo.Market.Profit,
+			Price:       algo.Market.Price,
 		})
 	} else {
 		algo.LogLiveState()
 	}
 	if algo.Debug {
-		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Asset.BaseBalance*algo.Asset.Price+(algo.Asset.Quantity), algo.Asset.Delta, algo.Asset.BaseBalance, algo.Asset.Quantity, algo.Asset.Price, algo.Asset.AverageCost))
+		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.BaseAsset.Quantity*algo.Market.Price+(algo.QuoteAsset.Quantity), 0, algo.BaseAsset.Quantity, algo.QuoteAsset.Quantity, algo.Market.Price, algo.Market.AverageCost))
 	}
 }
 
@@ -102,20 +102,20 @@ func (algo *Algo) LogLiveState() {
 
 	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}
 
-	fields := structs.Map(algo.Asset)
+	fields := structs.Map(algo.Market)
 
 	pt, err := client.NewPoint(
-		"asset",
+		"market",
 		tags,
 		fields,
 		time.Now(),
 	)
 	bp.AddPoint(pt)
 
-	for index := 0; index < len(algo.BuyOrders.Quantity); index++ {
+	for index := 0; index < len(algo.Market.BuyOrders.Quantity); index++ {
 
 		fields = map[string]interface{}{
-			fmt.Sprintf("%0.2f", algo.BuyOrders.Price[index]): algo.BuyOrders.Quantity[index],
+			fmt.Sprintf("%0.2f", algo.Market.BuyOrders.Price[index]): algo.Market.BuyOrders.Quantity[index],
 		}
 
 		pt, err = client.NewPoint(
@@ -127,9 +127,9 @@ func (algo *Algo) LogLiveState() {
 		bp.AddPoint(pt)
 	}
 
-	for index := 0; index < len(algo.SellOrders.Quantity); index++ {
+	for index := 0; index < len(algo.Market.SellOrders.Quantity); index++ {
 		fields = map[string]interface{}{
-			fmt.Sprintf("%0.2f", algo.SellOrders.Price[index]): algo.SellOrders.Quantity[index],
+			fmt.Sprintf("%0.2f", algo.Market.SellOrders.Price[index]): algo.Market.SellOrders.Quantity[index],
 		}
 		pt, err = client.NewPoint(
 			"sell_orders",
@@ -280,10 +280,6 @@ func sumArr(arr []float64) float64 {
 	return sum
 }
 
-func fixFloat(x float64) float64 {
-	return math.Round(x*1000) / 1000
-}
-
 func exponent(x, y float64) float64 {
 	return math.Pow(x, y)
 }
@@ -296,4 +292,13 @@ func createKeyValuePairs(m map[string]interface{}) string {
 	}
 	fmt.Fprint(b, "}\n")
 	return b.String()
+}
+
+func round(num float64) int {
+	return int(num + math.Copysign(0.5, num))
+}
+
+func toFixed(num float64, precision int) float64 {
+	output := math.Pow(10, float64(precision))
+	return float64(round(num*output)) / output
 }

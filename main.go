@@ -12,38 +12,41 @@ import (
 var commitHash string
 
 type Asset struct {
+	Symbol   string
+	Quantity float64
+}
+
+type Market struct {
 	Symbol           string
-	Market           string
-	Currency         string
+	BaseAsset        string
+	QuoteAsset       string
 	Exchange         string
 	ExchangeURL      string
 	WSStream         string
-	BaseBalance      float64
-	Quantity         float64
-	AverageCost      float64
+	MaxOrders        int32
 	Price            float64
 	Profit           float64
+	AverageCost      float64
+	TickSize         float64
 	MakerFee         float64
 	TakerFee         float64
-	TickSize         float64
-	Delta            float64
+	MinimumOrderSize float64
 	Buying           float64
 	Selling          float64
-	MaxOrders        int32
 	Leverage         float64
-	MaxLeverage      float64
-	MinimumOrderSize float64
+	BuyOrders        models.OrderArray
+	SellOrders       models.OrderArray
 }
 
 type Algo struct {
 	//Required
 	Name       string
-	Asset      Asset
+	Market     Market
+	BaseAsset  Asset
+	QuoteAsset Asset
 	State      map[string]interface{}
 	Futures    bool
 	Debug      bool
-	BuyOrders  models.OrderArray
-	SellOrders models.OrderArray
 	Index      int
 	DataLength int
 	History    []algoModels.History
