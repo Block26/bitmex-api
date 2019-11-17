@@ -179,7 +179,7 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 	// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		newQuantity := fillCost * fillAmount
-		fee := math.Abs(fillAmount) * algo.Market.MakerFee
+		fee := math.Abs(fillAmount/fillCost) * algo.Market.MakerFee
 		// log.Printf("fillCost %.2f -> fillAmount %.2f -> Fee %.2f \n", fillCost, fillCost*fillAmount, fee)
 		currentCost := (algo.QuoteAsset.Quantity * algo.Market.AverageCost)
 		totalQuantity := algo.QuoteAsset.Quantity + newQuantity
@@ -189,15 +189,29 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 				//Adding to position
 				algo.Market.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
 			} else if ((newQuantity >= 0 && algo.QuoteAsset.Quantity <= 0) || (newQuantity <= 0 && algo.QuoteAsset.Quantity >= 0)) && math.Abs(newQuantity) >= math.Abs(algo.QuoteAsset.Quantity) {
-				algo.Market.AverageCost = fillCost
-			} else {
+				//Position changed
 				var diff float64
 				if fillAmount > 0 {
 					diff = calculateDifference(algo.Market.AverageCost, fillCost)
 				} else {
 					diff = calculateDifference(fillCost, algo.Market.AverageCost)
 				}
-				algo.QuoteAsset.Quantity = algo.QuoteAsset.Quantity + ((math.Abs(newQuantity) * diff) / fillCost)
+				// Only use the remaining position that was filled to calculate cost
+				portionFillQuantity := math.Abs(algo.QuoteAsset.Quantity)
+				algo.BaseAsset.Quantity = algo.BaseAsset.Quantity + ((portionFillQuantity * diff) / fillCost)
+				// log.Println(algo.BaseAsset.Quantity, "profit", ((portionFillQuantity * diff) / fillCost))
+
+				algo.Market.AverageCost = fillCost
+			} else {
+				//Leaving Position
+				var diff float64
+				if fillAmount > 0 {
+					diff = calculateDifference(algo.Market.AverageCost, fillCost)
+				} else {
+					diff = calculateDifference(fillCost, algo.Market.AverageCost)
+				}
+				algo.BaseAsset.Quantity = algo.BaseAsset.Quantity + ((math.Abs(newQuantity) * diff) / fillCost)
+				// log.Println(algo.BaseAsset.Quantity, "profit", ((math.Abs(newQuantity) * diff) / fillCost))
 			}
 			algo.QuoteAsset.Quantity = algo.QuoteAsset.Quantity + newQuantity
 		}
