@@ -4,7 +4,7 @@ go 1.13
 
 // replace github.com/tantralabs/exchanges => ../../tantralabs/exchanges
 
-replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
+// replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
 
 require (
 	firebase.google.com/go v3.10.0+incompatible
@@ -18,7 +18,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.2.0
 	github.com/tantralabs/exchanges v0.0.0-20191106215748-4d3dd77e096e
-	github.com/tantralabs/tradeapi v0.0.0-20191112075701-2692528655ec
+	github.com/tantralabs/tradeapi v0.0.0-20191118044312-701a0c56e3f1
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	gonum.org/v1/gonum v0.0.0-20190724133715-a8659125a966
 	google.golang.org/api v0.13.0
