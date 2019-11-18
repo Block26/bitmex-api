@@ -2,11 +2,22 @@ package algo
 
 import (
 	"log"
+	"math"
+	"sort"
 
 	"github.com/tantralabs/tradeapi/iex"
 )
 
+func deltaFloat(a, b, delta float64) bool {
+	return math.Abs(a-b) <= delta
+}
+
 func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
+
+	// For now. Should be parameterized
+	qtyTolerance := 1.0
+	priceTolerance := 1.0
+
 	var bids []iex.Order
 	var asks []iex.Order
 	totalQty := 0.0
@@ -17,7 +28,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			order := iex.Order{
 				Market:   a.BaseAsset.Symbol,
 				Currency: a.QuoteAsset.Symbol,
-				Amount:   totalQty,
+				Amount:   float64(int(totalQty)),
 				Rate:     toFixed(orderPrice, 2),
 				Type:     "Limit",
 				Side:     "Buy",
@@ -35,7 +46,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			order := iex.Order{
 				Market:   a.BaseAsset.Symbol,
 				Currency: a.QuoteAsset.Symbol,
-				Amount:   totalQty,
+				Amount:   float64(int(totalQty)),
 				Rate:     toFixed(orderPrice, 2),
 				Type:     "Limit",
 				Side:     "Sell",
@@ -45,133 +56,133 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 
-	// var toCreate []iex.Order
-	// var orderToPlace []float64
+	// Get open buys, buys, open sells, sells, with matches filtered out
+	var openBuys []iex.WSOrder
+	var openSells []iex.WSOrder
 
-	_, bidsToCreate, _ := sortOrders(bids, openOrders)
-	// bidsToPlace, bidsToCreate, bidsToCancel := sortOrders(bids, openOrders)
-	log.Println(bidsToCreate)
-
-	_, asksToCreate, _ := sortOrders(asks, openOrders)
-	// asksToPlace, asksToCreate, asksToCancel := sortOrders(asks, openOrders)
-	log.Println(asksToCreate)
-
-	// for _, newOrder := range orders {
-	// 	if newOrder.Type != "Market" {
-	// 		orderFound := false
-	// 		for _, oldOrder := range openOrders {
-	// 			if !orderFound && oldOrder.Price == newOrder.Rate && oldOrder.OrderQty == newOrder.Amount {
-	// 				// If we are trying to place the same order then just leave the current one
-	// 				orderFound = true
-	// 				orderToPlace = append(orderToPlace, newOrder.Rate)
-	// 				break
-	// 			} else if !orderFound && oldOrder.Price == newOrder.Rate {
-	// 				// If we are trying to place the same order with a different quantity
-	// 				// then we should cancel it and place the new order
-	// 				log.Println("Cancel then place")
-	// 				orderFound = true
-	// 				orderToPlace = append(orderToPlace, newOrder.Rate)
-	// 				log.Println(iex.CancelOrderF{
-	// 					Market: oldOrder.Symbol,
-	// 					Uuid:   oldOrder.OrderID,
-	// 				})
-	// 				err := ex.CancelOrder(iex.CancelOrderF{
-	// 					Market: oldOrder.Symbol,
-	// 					Uuid:   oldOrder.OrderID,
-	// 				})
-	// 				if err != nil {
-	// 					log.Println("Error:", err)
-	// 					time.Sleep(500)
-	// 				}
-	// 				// log.Println("Canceled", oldOrder.OrderID)
-	// 				log.Println("Placing order:", newOrder)
-	// 				uuid, err := ex.PlaceOrder(newOrder)
-	// 				if err != nil {
-	// 					log.Println("Error:", err)
-	// 					time.Sleep(1 * time.Second)
-	// 				} else {
-	// 					log.Println("Placed order:", newOrder, uuid)
-	// 					time.Sleep(150 * time.Millisecond)
-	// 				}
-	// 				break
-	// 			}
-	// 		}
-	// 		if !orderFound {
-	// 			log.Println("Placing order:", newOrder)
-	// 			uuid, err := ex.PlaceOrder(newOrder)
-	// 			if err != nil {
-	// 				log.Println("Error:", err)
-	// 				time.Sleep(1 * time.Second)
-	// 			} else {
-	// 				log.Println("Placed order:", uuid)
-	// 				time.Sleep(150 * time.Millisecond)
-	// 			}
-	// 			orderToPlace = append(orderToPlace, newOrder.Rate)
-	// 		}
-	// 	}
-	// }
-
-	// var toCancel []iex.WSOrder
-	// for _, oldOrder := range openOrders {
-	// 	found := false
-	// 	for _, newOrder := range orderToPlace {
-	// 		if newOrder == oldOrder.Price {
-	// 			found = true
-	// 			break
-	// 		}
-	// 	}
-	// 	if !found {
-	// 		// toCancel = append(toCancel, oldOrder)
-	// 		log.Println("Trying to cancel", oldOrder.OrderID)
-	// 		err := ex.CancelOrder(iex.CancelOrderF{
-	// 			Market: oldOrder.Symbol,
-	// 			Uuid:   oldOrder.OrderID,
-	// 		})
-	// 		if err != nil {
-	// 			log.Println("Error:", err)
-	// 		}
-	// 		// log.Println("Canceled", oldOrder.OrderID)
-	// 		time.Sleep(150 * time.Millisecond)
-	// 	}
-	// }
-
-	// log.Println(len(toCreate), "toCreate")
-	// log.Println(len(toCancel), "toCancel")
-
-	return
-}
-
-func sortOrders(orders []iex.Order, openOrders []iex.WSOrder) ([]float64, []iex.Order, []iex.WSOrder) {
-	var toCreate []iex.Order
-	var toCancel []iex.WSOrder
-	var orderToPlace []float64
-	for _, newOrder := range orders {
-		if newOrder.Type != "Market" {
-			orderFound := false
-			for _, oldOrder := range openOrders {
-				if !orderFound && oldOrder.Price == newOrder.Rate && oldOrder.OrderQty == newOrder.Amount {
-					// If we are trying to place the same order then just leave the current one
-					orderFound = true
-					orderToPlace = append(orderToPlace, newOrder.Rate)
-					break
-				} else if !orderFound && oldOrder.Price == newOrder.Rate {
-					// If we are trying to place the same order with a different quantity
-					// then we should cancel it and place the new order
-					orderFound = true
-					orderToPlace = append(orderToPlace, newOrder.Rate)
-					toCreate = append(toCreate, newOrder)
-					toCancel = append(toCancel, oldOrder)
-					break
-				}
-			}
-			if !orderFound {
-				toCreate = append(toCreate, newOrder)
-				orderToPlace = append(orderToPlace, newOrder.Rate)
-			}
+	for _, order := range openOrders {
+		if order.Side == "Buy" {
+			openBuys = append(openBuys, order)
+		} else if order.Side == "Sell" {
+			openSells = append(openSells, order)
 		}
 	}
 
-	return orderToPlace, toCreate, toCancel
+	// Make a local sifting function
+	siftMatches := func(open []iex.WSOrder, new []iex.Order) ([]iex.WSOrder, []iex.Order) {
+		openfound := make([]bool, len(open))
+		newfound := make([]bool, len(new))
+
+		/*
+			Not 100% efficient, but it's simple and predictable (more hardware friendly,
+			which will likely make it more efficient). O(kn) time, but k and n should both
+			be pretty small anyway.
+		*/
+		for i, op := range open {
+			for j, nw := range new {
+				if (deltaFloat(op.Price, nw.Rate, priceTolerance)) && (deltaFloat(op.OrderQty, nw.Amount, qtyTolerance)) {
+					openfound[i] = true
+					newfound[j] = true
+				}
+			}
+		}
+
+		var retOpen []iex.WSOrder
+		var retNew []iex.Order
+		// Filter out matches
+		for i, op := range open {
+			if !openfound[i] {
+				retOpen = append(retOpen, op)
+			}
+		}
+		for i, nw := range new {
+			if !newfound[i] {
+				retNew = append(retNew, nw)
+			}
+		}
+		return retOpen, retNew
+	}
+
+	// Call local sifting function to get rid of matches
+	openBuys, bids = siftMatches(openBuys, bids)
+	openSells, asks = siftMatches(openSells, asks)
+
+	// Sort buy and sell orders by priority
+	sort.Slice(bids, func(a, b int) bool {
+		return bids[a].Rate > bids[b].Rate
+	})
+	sort.Slice(asks, func(a, b int) bool {
+		return asks[a].Rate < asks[b].Rate
+	})
+
+	sort.Slice(openBuys, func(a, b int) bool {
+		return openBuys[a].Price > openBuys[b].Price
+	})
+	sort.Slice(openSells, func(a, b int) bool {
+		return openSells[a].Price < openSells[b].Price
+	})
+
+	cancel := func(order iex.WSOrder) {
+		log.Println("Trying to cancel", order.OrderID)
+		err := ex.CancelOrder(iex.CancelOrderF{
+			Market: order.Symbol,
+			Uuid:   order.OrderID,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	place := func(order iex.Order) {
+		uuid, err := ex.PlaceOrder(order)
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			log.Println("Placed BUY", uuid)
+		}
+	}
+
+	byix := 0
+	slix := 0
+	bcont := len(bids) != 0
+	scont := len(asks) != 0
+	for bcont || scont {
+		if bcont && scont {
+			diffb := math.Abs(bids[byix].Rate - a.Market.Price)
+			diffs := math.Abs(asks[slix].Rate - a.Market.Price)
+			if diffb < diffs {
+				// cancel buy
+				if len(openBuys) > byix {
+					cancel(openBuys[byix])
+					place(bids[byix])
+					byix++
+				}
+			} else {
+				// cancel sell
+				if len(openSells) > slix {
+					cancel(openSells[slix])
+					place(asks[slix])
+					slix++
+				}
+			}
+		} else if !bcont {
+			// finish the rest of the sells
+			for i := slix; i < len(asks); i++ {
+				cancel(openSells[i])
+				place(asks[i])
+			}
+			break
+		} else if !scont {
+			// finish the rest of the buys
+			for i := byix; i < len(bids); i++ {
+				cancel(openBuys[i])
+				place(bids[i])
+			}
+			break
+		}
+		bcont = (byix < len(bids))
+		scont = (slix < len(asks))
+	}
 }
 
 func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.WSOrder {
