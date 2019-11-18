@@ -179,12 +179,12 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 	// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		newQuantity := fillCost * fillAmount
-		fee := math.Abs(fillAmount/fillCost) * algo.Market.MakerFee
-		// log.Printf("fillCost %.2f -> fillAmount %.2f -> Fee %.2f \n", fillCost, fillCost*fillAmount, fee)
+		// fee := math.Abs(fillAmount/fillCost) * algo.Market.MakerFee
+		// log.Printf("fillCost %.8f -> fillAmount %.8f -> newQuantity %0.8f -> Fee %.2f \n", fillCost, fillAmount, newQuantity, fee)
 		currentCost := (algo.QuoteAsset.Quantity * algo.Market.AverageCost)
 		totalQuantity := algo.QuoteAsset.Quantity + newQuantity
 		newCost := fillCost * newQuantity
-		if algo.Futures {
+		if algo.Market.Futures {
 			if (newQuantity >= 0 && algo.QuoteAsset.Quantity >= 0) || (newQuantity <= 0 && algo.QuoteAsset.Quantity <= 0) {
 				//Adding to position
 				algo.Market.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
@@ -214,8 +214,19 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 				// log.Println(algo.BaseAsset.Quantity, "profit", ((math.Abs(newQuantity) * diff) / fillCost))
 			}
 			algo.QuoteAsset.Quantity = algo.QuoteAsset.Quantity + newQuantity
+		} else {
+			if newQuantity >= 0 && algo.QuoteAsset.Quantity >= 0 {
+				//Adding to position
+				algo.Market.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
+			}
+
+			algo.QuoteAsset.Quantity = algo.QuoteAsset.Quantity - newCost
+			algo.BaseAsset.Quantity = algo.BaseAsset.Quantity + newQuantity
+
+			// log.Println("PV:", (algo.BaseAsset.Quantity*algo.Market.Price)+algo.QuoteAsset.Quantity)
+			// log.Println("Base", algo.BaseAsset.Quantity, "Quote", algo.QuoteAsset.Quantity)
 		}
-		algo.BaseAsset.Quantity = algo.BaseAsset.Quantity - fee
+		// algo.BaseAsset.Quantity = algo.BaseAsset.Quantity - fee
 	}
 }
 
@@ -261,8 +272,9 @@ func MinMaxStats(history []models.History) (float64, float64, float64, float64, 
 			highestBalance = row.UBalance
 		}
 
-		if drawdown > row.UBalance-highestBalance {
-			drawdown = row.UBalance - highestBalance
+		ddDiff := calculateDifference(row.UBalance, highestBalance)
+		if drawdown > ddDiff {
+			drawdown = ddDiff
 		}
 
 		if maxLeverage < row.Leverage {

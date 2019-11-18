@@ -4,6 +4,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/tantralabs/tradeapi/iex"
 )
@@ -15,7 +16,7 @@ func deltaFloat(a, b, delta float64) bool {
 func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	// For now. Should be parameterized
-	qtyTolerance := 1.0
+	qtyTolerance := 0.0001
 	priceTolerance := 1.0
 
 	var bids []iex.Order
@@ -28,8 +29,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			order := iex.Order{
 				Market:   a.BaseAsset.Symbol,
 				Currency: a.QuoteAsset.Symbol,
-				Amount:   float64(int(totalQty)),
-				Rate:     toFixed(orderPrice, 2),
+				Amount:   totalQty, //float64(int(totalQty)),
+				Rate:     toFixed(orderPrice, 8),
 				Type:     "Limit",
 				Side:     "Buy",
 			}
@@ -46,8 +47,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			order := iex.Order{
 				Market:   a.BaseAsset.Symbol,
 				Currency: a.QuoteAsset.Symbol,
-				Amount:   float64(int(totalQty)),
-				Rate:     toFixed(orderPrice, 2),
+				Amount:   totalQty, //float64(int(totalQty)),
+				Rate:     toFixed(orderPrice, 8),
 				Type:     "Limit",
 				Side:     "Sell",
 			}
@@ -60,13 +61,15 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	var openBuys []iex.WSOrder
 	var openSells []iex.WSOrder
 
+	log.Println("openOrders", openOrders)
 	for _, order := range openOrders {
-		if order.Side == "Buy" {
+		if strings.ToLower(order.Side) == "buy" {
 			openBuys = append(openBuys, order)
-		} else if order.Side == "Sell" {
+		} else if strings.ToLower(order.Side) == "sell" {
 			openSells = append(openSells, order)
 		}
 	}
+	log.Println("openSells", openSells)
 
 	// Make a local sifting function
 	siftMatches := func(open []iex.WSOrder, new []iex.Order) ([]iex.WSOrder, []iex.Order) {
@@ -146,6 +149,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	slix := 0
 	bcont := len(bids) != 0
 	scont := len(asks) != 0
+	log.Println("len(bids)", len(bids), "len(asks)", len(asks))
 	for bcont || scont {
 		if bcont && scont {
 			diffb := math.Abs(bids[byix].Rate - a.Market.Price)
@@ -167,15 +171,21 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			}
 		} else if !bcont {
 			// finish the rest of the sells
-			for i := slix; i < len(asks); i++ {
+			for i := slix; i < len(openSells); i++ {
 				cancel(openSells[i])
+			}
+
+			for i := slix; i < len(asks); i++ {
 				place(asks[i])
 			}
+
 			break
 		} else if !scont {
 			// finish the rest of the buys
-			for i := byix; i < len(bids); i++ {
+			for i := byix; i < len(openBuys); i++ {
 				cancel(openBuys[i])
+			}
+			for i := byix; i < len(bids); i++ {
 				place(bids[i])
 			}
 			break

@@ -16,6 +16,10 @@ type Asset struct {
 	Quantity float64
 }
 
+type OptionContract struct {
+	Symbol string
+}
+
 type Market struct {
 	Symbol           string
 	BaseAsset        string
@@ -36,6 +40,9 @@ type Market struct {
 	Leverage         float64
 	BuyOrders        models.OrderArray
 	SellOrders       models.OrderArray
+
+	Futures bool
+	Options []OptionContract
 }
 
 type Algo struct {
@@ -44,21 +51,15 @@ type Algo struct {
 	Market     Market
 	BaseAsset  Asset
 	QuoteAsset Asset
-	State      map[string]interface{}
-	Futures    bool
+
+	State map[string]interface{}
+
 	Debug      bool
 	Index      int
 	DataLength int
 	History    []algoModels.History
 	Params     map[string]interface{}
 	Result     map[string]interface{}
-
-	//Custom
-	EntrySpread     float64
-	EntryConfidence float64
-	ExitSpread      float64
-	ExitConfidence  float64
-	Liquidity       float64
 }
 
 // Example

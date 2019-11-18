@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fatih/structs"
+	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
 	algoModels "github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/TheAlgoV2/settings"
@@ -39,15 +40,36 @@ func loadConfiguration(file string, secret bool) settings.Config {
 	}
 }
 
+func LoadBars(csvFile string) []algoModels.Bar {
+	var bars []algoModels.Bar
+
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(dir + "/" + csvFile + ".csv")
+	dataFile, err := os.OpenFile(dir+"/"+csvFile+".csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	defer dataFile.Close()
+	// log.Println("Done Loading Data... ")
+
+	if err := gocsv.UnmarshalFile(dataFile, &bars); err != nil { // Load bars from file
+		panic(err)
+	}
+
+	return bars
+}
+
 //Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
 func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
-	if a.Futures {
+	if a.Market.Futures {
 		return percentage * a.BaseAsset.Quantity
 	} else {
 		if side == "buy" {
 			return percentage * a.QuoteAsset.Quantity
 		}
-		log.Println(a.BaseAsset.Quantity, a.Market.Price, a.QuoteAsset.Quantity)
 		return percentage * ((a.BaseAsset.Quantity * a.Market.Price) + a.QuoteAsset.Quantity)
 	}
 }
@@ -56,7 +78,7 @@ func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 func (algo *Algo) logState(timestamp ...string) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
 	var balance float64
-	if algo.Futures {
+	if algo.Market.Futures {
 		balance = algo.BaseAsset.Quantity
 		algo.Market.Leverage = (math.Abs(algo.QuoteAsset.Quantity) / algo.Market.Price) / algo.BaseAsset.Quantity
 	} else {
@@ -68,16 +90,23 @@ func (algo *Algo) logState(timestamp ...string) {
 	algo.Market.Profit = algo.CurrentProfit(algo.Market.Price) * algo.Market.Leverage
 
 	if timestamp != nil {
-		algo.History = append(algo.History, algoModels.History{
+		history := algoModels.History{
 			Timestamp:   timestamp[0],
 			Balance:     balance,
-			UBalance:    balance + (balance * algo.Market.Profit),
 			Quantity:    algo.QuoteAsset.Quantity,
 			AverageCost: algo.Market.AverageCost,
 			Leverage:    algo.Market.Leverage,
 			Profit:      algo.Market.Profit,
 			Price:       algo.Market.Price,
-		})
+		}
+
+		if algo.Market.Futures {
+			history.UBalance = balance + (balance * algo.Market.Profit)
+		} else {
+			history.UBalance = (algo.BaseAsset.Quantity * algo.Market.Price) + algo.QuoteAsset.Quantity
+		}
+
+		algo.History = append(algo.History, history)
 	} else {
 		algo.LogLiveState()
 	}

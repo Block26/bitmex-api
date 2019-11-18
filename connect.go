@@ -5,7 +5,6 @@ import (
 	"log"
 	"strings"
 
-	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
@@ -38,8 +37,9 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	}
 	orderStatus = ex.GetPotentialOrderStatus()
 
-	localBars := data.GetData(algo.Market.Symbol, "1m", algo.DataLength)
-	log.Println(len(localBars), "downloaded")
+	localBars := make([]models.Bar, 0) //data.GetData(algo.Market.Symbol, "1m", algo.DataLength)
+	// localBars := data.GetData(algo.Market.Symbol, "1m", algo.DataLength)
+	// log.Println(len(localBars), "downloaded")
 
 	// channels to subscribe to
 	symbol := strings.ToLower(algo.Market.Symbol)
@@ -89,6 +89,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			OrderQty:  oo.Quantity,
 			OrderID:   oo.UUID,
 			OrdStatus: oo.Status,
+			Side:      oo.Side,
 		}
 		localOrders = append(localOrders, order)
 	}
@@ -101,6 +102,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			OrderQty:  oo.Quantity,
 			OrderID:   oo.UUID,
 			OrdStatus: oo.Status,
+			Side:      oo.Side,
 		}
 		localOrders = append(localOrders, order)
 	}
@@ -108,7 +110,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	localOrders = UpdateLocalOrders(emptyOrders, localOrders)
 	balances, err := ex.GetBalances()
 	algo.updateAlgoBalances(balances)
-
+	algo.logState()
 	for {
 		select {
 		case positions := <-channels.PositionChan:
@@ -125,15 +127,17 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		case trade := <-channels.TradeBinChan:
 			log.Println("Trade Update:", trade)
 			algo.Market.Price = trade[0].Close
-			localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
-			log.Println("Bars", len(localBars))
+			// localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
+			// log.Println("Bars", len(localBars))
 			setupData(&localBars, algo)
 			algo.Index = len(localBars) - 1
 			algo = rebalance(trade[0].Close, algo)
-			if algo.Futures {
+			if algo.Market.Futures {
 				algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price))
 				algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price))
 			} else {
+				log.Println("Buying", algo.Market.Buying, algo.Market.BuyOrders.Quantity)
+				log.Println("Selling", algo.Market.Selling, algo.Market.SellOrders.Quantity)
 				algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price))
 				algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price))
 				log.Println("Buying", algo.Market.Buying, algo.Market.BuyOrders.Quantity)
