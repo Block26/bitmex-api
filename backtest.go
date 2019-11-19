@@ -96,40 +96,10 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) 
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
 				algo.UpdateBalance(fillCost, algo.Market.Selling*-fillPercentage)
 			} else if algo.FillType == "close" {
-				log.Println(algo.Market.Weight, algo.Market.Leverage, algo.Market.MaxLeverage)
-				if algo.Market.Leverage+algo.DeleverageOrderSize <= algo.Market.MaxLeverage && algo.Market.Weight != 0 {
-					//TODO track if we are going from long to short and use OrderSize first
-					var tmpOrderSize float64
-					if algo.OrderSize < algo.Market.MaxLeverage-algo.Market.Leverage {
-						tmpOrderSize = algo.OrderSize
-					} else {
-						tmpOrderSize = algo.Market.MaxLeverage - algo.Market.Leverage
-					}
-					fillCost, ordersFilled := algo.getCostAverage([]float64{bar.Close}, []float64{tmpOrderSize})
-					algo.UpdateBalance(fillCost, ordersFilled*float64(algo.Market.Weight))
-				} else if algo.Market.Leverage-algo.DeleverageOrderSize > algo.Market.MaxLeverage {
-					fillCost, ordersFilled := algo.getCostAverage([]float64{bar.Close}, []float64{algo.DeleverageOrderSize})
-					if algo.Market.Futures {
-						algo.UpdateBalance(fillCost, -math.Copysign(ordersFilled, algo.Market.QuoteAsset.Quantity))
-					} else {
-						algo.UpdateBalance(fillCost, -ordersFilled)
-					}
-				} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
-					var tmpOrderSize float64
-					if algo.OrderSize > algo.Market.Leverage {
-						tmpOrderSize = algo.OrderSize
-					} else {
-						tmpOrderSize = algo.Market.Leverage
-					}
-					fillCost, ordersFilled := algo.getCostAverage([]float64{bar.Close}, []float64{tmpOrderSize})
-					if algo.Market.Futures {
-						algo.UpdateBalance(fillCost, -math.Copysign(ordersFilled, algo.Market.QuoteAsset.Quantity))
-					} else {
-						algo.UpdateBalance(fillCost, -ordersFilled)
-					}
-				}
+				algo.UpdateBalanceFromFill(bar.Close)
+			} else if algo.FillType == "open" {
+				algo.UpdateBalanceFromFill(bar.Open)
 			}
-
 			// updateBalanceXBTStrat(bar)
 			algo.logState(timestamp)
 			// if algo.Market.Qua+(algo.Market.BaseBalance*algo.Market.Profit) < 0 {
@@ -200,6 +170,40 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) 
 	LogBacktest(algo)
 	// score := ((math.Abs(minProfit) / algo.History[len(algo.History)-1].Balance) + maxLeverage) - algo.History[len(algo.History)-1].Balance // minimize
 	return score //algo.History.Balance[len(algo.History.Balance)-1] / (maxLeverage + 1)
+}
+
+func (algo *Algo) UpdateBalanceFromFill(fillPrice float64) {
+	if algo.Market.Leverage+algo.DeleverageOrderSize <= algo.Market.MaxLeverage && algo.Market.Weight != 0 {
+		//TODO track if we are going from long to short and use OrderSize first
+		var tmpOrderSize float64
+		if algo.OrderSize < algo.Market.MaxLeverage-algo.Market.Leverage {
+			tmpOrderSize = algo.OrderSize
+		} else {
+			tmpOrderSize = algo.Market.MaxLeverage - algo.Market.Leverage
+		}
+		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
+		algo.UpdateBalance(fillCost, ordersFilled*float64(algo.Market.Weight))
+	} else if algo.Market.Leverage-algo.DeleverageOrderSize > algo.Market.MaxLeverage {
+		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{algo.DeleverageOrderSize})
+		if algo.Market.Futures {
+			algo.UpdateBalance(fillCost, -math.Copysign(ordersFilled, algo.Market.QuoteAsset.Quantity))
+		} else {
+			algo.UpdateBalance(fillCost, -ordersFilled)
+		}
+	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
+		var tmpOrderSize float64
+		if algo.OrderSize > algo.Market.Leverage {
+			tmpOrderSize = algo.OrderSize
+		} else {
+			tmpOrderSize = algo.Market.Leverage
+		}
+		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
+		if algo.Market.Futures {
+			algo.UpdateBalance(fillCost, -math.Copysign(ordersFilled, algo.Market.QuoteAsset.Quantity))
+		} else {
+			algo.UpdateBalance(fillCost, -ordersFilled)
+		}
+	}
 }
 
 func (algo *Algo) CurrentProfit(price float64) float64 {
