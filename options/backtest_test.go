@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func arange(start, stop, step float64) []float64 {
+func Arange(start, stop, step float64) []float64 {
 	N := int(math.Ceil((stop - start) / step))
 	arr := make([]float64, N, N)
 	i := 0
@@ -23,7 +23,7 @@ func arange(start, stop, step float64) []float64 {
 func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
 	vol := -1.
 	for _, data := range volData {
-		timeDiff := data.Timestamp - (time)
+		timeDiff := data.Timestamp - time
 		if timeDiff < 0 {
 			vol = data.IV
 			break
@@ -40,11 +40,9 @@ func TestBlackScholes(t *testing.T) {
 	// method := "blackScholes"
 	calcGreeks := true
 	numOptions := 0
-
-	times := arange(float64(start), float64(end), 3600.*1000)
-	strikes := arange(5000., 20000., 500.)
-	timesToExpiry := arange(7., 63., 7.)
-
+	times := Arange(float64(start), float64(end), 3600.*1000)
+	strikes := Arange(5000., 20000., 500.)
+	timesToExpiry := Arange(7., 63., 7.)
 	for _, time := range times {
 		for _, strike := range strikes {
 			for _, timeToExpiry := range timesToExpiry {
