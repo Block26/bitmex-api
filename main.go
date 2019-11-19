@@ -22,12 +22,13 @@ type OptionContract struct {
 
 type Market struct {
 	Symbol           string
-	BaseAsset        string
-	QuoteAsset       string
 	Exchange         string
 	ExchangeURL      string
 	WSStream         string
+	BaseAsset        Asset
+	QuoteAsset       Asset
 	MaxOrders        int32
+	Weight           int32
 	Price            float64
 	Profit           float64
 	AverageCost      float64
@@ -47,10 +48,10 @@ type Market struct {
 
 type Algo struct {
 	//Required
-	Name       string
-	Market     Market
-	BaseAsset  Asset
-	QuoteAsset Asset
+	Name   string
+	Market Market
+
+	FillType string
 
 	State map[string]interface{}
 

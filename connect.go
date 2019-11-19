@@ -74,7 +74,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	var localOrders []iex.WSOrder
 
 	//Setup local orders - Some exchanges don't send orders on WS connection so we prepopulate from restful api
-	openOrders, err := ex.OpenOrders(iex.OpenOrderF{Market: algo.Market.BaseAsset, Currency: algo.Market.QuoteAsset})
+	openOrders, err := ex.OpenOrders(iex.OpenOrderF{Market: algo.Market.BaseAsset.Symbol, Currency: algo.Market.QuoteAsset.Symbol})
 
 	if err != nil {
 		fmt.Println(err)
@@ -117,7 +117,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			log.Println("Position Update:", positions)
 			// position := positions[0]
 			// algo.Asset.Quantity = float64(position.CurrentQty)
-			// if math.Abs(algo.BaseAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
+			// if math.Abs(algo.Market.BaseAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
 			// 	algo.Asset.AverageCost = position.AvgCostPrice
 			// } else if position.CurrentQty == 0 {
 			// 	algo.Asset.AverageCost = 0
@@ -156,16 +156,16 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 
 func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 	for i := range balances {
-		if balances[i].Asset == algo.BaseAsset.Symbol {
+		if balances[i].Asset == algo.Market.BaseAsset.Symbol {
 			walletAmount := float64(balances[i].Balance)
-			if walletAmount > 0 && walletAmount != algo.BaseAsset.Quantity {
-				algo.BaseAsset.Quantity = walletAmount
+			if walletAmount > 0 && walletAmount != algo.Market.BaseAsset.Quantity {
+				algo.Market.BaseAsset.Quantity = walletAmount
 				fmt.Printf("BaseAsset: %+v \n", walletAmount)
 			}
-		} else if balances[i].Asset == algo.QuoteAsset.Symbol {
+		} else if balances[i].Asset == algo.Market.QuoteAsset.Symbol {
 			walletAmount := float64(balances[i].Balance)
-			if walletAmount > 0 && walletAmount != algo.QuoteAsset.Quantity {
-				algo.QuoteAsset.Quantity = walletAmount
+			if walletAmount > 0 && walletAmount != algo.Market.QuoteAsset.Quantity {
+				algo.Market.QuoteAsset.Quantity = walletAmount
 				fmt.Printf("QuoteAsset: %+v \n", walletAmount)
 			}
 		}

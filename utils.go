@@ -65,12 +65,12 @@ func LoadBars(csvFile string) []algoModels.Bar {
 //Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
 func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 	if a.Market.Futures {
-		return percentage * a.BaseAsset.Quantity
+		return percentage * a.Market.BaseAsset.Quantity
 	} else {
 		if side == "buy" {
-			return percentage * a.QuoteAsset.Quantity
+			return percentage * a.Market.QuoteAsset.Quantity
 		}
-		return percentage * ((a.BaseAsset.Quantity * a.Market.Price) + a.QuoteAsset.Quantity)
+		return percentage * ((a.Market.BaseAsset.Quantity * a.Market.Price) + a.Market.QuoteAsset.Quantity)
 	}
 }
 
@@ -79,12 +79,12 @@ func (algo *Algo) logState(timestamp ...string) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
 	var balance float64
 	if algo.Market.Futures {
-		balance = algo.BaseAsset.Quantity
-		algo.Market.Leverage = (math.Abs(algo.QuoteAsset.Quantity) / algo.Market.Price) / algo.BaseAsset.Quantity
+		balance = algo.Market.BaseAsset.Quantity
+		algo.Market.Leverage = (math.Abs(algo.Market.QuoteAsset.Quantity) / algo.Market.Price) / algo.Market.BaseAsset.Quantity
 	} else {
-		balance = algo.BaseAsset.Quantity + (algo.QuoteAsset.Quantity * algo.Market.Price)
+		balance = algo.Market.BaseAsset.Quantity + (algo.Market.QuoteAsset.Quantity * algo.Market.Price)
 		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
-		algo.Market.Leverage = (math.Abs(algo.QuoteAsset.Quantity)) / (algo.BaseAsset.Quantity * algo.Market.Price)
+		algo.Market.Leverage = (math.Abs(algo.Market.QuoteAsset.Quantity)) / (algo.Market.BaseAsset.Quantity * algo.Market.Price)
 	}
 
 	algo.Market.Profit = algo.CurrentProfit(algo.Market.Price) * algo.Market.Leverage
@@ -93,7 +93,7 @@ func (algo *Algo) logState(timestamp ...string) {
 		history := algoModels.History{
 			Timestamp:   timestamp[0],
 			Balance:     balance,
-			Quantity:    algo.QuoteAsset.Quantity,
+			Quantity:    algo.Market.QuoteAsset.Quantity,
 			AverageCost: algo.Market.AverageCost,
 			Leverage:    algo.Market.Leverage,
 			Profit:      algo.Market.Profit,
@@ -103,7 +103,7 @@ func (algo *Algo) logState(timestamp ...string) {
 		if algo.Market.Futures {
 			history.UBalance = balance + (balance * algo.Market.Profit)
 		} else {
-			history.UBalance = (algo.BaseAsset.Quantity * algo.Market.Price) + algo.QuoteAsset.Quantity
+			history.UBalance = (algo.Market.BaseAsset.Quantity * algo.Market.Price) + algo.Market.QuoteAsset.Quantity
 		}
 
 		algo.History = append(algo.History, history)
@@ -111,7 +111,7 @@ func (algo *Algo) logState(timestamp ...string) {
 		algo.LogLiveState()
 	}
 	if algo.Debug {
-		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.BaseAsset.Quantity*algo.Market.Price+(algo.QuoteAsset.Quantity), 0, algo.BaseAsset.Quantity, algo.QuoteAsset.Quantity, algo.Market.Price, algo.Market.AverageCost))
+		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price+(algo.Market.QuoteAsset.Quantity), 0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price, algo.Market.AverageCost))
 	}
 }
 

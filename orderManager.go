@@ -27,8 +27,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		if totalQty > a.Market.MinimumOrderSize {
 			orderPrice := a.Market.BuyOrders.Price[i]
 			order := iex.Order{
-				Market:   a.BaseAsset.Symbol,
-				Currency: a.QuoteAsset.Symbol,
+				Market:   a.Market.BaseAsset.Symbol,
+				Currency: a.Market.QuoteAsset.Symbol,
 				Amount:   totalQty, //float64(int(totalQty)),
 				Rate:     toFixed(orderPrice, 8),
 				Type:     "Limit",
@@ -45,8 +45,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		if totalQty > a.Market.MinimumOrderSize {
 			orderPrice := a.Market.SellOrders.Price[i]
 			order := iex.Order{
-				Market:   a.BaseAsset.Symbol,
-				Currency: a.QuoteAsset.Symbol,
+				Market:   a.Market.BaseAsset.Symbol,
+				Currency: a.Market.QuoteAsset.Symbol,
 				Amount:   totalQty, //float64(int(totalQty)),
 				Rate:     toFixed(orderPrice, 8),
 				Type:     "Limit",
