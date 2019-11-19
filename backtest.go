@@ -96,8 +96,38 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) 
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
 				algo.UpdateBalance(fillCost, algo.Market.Selling*-fillPercentage)
 			} else if algo.FillType == "close" {
-				fillCost, ordersFilled := algo.getCostAverage([]float64{bar.Close}, []float64{1})
-				algo.UpdateBalance(fillCost, ordersFilled)
+				log.Println(algo.Market.Weight, algo.Market.Leverage, algo.Market.MaxLeverage)
+				if algo.Market.Leverage+algo.DeleverageOrderSize <= algo.Market.MaxLeverage && algo.Market.Weight != 0 {
+					//TODO track if we are going from long to short and use OrderSize first
+					var tmpOrderSize float64
+					if algo.OrderSize < algo.Market.MaxLeverage-algo.Market.Leverage {
+						tmpOrderSize = algo.OrderSize
+					} else {
+						tmpOrderSize = algo.Market.MaxLeverage - algo.Market.Leverage
+					}
+					fillCost, ordersFilled := algo.getCostAverage([]float64{bar.Close}, []float64{tmpOrderSize})
+					algo.UpdateBalance(fillCost, ordersFilled*float64(algo.Market.Weight))
+				} else if algo.Market.Leverage-algo.DeleverageOrderSize > algo.Market.MaxLeverage {
+					fillCost, ordersFilled := algo.getCostAverage([]float64{bar.Close}, []float64{algo.DeleverageOrderSize})
+					if algo.Market.Futures {
+						algo.UpdateBalance(fillCost, -math.Copysign(ordersFilled, algo.Market.QuoteAsset.Quantity))
+					} else {
+						algo.UpdateBalance(fillCost, -ordersFilled)
+					}
+				} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
+					var tmpOrderSize float64
+					if algo.OrderSize > algo.Market.Leverage {
+						tmpOrderSize = algo.OrderSize
+					} else {
+						tmpOrderSize = algo.Market.Leverage
+					}
+					fillCost, ordersFilled := algo.getCostAverage([]float64{bar.Close}, []float64{tmpOrderSize})
+					if algo.Market.Futures {
+						algo.UpdateBalance(fillCost, -math.Copysign(ordersFilled, algo.Market.QuoteAsset.Quantity))
+					} else {
+						algo.UpdateBalance(fillCost, -ordersFilled)
+					}
+				}
 			}
 
 			// updateBalanceXBTStrat(bar)

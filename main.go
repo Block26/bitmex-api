@@ -39,6 +39,7 @@ type Market struct {
 	Buying           float64
 	Selling          float64
 	Leverage         float64
+	MaxLeverage      float64
 	BuyOrders        models.OrderArray
 	SellOrders       models.OrderArray
 
@@ -51,7 +52,9 @@ type Algo struct {
 	Name   string
 	Market Market
 
-	FillType string
+	FillType            string
+	OrderSize           float64
+	DeleverageOrderSize float64
 
 	State map[string]interface{}
 
