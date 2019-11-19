@@ -1,7 +1,6 @@
 package options
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/chobie/go-gaussian"
@@ -10,7 +9,7 @@ import (
 const PI float64 = 3.14159265359
 const day = 86400
 
-type OptionData struct {
+type OptionTheo struct {
 	strike      float64 // strike price
 	uPrice      float64 // underlying price
 	r           float64 // risk free rate
@@ -23,13 +22,14 @@ type OptionData struct {
 	delta       float64 // derived from info above
 	theta       float64 // derived from info above
 	gamma       float64 // derived from info above
+	vega        float64 // derived from info above
 }
 
 // Either theo or volatility is unknown (pass in -1.0 for unknown values)
-func NewOptionData(optionType string, uPrice float64, strike float64,
+func NewOptionTheo(optionType string, uPrice float64, strike float64,
 	currentTime int, expiry int, r float64,
-	volatility float64, theo float64) *OptionData {
-	o := &OptionData{
+	volatility float64, theo float64) *OptionTheo {
+	o := &OptionTheo{
 		strike:      strike,
 		uPrice:      uPrice,
 		r:           r,
@@ -58,19 +58,19 @@ func GetTimeLeft(currentTime int, expiry int) float64 {
 	return float64(expiry-currentTime) / float64(1000*day*365)
 }
 
-func (self *OptionData) d1() float64 {
-	return (math.Log(self.uPrice/self.strike) + (self.r+math.Pow(self.volatility, 2)/2)*self.timeLeft) / (self.volatility * math.Sqrt(self.timeLeft))
+func (self *OptionTheo) calcD1(volatility float64) float64 {
+	return (math.Log(self.uPrice/self.strike) + (self.r+math.Pow(self.volatility, 2)/2)*self.timeLeft) / (volatility * math.Sqrt(self.timeLeft))
 }
 
-func (self *OptionData) d2() float64 {
-	return (math.Log(self.uPrice/self.strike) + (self.r-math.Pow(self.volatility, 2)/2)*self.timeLeft) / (self.volatility * math.Sqrt(self.timeLeft))
+func (self *OptionTheo) calcD2(volatility float64) float64 {
+	return (math.Log(self.uPrice/self.strike) + (self.r-math.Pow(self.volatility, 2)/2)*self.timeLeft) / (volatility * math.Sqrt(self.timeLeft))
 }
 
 // calculate Black Scholes theo and greeks
-func (self *OptionData) getBlackScholes(calcGreeks bool) float64 {
+func (self *OptionTheo) calcBlackScholesTheo(calcGreeks bool) {
 	norm := gaussian.NewGaussian(0, 1)
-	td1 := self.d1()
-	td2 := self.d2()
+	td1 := self.calcD1(self.volatility)
+	td2 := self.calcD2(self.volatility)
 	nPrime := math.Pow((2*PI), -(1/2)) * math.Exp(math.Pow(-0.5*(td1), 2))
 	if self.theo < 0 {
 		if self.optionType == "call" {
@@ -113,17 +113,15 @@ func (self *OptionData) getBlackScholes(calcGreeks bool) float64 {
 
 	// Convert theo to be quoted in terms of underlying
 	self.theo = self.theo / self.uPrice
-	return self.theo
 }
 
 // use newton raphson method to find volatility
-func (self *OptionData) impliedVol() float64 {
+func (self *OptionTheo) impliedVol() float64 {
 	norm := gaussian.NewGaussian(0, 1)
 	v := math.Sqrt(2*PI/self.timeLeft) * self.theo / self.uPrice
-	//fmt.Printf(“ - initial vol: %v\n”, v)
 	for i := 0; i < 100; i++ {
-		d1 := (math.Log(self.uPrice/self.strike) + (self.r+0.5*math.Pow(v, 2))*self.timeLeft) / (v * math.Sqrt(self.timeLeft))
-		d2 := d1 - v*math.Sqrt(self.timeLeft)
+		d1 := self.calcD1(v)
+		d2 := self.calcD2(v)
 		vega := self.uPrice * norm.Pdf(d1) * math.Sqrt(self.timeLeft)
 		cp := 1.0
 		if self.optionType == "put" {
@@ -131,24 +129,9 @@ func (self *OptionData) impliedVol() float64 {
 		}
 		theo0 := cp*self.uPrice*norm.Cdf(cp*d1) - cp*self.strike*math.Exp(-self.r*self.timeLeft)*norm.Cdf(cp*d2)
 		v = v - (theo0-self.theo)/vega
-		//fmt.Printf(“ - next vol %v : %v / %v \n”, i, v,
-		//             math.Pow(10, -25))
 		if math.Abs(theo0-self.theo) < math.Pow(10, -25) {
 			break
 		}
 	}
 	return v
-}
-
-func GetOptionValue(optionType string, uPrice float64, strike float64, currentTime int, expiry int, method string, impliedVol float64) float64 {
-	// Assume interest rate of 0
-	r := 0.0
-	value := -1.0
-	optionData := NewOptionData(optionType, uPrice, strike, currentTime, expiry, r, impliedVol, value)
-	if method == "blackScholes" {
-		value = optionData.getBlackScholes(false)
-	} else {
-		fmt.Printf("Option valuation method %v not supported", method)
-	}
-	return value
 }
