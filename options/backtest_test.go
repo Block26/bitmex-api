@@ -12,13 +12,12 @@ func TestBlackScholes(t *testing.T) {
 	start := 1546644871291
 	end := 1568365292609
 	impliedVolData := tantradb.LoadImpliedVols("XBTUSD", start, end)
-	fmt.Printf("Loaded implied vol data: %v", impliedVolData)
 	method := "blackScholes"
 	for _, data := range impliedVolData {
 		currentPrice := data.IndexPrice
 		strike := data.Strike
-		currentTime := data.Timestamp / 1000
-		expiry := (data.Timestamp + int(data.TimeToExpiry)) / 1000
+		currentTime := data.Timestamp
+		expiry := data.Timestamp + int(data.TimeToExpiry)
 		impliedVol := data.IV
 		for _, optionType := range []string{"call", "put"} {
 			value := GetOptionValue(optionType, currentPrice, strike, currentTime, expiry, method, impliedVol)

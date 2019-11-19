@@ -53,8 +53,9 @@ func NewOptionData(optionType string, uPrice float64, strike float64,
 	return o
 }
 
+//Times in ms
 func GetTimeLeft(currentTime int, expiry int) float64 {
-	return float64(expiry-currentTime) / float64(day*365)
+	return float64(expiry-currentTime) / float64(1000*day*365)
 }
 
 func (self *OptionData) d1() float64 {
