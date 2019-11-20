@@ -2,9 +2,9 @@ package options
 
 import (
 	"fmt"
-	"github.com/chobie/go-gaussian"
-	"log"
 	"math"
+
+	"github.com/chobie/go-gaussian"
 )
 
 const PI float64 = 3.14159265359
@@ -112,10 +112,8 @@ func (self *OptionTheo) impliedVol() float64 {
 	return v
 }
 
-// If minProb is reached, stop the walk
-const minProb = .0001
-
-// Binomial tree indexing
+// TODO: can be made more efficient by assuming paths can intersect (i.e. up -> down yields same node as down -> up)
+// Can be done with binomial tree indexing instead of indexing by path string:
 //			4
 //		2
 //	1		5
@@ -123,18 +121,22 @@ const minProb = .0001
 //			6
 //
 // 	0	1	2
-//
+//   timestep
+
+// Stopping conditions for binomial walk
+const maxPrice = 20000
+const minPrice = 2000
+const minProb = .00001
 
 // Recursively calculate the expected values of underlying price
 func (self *OptionTheo) binomialWalk(move float64, prob float64, currentPrice float64, currentProb float64, path string,
 	evSum *float64, timestepsLeft int, walkCache map[string]*float64) {
-	fmt.Printf("BinomialWalk with timestepsLeft %v, currentProb %v, currentPrice %v, path %v\n", timestepsLeft, currentProb, currentPrice, path)
 	value, ok := walkCache[path]
 	if ok {
-		fmt.Printf("Loaded EV %v for path %v\n", *value, path)
+		// fmt.Printf("Loaded EV %v for path %v\n", *value, path)
 		*evSum += *value
 		return
-	} else if timestepsLeft <= 0 || currentProb < minProb {
+	} else if timestepsLeft <= 0 || currentPrice > maxPrice || currentPrice < minPrice || currentProb < minProb {
 		ev := 0.
 		if self.optionType == "call" {
 			ev = (currentPrice - self.strike) * currentProb
@@ -149,8 +151,8 @@ func (self *OptionTheo) binomialWalk(move float64, prob float64, currentPrice fl
 		}
 		*evSum += ev
 		walkCache[path] = &ev
-		log.Printf("Cached EV %v for path %v\n", ev, path)
-		fmt.Printf("Cached EV %v for path %v\n", ev, path)
+		// log.Printf("Cached EV %v for path %v\n", ev, path)
+		// fmt.Printf("Cached EV %v for path %v\n", ev, path)
 		return
 	}
 	currentPrice = currentPrice * (1 + move)
@@ -168,19 +170,19 @@ func (self *OptionTheo) binomialWalk(move float64, prob float64, currentPrice fl
 	self.binomialWalk(-move, 1-prob, currentPrice, currentProb, path, evSum, timestepsLeft-1, walkCache)
 }
 
-// Calculate theoretical option value based on percentage move, probability of up move, and length of timesteps (in seconds)
-// Param move: magnitude of each move at each timestep, in terms of fraction (i.e. 1% -> 0.01)
-// Param prob: probability of an up move (i.e. 0.5), downmove assumed with complementary probability
-// Param timestep: number of seconds for each timestep in the binomial walk
-func (self *OptionTheo) calcBinomialTreeTheo(move float64, prob float64, timestep float64) {
-	numTimesteps := int(math.Ceil(float64(self.expiry-self.currentTime) / (1000 * timestep)))
-	fmt.Printf("numTimesteps: %v, diff: %v\n", numTimesteps, self.expiry-self.currentTime)
+// Calculate the theoretical value of an option based on a binary tree model
+// We can calculate the appropriate move for each timestep based on volatility of underlying and time to expiry
+// Param prob: probability of an upmove at each timestep
+// Param numTimesteps: number of timesteps for the binomial tree traversal
+func (self *OptionTheo) calcBinomialTreeTheo(prob float64, numTimesteps int) {
+	timestep := self.timeLeft / float64(numTimesteps)
+	move := self.volatility * math.Sqrt(timestep)
+	fmt.Printf("Calculating binomial tree theo with numTimesteps %v, move %v, prob %v, volatility %v\n", numTimesteps, move, prob, self.volatility)
 	path := ""
 	walkCache := make(map[string]*float64) // Stores an ev for a path whose ev is known
 	evSum := 0.
 	self.binomialWalk(move, prob, self.uPrice, 1, path, &evSum, numTimesteps, walkCache)
-	fmt.Printf("Got EV sum %v", evSum)
 	// Calculate binomial tree theo quoted in terms of underlying price
 	self.binomialTheo = evSum / self.uPrice
-	fmt.Printf("EV sum: %v, binomialTheo: %v\n", evSum, self.binomialTheo)
+	fmt.Printf("EV sum: %v, binomialTheo: %v, move: %v\n", evSum, self.binomialTheo, move)
 }

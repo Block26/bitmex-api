@@ -98,8 +98,9 @@ func TestBinomialTree(t *testing.T) {
 	// }
 	// fmt.Printf("Got implied vol data: %v\n", impliedVolData)
 
-	o := NewOptionTheo("call", 8000, 10000, int(end), int(end+(7*86400000)), 0, .8, -1)
-	o.calcBinomialTreeTheo(.05, .5, 86400)
+	o := NewOptionTheo("call", 8000, 10000, int(end), int(end+(10*86400000)), 0, .75, -1)
+	// o.calcBinomialTreeTheo(.01, .5, 3600)
+	o.calcBinomialTreeTheo(.5, 20)
 
 	duration := float64(time.Now().UnixNano()-testStart) / 1000000000
 	fmt.Printf("Processed %v options in %v seconds.\n", numOptions, duration)
