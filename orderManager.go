@@ -145,53 +145,50 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 
-	byix := 0
-	slix := 0
-	bcont := len(bids) != 0
-	scont := len(asks) != 0
-	log.Println("len(bids)", len(bids), "len(asks)", len(asks))
-	for bcont || scont {
-		if bcont && scont {
-			diffb := math.Abs(bids[byix].Rate - a.Market.Price)
-			diffs := math.Abs(asks[slix].Rate - a.Market.Price)
-			if diffb < diffs {
+	buyIndex := 0
+	sellIndex := 0
+	buyCont := len(bids) != 0
+	sellCont := len(asks) != 0
+	for buyCont || sellCont {
+		if buyCont && sellCont {
+			buyDiff := math.Abs(bids[buyIndex].Rate - a.Market.Price)
+			sellDiff := math.Abs(asks[sellIndex].Rate - a.Market.Price)
+			if buyDiff < sellDiff {
 				// cancel buy
-				if len(openBuys) > byix {
-					cancel(openBuys[byix])
-					place(bids[byix])
-					byix++
+				if len(openBuys) > buyIndex {
+					cancel(openBuys[buyIndex])
+					place(bids[buyIndex])
+					buyIndex++
 				}
 			} else {
 				// cancel sell
-				if len(openSells) > slix {
-					cancel(openSells[slix])
-					place(asks[slix])
-					slix++
+				if len(openSells) > sellIndex {
+					cancel(openSells[sellIndex])
+					place(asks[sellIndex])
+					sellIndex++
 				}
 			}
-		} else if !bcont {
+		} else if !buyCont {
 			// finish the rest of the sells
-			for i := slix; i < len(openSells); i++ {
+			for i := sellIndex; i < len(openSells); i++ {
 				cancel(openSells[i])
 			}
 
-			for i := slix; i < len(asks); i++ {
+			for i := sellIndex; i < len(asks); i++ {
 				place(asks[i])
 			}
-
-			break
-		} else if !scont {
+		} else if !sellCont {
 			// finish the rest of the buys
-			for i := byix; i < len(openBuys); i++ {
+			for i := buyIndex; i < len(openBuys); i++ {
 				cancel(openBuys[i])
 			}
-			for i := byix; i < len(bids); i++ {
+			for i := sellIndex; i < len(bids); i++ {
 				place(bids[i])
 			}
 			break
 		}
-		bcont = (byix < len(bids))
-		scont = (slix < len(asks))
+		buyCont = (buyIndex < len(bids))
+		sellCont = (sellIndex < len(asks))
 	}
 }
 
