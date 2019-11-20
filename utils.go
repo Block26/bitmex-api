@@ -87,7 +87,7 @@ func (algo *Algo) logState(timestamp ...string) {
 		algo.Market.Leverage = (math.Abs(algo.Market.QuoteAsset.Quantity)) / (algo.Market.BaseAsset.Quantity * algo.Market.Price)
 	}
 
-	algo.Market.Profit = algo.CurrentProfit(algo.Market.Price) * algo.Market.Leverage
+	algo.Market.Profit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price) * algo.Market.Leverage)
 
 	if timestamp != nil {
 		history := algoModels.History{
