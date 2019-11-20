@@ -1,7 +1,6 @@
 package options
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/chobie/go-gaussian"
@@ -146,9 +145,6 @@ func (self *OptionTheo) binomialWalk(move float64, prob float64, currentPrice fl
 		if ev < 0 {
 			ev = 0
 		}
-		if ev > 0 {
-			fmt.Printf("Got pos EV %v for path %v\n", ev, path)
-		}
 		*evSum += ev
 		walkCache[path] = &ev
 		// log.Printf("Cached EV %v for path %v\n", ev, path)
@@ -177,12 +173,12 @@ func (self *OptionTheo) binomialWalk(move float64, prob float64, currentPrice fl
 func (self *OptionTheo) calcBinomialTreeTheo(prob float64, numTimesteps int) {
 	timestep := self.timeLeft / float64(numTimesteps)
 	move := self.volatility * math.Sqrt(timestep)
-	fmt.Printf("Calculating binomial tree theo with numTimesteps %v, move %v, prob %v, volatility %v\n", numTimesteps, move, prob, self.volatility)
+	// fmt.Printf("Calculating binomial tree theo with numTimesteps %v, move %v, prob %v, volatility %v\n", numTimesteps, move, prob, self.volatility)
 	path := ""
 	walkCache := make(map[string]*float64) // Stores an ev for a path whose ev is known
 	evSum := 0.
 	self.binomialWalk(move, prob, self.uPrice, 1, path, &evSum, numTimesteps, walkCache)
 	// Calculate binomial tree theo quoted in terms of underlying price
 	self.binomialTheo = evSum / self.uPrice
-	fmt.Printf("EV sum: %v, binomialTheo: %v, move: %v\n", evSum, self.binomialTheo, move)
+	// fmt.Printf("EV sum: %v, binomialTheo: %v, move: %v\n", evSum, self.binomialTheo, move)
 }
