@@ -1,9 +1,10 @@
 package options
 
 import (
-	"math"
-
+	"fmt"
 	"github.com/chobie/go-gaussian"
+	"log"
+	"math"
 )
 
 const PI float64 = 3.14159265359
@@ -22,7 +23,7 @@ type OptionTheo struct {
 	binomialTheo float64 // Theoretical value calculated via binomial tree
 	delta        float64 // Change in theo wrt. 1 USD change in uPrice
 	theta        float64 // Change in theo wrt. 1 day decrease in timeLeft
-	gamma        float64 // Change in delta wrt. 1USD change in uPrice
+	gamma        float64 // Change in delta wrt. 1 USD change in uPrice
 	vega         float64 // Change in theo wrt. 1% increase in volatility
 }
 
@@ -111,19 +112,60 @@ func (self *OptionTheo) impliedVol() float64 {
 	return v
 }
 
+// If minProb is reached, stop the walk
+const minProb = .0001
+
+// Binomial tree indexing
+//			4
+//		2
+//	1		5
+//		3
+//			6
+//
+// 	0	1	2
+//
+
 // Recursively calculate the expected values of underlying price
-func BinomialWalk(currentProb float64, move float64, prob float64, timestepsLeft int, probs []float64, currentPrice float64, prices []float64) {
-	if timestepsLeft <= 0 {
-		probs[len(probs)] = currentProb
-		prices[len(prices)] = currentPrice
+func (self *OptionTheo) binomialWalk(move float64, prob float64, currentPrice float64, currentProb float64, path string,
+	evSum *float64, timestepsLeft int, walkCache map[string]*float64) {
+	fmt.Printf("BinomialWalk with timestepsLeft %v, currentProb %v, currentPrice %v, path %v\n", timestepsLeft, currentProb, currentPrice, path)
+	value, ok := walkCache[path]
+	if ok {
+		fmt.Printf("Loaded EV %v for path %v\n", *value, path)
+		*evSum += *value
+		return
+	} else if timestepsLeft <= 0 || currentProb < minProb {
+		ev := 0.
+		if self.optionType == "call" {
+			ev = (currentPrice - self.strike) * currentProb
+		} else if self.optionType == "put" {
+			ev = (self.strike - currentPrice) * currentProb
+		}
+		if ev < 0 {
+			ev = 0
+		}
+		if ev > 0 {
+			fmt.Printf("Got pos EV %v for path %v\n", ev, path)
+		}
+		*evSum += ev
+		walkCache[path] = &ev
+		log.Printf("Cached EV %v for path %v\n", ev, path)
+		fmt.Printf("Cached EV %v for path %v\n", ev, path)
 		return
 	}
 	currentPrice = currentPrice * (1 + move)
 	currentProb = currentProb * prob
-	// Walk in same direction
-	BinomialWalk(currentProb, move, prob, timestepsLeft-1, probs, currentPrice, prices)
-	// Walk in opposite direction
-	BinomialWalk(currentProb, -move, 1-prob, timestepsLeft-1, probs, currentPrice, prices)
+	if move < 0 {
+		move *= -1
+		prob = 1 - prob
+		path += "d"
+	} else {
+		path += "u"
+	}
+	// Walk up
+	self.binomialWalk(move, prob, currentPrice, currentProb, path, evSum, timestepsLeft-1, walkCache)
+	// Walk down
+	self.binomialWalk(-move, 1-prob, currentPrice, currentProb, path, evSum, timestepsLeft-1, walkCache)
 }
 
 // Calculate theoretical option value based on percentage move, probability of up move, and length of timesteps (in seconds)
@@ -131,28 +173,14 @@ func BinomialWalk(currentProb float64, move float64, prob float64, timestepsLeft
 // Param prob: probability of an up move (i.e. 0.5), downmove assumed with complementary probability
 // Param timestep: number of seconds for each timestep in the binomial walk
 func (self *OptionTheo) calcBinomialTreeTheo(move float64, prob float64, timestep float64) {
-	numTimesteps := int(math.Ceil(float64(self.expiry-self.currentTime) / 1000))
-	probs := make([]float64, numTimesteps)
-	prices := make([]float64, numTimesteps)
-	BinomialWalk(1, move, prob, numTimesteps, probs, self.uPrice, prices)
-	evSum := 0.0
-	if self.optionType == "call" {
-		for i := 0; i < len(prices); i++ {
-			ev := probs[i] * (prices[i] - self.strike)
-			if ev < 0 {
-				ev = 0
-			}
-			evSum += ev
-		}
-	} else if self.optionType == "put" {
-		for i := 0; i < len(prices); i++ {
-			ev := probs[i] * (self.strike - prices[i])
-			if ev < 0 {
-				ev = 0
-			}
-			evSum += ev
-		}
-	}
+	numTimesteps := int(math.Ceil(float64(self.expiry-self.currentTime) / (1000 * timestep)))
+	fmt.Printf("numTimesteps: %v, diff: %v\n", numTimesteps, self.expiry-self.currentTime)
+	path := ""
+	walkCache := make(map[string]*float64) // Stores an ev for a path whose ev is known
+	evSum := 0.
+	self.binomialWalk(move, prob, self.uPrice, 1, path, &evSum, numTimesteps, walkCache)
+	fmt.Printf("Got EV sum %v", evSum)
 	// Calculate binomial tree theo quoted in terms of underlying price
-	self.binomialTheo = evSum / float64(len(prices)) / self.uPrice
+	self.binomialTheo = evSum / self.uPrice
+	fmt.Printf("EV sum: %v, binomialTheo: %v\n", evSum, self.binomialTheo)
 }

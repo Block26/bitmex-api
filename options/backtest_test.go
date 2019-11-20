@@ -2,11 +2,11 @@ package options
 
 import (
 	"fmt"
-	"github.com/tantralabs/TheAlgoV2/models"
-	"github.com/tantralabs/TheAlgoV2/tantradb"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/tantralabs/TheAlgoV2/models"
 )
 
 func Arange(start, stop, step float64) []float64 {
@@ -32,38 +32,75 @@ func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
 	return vol
 }
 
-func TestBlackScholes(t *testing.T) {
+// func TestBlackScholes(t *testing.T) {
+// 	testStart := time.Now().UnixNano()
+// 	start := 1567756800000
+// 	end := 1571990400000
+// 	impliedVolData := tantradb.LoadImpliedVols("XBTUSD", start, end)
+// 	calcGreeks := true
+// 	numOptions := 0
+// 	times := Arange(float64(start), float64(end), 3600.*1000)
+// 	strikes := Arange(5000., 20000., 500.)
+// 	timesToExpiry := Arange(7., 63., 7.)
+// 	for _, time := range times {
+// 		for _, strike := range strikes {
+// 			for _, timeToExpiry := range timesToExpiry {
+// 				for _, currentPrice := range strikes {
+// 					for _, optionType := range []string{"call", "put"} {
+// 						// fmt.Printf("Time: %v, strike: %v, timeToExpiry: %v, currentPrice: %v, optionType: %v\n", time, strike, timeToExpiry, currentPrice, optionType)
+// 						impliedVol := GetNearestVol(impliedVolData, int(time))
+// 						// fmt.Printf("Got nearest vol: %v\n", impliedVol)
+// 						o := NewOptionTheo(optionType, currentPrice, strike, int(time), int(time+timeToExpiry), 0, impliedVol, -1)
+// 						o.calcBlackScholesTheo(calcGreeks)
+// 						// fmt.Printf("Got theo %v for %v option with strike %v, days to expiration %v\n", o.theo, optionType, strike, o.timeLeft*365)
+// 						// if calcGreeks {
+// 						// 	fmt.Printf("Delta: %v, Gamma: %v, Theta: %v, Vega: %v\n", o.delta, o.gamma, o.theta, o.vega)
+// 						// }
+// 						numOptions += 1
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// 	// fmt.Printf("Got implied vol data: %v\n", impliedVolData)
+// 	duration := float64(time.Now().UnixNano()-testStart) / 1000000000
+// 	fmt.Printf("Processed %v options in %v seconds.\n", numOptions, duration)
+// }
+
+func TestBinomialTree(t *testing.T) {
 	testStart := time.Now().UnixNano()
-	start := 1567756800000
+	// start := 1567756800000
 	end := 1571990400000
-	impliedVolData := tantradb.LoadImpliedVols("XBTUSD", start, end)
-	// method := "blackScholes"
-	calcGreeks := true
+	// impliedVolData := tantradb.LoadImpliedVols("XBTUSD", start, end)
 	numOptions := 0
-	times := Arange(float64(start), float64(end), 3600.*1000)
-	strikes := Arange(5000., 20000., 500.)
-	timesToExpiry := Arange(7., 63., 7.)
-	for _, time := range times {
-		for _, strike := range strikes {
-			for _, timeToExpiry := range timesToExpiry {
-				for _, currentPrice := range strikes {
-					for _, optionType := range []string{"call", "put"} {
-						// fmt.Printf("Time: %v, strike: %v, timeToExpiry: %v, currentPrice: %v, optionType: %v\n", time, strike, timeToExpiry, currentPrice, optionType)
-						impliedVol := GetNearestVol(impliedVolData, int(time))
-						// fmt.Printf("Got nearest vol: %v\n", impliedVol)
-						o := NewOptionTheo(optionType, currentPrice, strike, int(time), int(time+timeToExpiry), 0, impliedVol, -1)
-						o.calcBlackScholesTheo(calcGreeks)
-						// fmt.Printf("Got theo %v for %v option with strike %v, days to expiration %v [%v]\n", o.theo, optionType, strike, o.timeLeft*365, method)
-						// if calcGreeks {
-						// 	fmt.Printf("Delta: %v, Gamma: %v, Theta: %v, Vega: %v\n", o.delta, o.gamma, o.theta, o.vega)
-						// }
-						numOptions += 1
-					}
-				}
-			}
-		}
-	}
+	// times := Arange(float64(start), float64(end), 86400.*1000)
+	// strikes := Arange(5000., 20000., 500.)
+	// timesToExpiry := Arange(7., 63., 7.)
+	// for _, time := range times {
+	// 	for _, strike := range strikes {
+	// 		for _, timeToExpiry := range timesToExpiry {
+	// 			for _, currentPrice := range strikes {
+	// 				for _, optionType := range []string{"call", "put"} {
+	// 					// fmt.Printf("Time: %v, strike: %v, timeToExpiry: %v, currentPrice: %v, optionType: %v\n", time, strike, timeToExpiry, currentPrice, optionType)
+	// 					impliedVol := GetNearestVol(impliedVolData, int(time))
+	// 					// fmt.Printf("Got nearest vol: %v\n", impliedVol)
+	// 					o := NewOptionTheo(optionType, currentPrice, strike, int(time), int(time+(timeToExpiry*86400)), 0, impliedVol, -1)
+	// 					o.calcBinomialTreeTheo(.01, .5, 3600*4)
+	// 					fmt.Printf("Got theo %v for %v option with strike %v, days to expiration %v\n", o.binomialTheo, optionType, strike, o.timeLeft*365)
+	// 					// if calcGreeks {
+	// 					// 	fmt.Printf("Delta: %v, Gamma: %v, Theta: %v, Vega: %v\n", o.delta, o.gamma, o.theta, o.vega)
+	// 					// }
+	// 					numOptions += 1
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 	// fmt.Printf("Got implied vol data: %v\n", impliedVolData)
+
+	o := NewOptionTheo("call", 8000, 10000, int(end), int(end+(7*86400000)), 0, .8, -1)
+	o.calcBinomialTreeTheo(.05, .5, 86400)
+
 	duration := float64(time.Now().UnixNano()-testStart) / 1000000000
 	fmt.Printf("Processed %v options in %v seconds.\n", numOptions, duration)
 }
