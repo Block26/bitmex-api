@@ -84,7 +84,7 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) 
 		timestamp = bar.Timestamp
 		if idx > algo.DataLength {
 			algo.Index = idx
-			algo.Market.Price = bar.Open
+			algo.Market.Price = bar.Close
 			algo = rebalance(bar.Open, algo)
 
 			if algo.FillType == "limit" {
@@ -190,10 +190,10 @@ func (algo *Algo) UpdateBalanceFromFill(fillPrice float64) {
 		// log.Println("Adding To Position")
 	} else if !adding {
 		var tmpOrderSize float64
-		if algo.OrderSize > algo.Market.Leverage {
-			tmpOrderSize = algo.OrderSize
-		} else {
+		if algo.OrderSize > algo.Market.Leverage && algo.Market.Weight == 0 {
 			tmpOrderSize = algo.Market.Leverage
+		} else {
+			tmpOrderSize = algo.OrderSize
 		}
 		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
 		algo.UpdateBalance(fillCost, ordersFilled*float64(algo.Market.Weight))

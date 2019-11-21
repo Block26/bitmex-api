@@ -60,6 +60,7 @@ type Algo struct {
 
 	Debug      bool
 	Index      int
+	Timestamp  string
 	DataLength int
 	History    []algoModels.History
 	Params     map[string]interface{}
