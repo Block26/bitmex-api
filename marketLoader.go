@@ -3,23 +3,25 @@ package algo
 import (
 	"errors"
 	"log"
+
+	"github.com/tantralabs/TheAlgoV2/models"
 )
 
-func LoadMarket(exchange string, market string) (newMarket Market, err error) {
+func LoadMarket(exchange string, market string) (newMarket models.Market, err error) {
 
 	if exchange == "bitmex" {
 		switch m := market; m {
 		case "XBTUSD":
-			return Market{
+			return models.Market{
 				Symbol:      "XBTUSD",
 				Exchange:    "bitmex",
 				ExchangeURL: "https://testnet.bitmex.com",
 				WSStream:    "testnet.bitmex.com",
-				BaseAsset: Asset{
+				BaseAsset: models.Asset{
 					Symbol:   "XBT",
 					Quantity: 1,
 				},
-				QuoteAsset: Asset{
+				QuoteAsset: models.Asset{
 					Symbol:   "USD",
 					Quantity: 0,
 				},
@@ -36,16 +38,16 @@ func LoadMarket(exchange string, market string) (newMarket Market, err error) {
 	} else if exchange == "binance" {
 		switch m := market; m {
 		case "BTCUSDT":
-			return Market{
+			return models.Market{
 				Symbol:      "BTCUSDT",
 				Exchange:    "binance",
 				ExchangeURL: "https://api.binance.us/",
 				WSStream:    "stream.binance.us:9443",
-				BaseAsset: Asset{
+				BaseAsset: models.Asset{
 					Symbol:   "BTC",
 					Quantity: 1,
 				},
-				QuoteAsset: Asset{
+				QuoteAsset: models.Asset{
 					Symbol:   "USDT",
 					Quantity: 0,
 				},
@@ -57,16 +59,16 @@ func LoadMarket(exchange string, market string) (newMarket Market, err error) {
 				Futures:          false,
 			}, nil
 		case "BNBBTC":
-			return Market{
+			return models.Market{
 				Symbol:      "BNBBTC",
 				Exchange:    "binance",
 				ExchangeURL: "https://api.binance.us/",
 				WSStream:    "stream.binance.us:9443",
-				BaseAsset: Asset{
+				BaseAsset: models.Asset{
 					Symbol:   "BNB",
 					Quantity: 100,
 				},
-				QuoteAsset: Asset{
+				QuoteAsset: models.Asset{
 					Symbol:   "BTC",
 					Quantity: 1,
 				},
