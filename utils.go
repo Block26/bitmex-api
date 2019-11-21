@@ -74,6 +74,16 @@ func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 	}
 }
 
+// Calculate the current % profit of the position vs
+func (algo *Algo) CurrentProfit(price float64) float64 {
+	//TODO this doesnt work on a spot backtest
+	if algo.Market.QuoteAsset.Quantity < 0 {
+		return calculateDifference(algo.Market.AverageCost, price)
+	} else {
+		return calculateDifference(price, algo.Market.AverageCost)
+	}
+}
+
 //Log the state of the algo and update variables like leverage
 func (algo *Algo) logState(timestamp ...string) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
@@ -101,7 +111,7 @@ func (algo *Algo) logState(timestamp ...string) {
 		}
 
 		if algo.Market.Futures {
-			history.UBalance = balance + (balance * algo.Market.Profit)
+			history.UBalance = balance + algo.Market.Profit
 		} else {
 			history.UBalance = (algo.Market.BaseAsset.Quantity * algo.Market.Price) + algo.Market.QuoteAsset.Quantity
 		}

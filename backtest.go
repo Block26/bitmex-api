@@ -231,15 +231,6 @@ func (algo *Algo) UpdateBalanceFromFill(fillPrice float64) {
 	// 	}
 }
 
-func (algo *Algo) CurrentProfit(price float64) float64 {
-	//TODO this doesnt work on a spot backtest
-	if algo.Market.QuoteAsset.Quantity < 0 {
-		return calculateDifference(algo.Market.AverageCost, price)
-	} else {
-		return calculateDifference(price, algo.Market.AverageCost)
-	}
-}
-
 func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 	// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
 	if math.Abs(fillAmount) > 0 {
