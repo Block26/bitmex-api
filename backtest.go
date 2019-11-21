@@ -190,7 +190,7 @@ func (algo *Algo) UpdateBalanceFromFill(fillPrice float64) {
 		// log.Println("Adding To Position")
 	} else if !adding {
 		var tmpOrderSize float64
-		if algo.OrderSize > algo.Market.Leverage {
+		if algo.OrderSize > algo.Market.Leverage && algo.Market.Weight == 0 {
 			tmpOrderSize = algo.Market.Leverage
 		} else {
 			tmpOrderSize = algo.OrderSize
