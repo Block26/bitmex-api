@@ -18,12 +18,16 @@ import (
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/TheAlgoV2/tantradb"
 	"golang.org/x/sync/errgroup"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
-// var minimumOrderSize = 25
+// var MinimumOrderSize = 25
 var currentRunUUID time.Time
+//TODO: use implied vol data as global var here
+var volData []ImpliedVol
+
 
 func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	currentRunUUID = time.Now()
@@ -60,6 +64,12 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 func RunBacktest(bars []models.Bar, a Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) float64 {
 	// log.Println("Loading Data... ")
 	// fmt.Println(unsafe.Sizeof(bars))
+	// Initialize volData
+	start := ToIntTimestamp(bars[0])
+	end := ToIntTimestamp(bars(len(bars)))
+	fmt.Printf("Vol data start: %v, end: %v\n", start, end)
+	volData = tantradb.LoadImpliedVols("XBTUSD", start, end)
+	fmt.Printf("Got implied vol data: %v\n", volData)
 	setupData(&bars, a)
 	score := runSingleTest(&bars, a, rebalance)
 	log.Println("Score", score)

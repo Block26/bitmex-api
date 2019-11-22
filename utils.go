@@ -197,31 +197,31 @@ func (algo *Algo) LogLiveState() {
 }
 
 //Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
-func CreateSpread(weight int32, confidence float64, price float64, spread float64, tickSize float64, maxOrders int32) models.OrderArray {
+func CreateSpread(weight int32, confidence float64, price float64, spread float64, TickSize float64, maxOrders int32) models.OrderArray {
 	xStart := 0.0
 	if weight == 1 {
 		xStart = price - (price * spread)
 	} else {
 		xStart = price
 	}
-	xStart = Round(xStart, tickSize)
+	xStart = Round(xStart, TickSize)
 
 	xEnd := xStart + (xStart * spread)
-	xEnd = Round(xEnd, tickSize)
+	xEnd = Round(xEnd, TickSize)
 
 	diff := xEnd - xStart
 
-	if diff/tickSize >= float64(maxOrders) {
+	if diff/TickSize >= float64(maxOrders) {
 		newTickSize := diff / (float64(maxOrders) - 1)
-		tickSize = Round(newTickSize, tickSize)
+		TickSize = Round(newTickSize, TickSize)
 	}
 
 	var priceArr []float64
 
 	if weight == 1 {
-		priceArr = arange(xStart, xEnd-float64(tickSize), float64(tickSize))
+		priceArr = arange(xStart, xEnd-float64(TickSize), float64(TickSize))
 	} else {
-		priceArr = arange(xStart, xEnd, float64(tickSize))
+		priceArr = arange(xStart, xEnd, float64(TickSize))
 	}
 
 	temp := divArr(priceArr, xStart)
@@ -249,6 +249,26 @@ func GetOHLCBars(bars []algoModels.Bar) ([]float64, []float64, []float64, []floa
 		close[i] = bars[i].Close
 	}
 	return open, high, low, close
+}
+
+func ToIntTimestamp(timeString string) int {
+	//TODO: debug layout
+	layout := "2006-01-02T15:04:05.000Z"
+	currentTime, err = time.Parse(layout, a.Timestamp)
+	if err != nil {
+		fmt.Printf("Error parsing a.Timestamp: %v", err)
+	}
+	return currentTime.UnixMillis()
+}
+
+func ToTimeObject(timeString string) time.Time {
+	//TODO: debug layout
+	layout := "2006-01-02T15:04:05.000Z"
+	currentTime, err = time.Parse(layout, a.Timestamp)
+	if err != nil {
+		fmt.Printf("Error parsing a.Timestamp: %v", err)
+	}
+	return currentTime
 }
 
 func Round(x, unit float64) float64 {
@@ -341,4 +361,8 @@ func round(num float64) int {
 func toFixed(num float64, precision int) float64 {
 	output := math.Pow(10, float64(precision))
 	return float64(round(num*output)) / output
+}
+
+func roundToNearest(num float64, interval float64) {
+	return math.Round(num/interval) * interval
 }

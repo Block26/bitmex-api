@@ -111,6 +111,20 @@ func (self *OptionTheo) impliedVol() float64 {
 	return v
 }
 
+// Get an option's PNL at expiration
+func (self *OptionTheo) getExpiryValue(currentPrice float64) float64 {
+	expiryValue := 0.
+	if self.optionType == "call" {
+		expiryValue = currentPrice - self.strike
+	} else if self.optionType == "put" {
+		expiryValue = self.strike - currentPrice
+	}
+	if expiryValue < 0 {
+		expiryValue = 0
+	}
+	return expiryValue
+}
+
 // TODO: can be made more efficient by assuming paths can intersect (i.e. up -> down yields same node as down -> up)
 // Can be done with binomial tree indexing instead of indexing by path string:
 //			4
