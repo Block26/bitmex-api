@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/TheAlgoV2/tantradb"
 )
 
@@ -19,18 +18,6 @@ func Arange(start, stop, step float64) []float64 {
 		i += 1
 	}
 	return arr
-}
-
-func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
-	vol := -1.
-	for _, data := range volData {
-		timeDiff := time - data.Timestamp
-		if timeDiff < 0 {
-			vol = data.IV
-			break
-		}
-	}
-	return vol
 }
 
 // func TestBlackScholes(t *testing.T) {
