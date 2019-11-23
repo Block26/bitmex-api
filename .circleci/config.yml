@@ -12,6 +12,8 @@ jobs:
       - run: apk add --no-cache git mercurial
       - run: apk add --no-cache openssh
       - checkout
+      - run: apk add --no-cache --update python3
+      - run: python deploy/create_version_json.py 
       - run: printf "\n[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig
       - run: go mod download
       - run: CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
@@ -20,6 +22,7 @@ jobs:
           paths: 
             - settings/*
             - ca-certificates.crt
+            - version.json
             - main
             - Dockerfile
 
