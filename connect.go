@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
@@ -38,8 +39,8 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	}
 	orderStatus = ex.GetPotentialOrderStatus()
 
-	localBars := make([]models.Bar, 0) //data.GetData(algo.Market.Symbol, "1m", algo.DataLength)
-	// localBars := data.GetData(algo.Market.Symbol, "1m", algo.DataLength)
+	// localBars := make([]models.Bar, 0) //data.GetData(algo.Market.Symbol, "1m", algo.DataLength)
+	localBars := data.GetData(algo.Market.Symbol, "1m", algo.DataLength)
 	// log.Println(len(localBars), "downloaded")
 
 	// channels to subscribe to
@@ -127,7 +128,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		case trade := <-channels.TradeBinChan:
 			log.Println("Trade Update:", trade)
 			algo.Market.Price = trade[0].Close
-			// localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
+			localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
 			// log.Println("Bars", len(localBars))
 			setupData(&localBars, algo)
 			algo.Index = len(localBars) - 1
