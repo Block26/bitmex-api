@@ -12,10 +12,8 @@ import (
 	"github.com/fatih/structs"
 	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
-	algoModels "github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/TheAlgoV2/settings"
-	"github.com/tantralabs/exchanges/models"
-
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
@@ -40,8 +38,8 @@ func loadConfiguration(file string, secret bool) settings.Config {
 	}
 }
 
-func LoadBars(csvFile string) []algoModels.Bar {
-	var bars []algoModels.Bar
+func LoadBars(csvFile string) []models.Bar {
+	var bars []models.Bar
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -101,7 +99,7 @@ func (algo *Algo) logState(timestamp ...string) {
 
 	if timestamp != nil {
 		algo.Timestamp = timestamp[0]
-		history := algoModels.History{
+		history := models.History{
 			Timestamp:   timestamp[0],
 			Balance:     balance,
 			Quantity:    algo.Market.QuoteAsset.Quantity,
@@ -237,7 +235,7 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 }
 
 // Break down the bars into open, high, low, close arrays that are easier to manipulate.
-func GetOHLCBars(bars []algoModels.Bar) ([]float64, []float64, []float64, []float64) {
+func GetOHLCBars(bars []models.Bar) ([]float64, []float64, []float64, []float64) {
 	open := make([]float64, len(bars))
 	high := make([]float64, len(bars))
 	low := make([]float64, len(bars))
