@@ -117,7 +117,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		case positions := <-channels.PositionChan:
 			log.Println("Position Update:", positions)
 			position := positions[0]
-			algo.Market.BaseAsset.Quantity = float64(position.CurrentQty)
+			algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
 			if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
 				algo.Market.AverageCost = position.AvgCostPrice
 			} else if position.CurrentQty == 0 {
