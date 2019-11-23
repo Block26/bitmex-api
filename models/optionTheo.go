@@ -1,13 +1,10 @@
-package options
+package models
 
 import (
 	"math"
 
 	"github.com/chobie/go-gaussian"
 )
-
-const PI float64 = 3.14159265359
-const day = 86400
 
 type OptionTheo struct {
 	strike       float64 // Strike price
@@ -25,6 +22,9 @@ type OptionTheo struct {
 	gamma        float64 // Change in delta wrt. 1 USD change in uPrice
 	vega         float64 // Change in theo wrt. 1% increase in volatility
 }
+
+const PI float64 = 3.14159265359
+const day = 86400
 
 // Either theo or volatility is unknown (pass in -1.0 for unknown values)
 func NewOptionTheo(optionType string, uPrice float64, strike float64,
@@ -49,62 +49,61 @@ func GetTimeLeft(currentTime int, expiry int) float64 {
 	return float64(expiry-currentTime) / float64(1000*day*365)
 }
 
-func (self *OptionTheo) calcD1(volatility float64) float64 {
-	return (math.Log(self.uPrice/self.strike) + (self.r+math.Pow(self.volatility, 2)/2)*self.timeLeft) / (volatility * math.Sqrt(self.timeLeft))
+func (o *OptionTheo) calcD1(volatility float64) float64 {
+	return (math.Log(o.uPrice/o.strike) + (o.r+math.Pow(o.volatility, 2)/2)*o.timeLeft) / (volatility * math.Sqrt(o.timeLeft))
 }
 
-func (self *OptionTheo) calcD2(volatility float64) float64 {
-	return (math.Log(self.uPrice/self.strike) + (self.r-math.Pow(self.volatility, 2)/2)*self.timeLeft) / (volatility * math.Sqrt(self.timeLeft))
+func (o *OptionTheo) calcD2(volatility float64) float64 {
+	return (math.Log(o.uPrice/o.strike) + (o.r-math.Pow(o.volatility, 2)/2)*o.timeLeft) / (volatility * math.Sqrt(o.timeLeft))
 }
 
 // Use Black-Scholes pricing model to calculate theoretical option value
-func (self *OptionTheo) calcBlackScholesTheo(calcGreeks bool) {
+func (o *OptionTheo) calcBlackScholesTheo(calcGreeks bool) {
 	norm := gaussian.NewGaussian(0, 1)
-	td1 := self.calcD1(self.volatility)
-	td2 := self.calcD2(self.volatility)
+	td1 := o.calcD1(o.volatility)
+	td2 := o.calcD2(o.volatility)
 	nPrime := math.Pow((2*PI), -(1/2)) * math.Exp(math.Pow(-0.5*(td1), 2))
-	if self.theo < 0 {
-		if self.optionType == "call" {
-			self.theo = self.uPrice*norm.Cdf(td1) - self.strike*math.Exp(-self.r*self.timeLeft)*norm.Cdf(td2)
-		} else if self.optionType == "put" {
-			self.theo = self.strike*math.Exp(-self.r*self.timeLeft)*norm.Cdf(-td2) - self.uPrice*norm.Cdf(-td1)
+	if o.theo < 0 {
+		if o.optionType == "call" {
+			o.theo = o.uPrice*norm.Cdf(td1) - o.strike*math.Exp(-o.r*o.timeLeft)*norm.Cdf(td2)
+		} else if o.optionType == "put" {
+			o.theo = o.strike*math.Exp(-o.r*o.timeLeft)*norm.Cdf(-td2) - o.uPrice*norm.Cdf(-td1)
 		}
-	} else if self.volatility < 0 {
-		self.volatility = self.impliedVol()
+	} else if o.volatility < 0 {
+		o.volatility = o.impliedVol()
 	}
 	if calcGreeks {
-		if self.optionType == "call" {
-			self.theo = self.uPrice*norm.Cdf(td1) - self.strike*math.Exp(-self.r*self.timeLeft)*norm.Cdf(td2)
-			self.delta = norm.Cdf(td1)
-			self.gamma = (nPrime / (self.uPrice * self.volatility * math.Pow(self.timeLeft, (1/2))))
-			self.theta = (nPrime)*(-self.uPrice*self.volatility*0.5/math.Sqrt(self.timeLeft)) - self.r*self.strike*math.Exp(-self.r*self.timeLeft)*norm.Cdf(td2)
-		} else if self.optionType == "put" {
-			self.theo = self.strike*math.Exp(-self.r*self.timeLeft)*norm.Cdf(-td2) - self.uPrice*norm.Cdf(-td1)
-			self.delta = norm.Cdf(td1) - 1
-			self.gamma = (nPrime / (self.uPrice * self.volatility * math.Pow(self.timeLeft, (1/2))))
-			self.theta = (nPrime)*(-self.uPrice*self.volatility*0.5/math.Sqrt(self.timeLeft)) + self.r*self.strike*math.Exp(-self.r*self.timeLeft)*norm.Cdf(-td2)
+		if o.optionType == "call" {
+			o.theo = o.uPrice*norm.Cdf(td1) - o.strike*math.Exp(-o.r*o.timeLeft)*norm.Cdf(td2)
+			o.delta = norm.Cdf(td1)
+			o.gamma = (nPrime / (o.uPrice * o.volatility * math.Pow(o.timeLeft, (1/2))))
+			o.theta = (nPrime)*(-o.uPrice*o.volatility*0.5/math.Sqrt(o.timeLeft)) - o.r*o.strike*math.Exp(-o.r*o.timeLeft)*norm.Cdf(td2)
+		} else if o.optionType == "put" {
+			o.theo = o.strike*math.Exp(-o.r*o.timeLeft)*norm.Cdf(-td2) - o.uPrice*norm.Cdf(-td1)
+			o.delta = norm.Cdf(td1) - 1
+			o.gamma = (nPrime / (o.uPrice * o.volatility * math.Pow(o.timeLeft, (1/2))))
+			o.theta = (nPrime)*(-o.uPrice*o.volatility*0.5/math.Sqrt(o.timeLeft)) + o.r*o.strike*math.Exp(-o.r*o.timeLeft)*norm.Cdf(-td2)
 		}
 	}
-
 	// Convert theo to be quoted in terms of underlying
-	self.theo = self.theo / self.uPrice
+	o.theo = o.theo / o.uPrice
 }
 
 // Use newton raphson method to find volatility
-func (self *OptionTheo) impliedVol() float64 {
+func (o *OptionTheo) impliedVol() float64 {
 	norm := gaussian.NewGaussian(0, 1)
-	v := math.Sqrt(2*PI/self.timeLeft) * self.theo / self.uPrice
+	v := math.Sqrt(2*PI/o.timeLeft) * o.theo / o.uPrice
 	for i := 0; i < 100; i++ {
-		d1 := self.calcD1(v)
-		d2 := self.calcD2(v)
-		vega := self.uPrice * norm.Pdf(d1) * math.Sqrt(self.timeLeft)
+		d1 := o.calcD1(v)
+		d2 := o.calcD2(v)
+		vega := o.uPrice * norm.Pdf(d1) * math.Sqrt(o.timeLeft)
 		cp := 1.0
-		if self.optionType == "put" {
+		if o.optionType == "put" {
 			cp = -1.0
 		}
-		theo0 := cp*self.uPrice*norm.Cdf(cp*d1) - cp*self.strike*math.Exp(-self.r*self.timeLeft)*norm.Cdf(cp*d2)
-		v = v - (theo0-self.theo)/vega
-		if math.Abs(theo0-self.theo) < math.Pow(10, -25) {
+		theo0 := cp*o.uPrice*norm.Cdf(cp*d1) - cp*o.strike*math.Exp(-o.r*o.timeLeft)*norm.Cdf(cp*d2)
+		v = v - (theo0-o.theo)/vega
+		if math.Abs(theo0-o.theo) < math.Pow(10, -25) {
 			break
 		}
 	}
@@ -112,12 +111,12 @@ func (self *OptionTheo) impliedVol() float64 {
 }
 
 // Get an option's PNL at expiration
-func (self *OptionTheo) getExpiryValue(currentPrice float64) float64 {
+func (o *OptionTheo) getExpiryValue(currentPrice float64) float64 {
 	expiryValue := 0.
-	if self.optionType == "call" {
-		expiryValue = currentPrice - self.strike
-	} else if self.optionType == "put" {
-		expiryValue = self.strike - currentPrice
+	if o.optionType == "call" {
+		expiryValue = currentPrice - o.strike
+	} else if o.optionType == "put" {
+		expiryValue = o.strike - currentPrice
 	}
 	if expiryValue < 0 {
 		expiryValue = 0
@@ -142,7 +141,7 @@ const minPrice = 2000
 const minProb = .00001
 
 // Recursively calculate the expected values of underlying price
-func (self *OptionTheo) binomialWalk(move float64, prob float64, currentPrice float64, currentProb float64, path string,
+func (o *OptionTheo) binomialWalk(move float64, prob float64, currentPrice float64, currentProb float64, path string,
 	evSum *float64, timestepsLeft int, walkCache map[string]*float64) {
 	value, ok := walkCache[path]
 	if ok {
@@ -151,10 +150,10 @@ func (self *OptionTheo) binomialWalk(move float64, prob float64, currentPrice fl
 		return
 	} else if timestepsLeft <= 0 || currentPrice > maxPrice || currentPrice < minPrice || currentProb < minProb {
 		ev := 0.
-		if self.optionType == "call" {
-			ev = (currentPrice - self.strike) * currentProb
-		} else if self.optionType == "put" {
-			ev = (self.strike - currentPrice) * currentProb
+		if o.optionType == "call" {
+			ev = (currentPrice - o.strike) * currentProb
+		} else if o.optionType == "put" {
+			ev = (o.strike - currentPrice) * currentProb
 		}
 		if ev < 0 {
 			ev = 0
@@ -175,24 +174,24 @@ func (self *OptionTheo) binomialWalk(move float64, prob float64, currentPrice fl
 		path += "u"
 	}
 	// Walk up
-	self.binomialWalk(move, prob, currentPrice, currentProb, path, evSum, timestepsLeft-1, walkCache)
+	o.binomialWalk(move, prob, currentPrice, currentProb, path, evSum, timestepsLeft-1, walkCache)
 	// Walk down
-	self.binomialWalk(-move, 1-prob, currentPrice, currentProb, path, evSum, timestepsLeft-1, walkCache)
+	o.binomialWalk(-move, 1-prob, currentPrice, currentProb, path, evSum, timestepsLeft-1, walkCache)
 }
 
 // Calculate the theoretical value of an option based on a binary tree model
 // We can calculate the appropriate move for each timestep based on volatility of underlying and time to expiry
 // Param prob: probability of an upmove at each timestep
 // Param numTimesteps: number of timesteps for the binomial tree traversal
-func (self *OptionTheo) calcBinomialTreeTheo(prob float64, numTimesteps int) {
-	timestep := self.timeLeft / float64(numTimesteps)
-	move := self.volatility * math.Sqrt(timestep)
-	// fmt.Printf("Calculating binomial tree theo with numTimesteps %v, move %v, prob %v, volatility %v\n", numTimesteps, move, prob, self.volatility)
+func (o *OptionTheo) calcBinomialTreeTheo(prob float64, numTimesteps int) {
+	timestep := o.timeLeft / float64(numTimesteps)
+	move := o.volatility * math.Sqrt(timestep)
+	// fmt.Printf("Calculating binomial tree theo with numTimesteps %v, move %v, prob %v, volatility %v\n", numTimesteps, move, prob, o.volatility)
 	path := ""
 	walkCache := make(map[string]*float64) // Stores an ev for a path whose ev is known
 	evSum := 0.
-	self.binomialWalk(move, prob, self.uPrice, 1, path, &evSum, numTimesteps, walkCache)
+	o.binomialWalk(move, prob, o.uPrice, 1, path, &evSum, numTimesteps, walkCache)
 	// Calculate binomial tree theo quoted in terms of underlying price
-	self.binomialTheo = evSum / self.uPrice
-	// fmt.Printf("EV sum: %v, binomialTheo: %v, move: %v\n", evSum, self.binomialTheo, move)
+	o.binomialTheo = evSum / o.uPrice
+	// fmt.Printf("EV sum: %v, binomialTheo: %v, move: %v\n", evSum, o.binomialTheo, move)
 }

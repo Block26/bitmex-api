@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/fatih/structs"
@@ -254,28 +255,36 @@ func GetOHLCBars(bars []algoModels.Bar) ([]float64, []float64, []float64, []floa
 func ToIntTimestamp(timeString string) int {
 	//TODO: debug layout
 	layout := "2006-01-02T15:04:05.000Z"
-	currentTime, err = time.Parse(layout, a.Timestamp)
+	currentTime, err := time.Parse(layout, timeString)
 	if err != nil {
-		fmt.Printf("Error parsing a.Timestamp: %v", err)
+		fmt.Printf("Error parsing timeString: %v", err)
 	}
-	return currentTime.UnixMillis()
+	return int(currentTime.UnixNano() / int64(time.Millisecond))
 }
 
 func ToTimeObject(timeString string) time.Time {
 	//TODO: debug layout
 	layout := "2006-01-02T15:04:05.000Z"
-	currentTime, err = time.Parse(layout, a.Timestamp)
+	currentTime, err := time.Parse(layout, timeString)
 	if err != nil {
-		fmt.Printf("Error parsing a.Timestamp: %v", err)
+		fmt.Printf("Error parsing timeString: %v", err)
 	}
 	return currentTime
+}
+
+func TimestampToTime(timestamp int) time.Time {
+	timeString, err := strconv.ParseInt(string(timestamp/1000), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return time.Unix(timeString, 0)
 }
 
 func Round(x, unit float64) float64 {
 	return math.Round(x/unit) * unit
 }
 
-func reverseArr(a []float64) []float64 {
+func ReverseArr(a []float64) []float64 {
 	for i := len(a)/2 - 1; i >= 0; i-- {
 		opp := len(a) - 1 - i
 		a[i], a[opp] = a[opp], a[i]
@@ -283,7 +292,7 @@ func reverseArr(a []float64) []float64 {
 	return a
 }
 
-func arange(min float64, max float64, step float64) []float64 {
+func Arange(min float64, max float64, step float64) []float64 {
 	a := make([]float64, int32((max-min)/step)+1)
 	for i := range a {
 		a[i] = float64(min+step) + (float64(i) * step)
@@ -363,6 +372,6 @@ func toFixed(num float64, precision int) float64 {
 	return float64(round(num*output)) / output
 }
 
-func roundToNearest(num float64, interval float64) {
+func roundToNearest(num float64, interval float64) float64 {
 	return math.Round(num/interval) * interval
 }

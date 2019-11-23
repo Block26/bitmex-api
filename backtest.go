@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/c-bata/goptuna"
-	"github.com/c-bata/goptuna/successivehalving"
+	// "github.com/c-bata/goptuna/successivehalving"
 	"github.com/c-bata/goptuna/tpe"
 	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
@@ -26,7 +26,7 @@ import (
 // var MinimumOrderSize = 25
 var currentRunUUID time.Time
 //TODO: use implied vol data as global var here
-var volData []ImpliedVol
+var volData []models.ImpliedVol
 
 
 func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
@@ -35,7 +35,7 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 		"optmm",
 		goptuna.StudyOptionSampler(tpe.NewSampler()),
 		goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMaximize),
-		goptuna.StudyOptionPruner(successivehalving.NewOptunaPruner()),
+		// goptuna.StudyOptionPruner(successivehalving.NewOptunaPruner()),
 		// goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMinimize),
 	)
 
@@ -65,8 +65,8 @@ func RunBacktest(bars []models.Bar, a Algo, rebalance func(float64, Algo) Algo, 
 	// log.Println("Loading Data... ")
 	// fmt.Println(unsafe.Sizeof(bars))
 	// Initialize volData
-	start := ToIntTimestamp(bars[0])
-	end := ToIntTimestamp(bars(len(bars)))
+	start := ToIntTimestamp(bars[0].Timestamp)
+	end := ToIntTimestamp(bars[len(bars)].Timestamp)
 	fmt.Printf("Vol data start: %v, end: %v\n", start, end)
 	volData = tantradb.LoadImpliedVols("XBTUSD", start, end)
 	fmt.Printf("Got implied vol data: %v\n", volData)

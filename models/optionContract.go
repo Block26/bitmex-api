@@ -1,7 +1,5 @@
 package models
 
-import "github.com/tantralabs/TheAlgoV2/options"
-
 type OptionContract struct {
 	Symbol           string
 	Strike           float64
@@ -16,6 +14,6 @@ type OptionContract struct {
 	BuyOrders        OrderArray
 	SellOrders       OrderArray
 	Position         float64
-	OptionTheo       options.OptionTheo
+	OptionTheo       OptionTheo
 	Status           string // "open", "expired"
 }
