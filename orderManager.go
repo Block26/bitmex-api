@@ -16,11 +16,11 @@ func deltaFloat(a, b, delta float64) bool {
 func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	// For now. Should be parameterized
-	qtyTolerance := 0.0001
+	qtyTolerance := 1.0
 	priceTolerance := 1.0
 
-	var bids []iex.Order
-	var asks []iex.Order
+	var newBids []iex.Order
+	var newAsks []iex.Order
 	totalQty := 0.0
 	for i, qty := range a.Market.BuyOrders.Quantity {
 		totalQty = totalQty + qty
@@ -29,12 +29,12 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			order := iex.Order{
 				Market:   a.Market.BaseAsset.Symbol,
 				Currency: a.Market.QuoteAsset.Symbol,
-				Amount:   totalQty, //float64(int(totalQty)),
+				Amount:   float64(int(totalQty)),
 				Rate:     toFixed(orderPrice, 8),
 				Type:     "Limit",
 				Side:     "Buy",
 			}
-			bids = append(bids, order)
+			newBids = append(newBids, order)
 			totalQty = 0.0
 		}
 	}
@@ -47,29 +47,27 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			order := iex.Order{
 				Market:   a.Market.BaseAsset.Symbol,
 				Currency: a.Market.QuoteAsset.Symbol,
-				Amount:   totalQty, //float64(int(totalQty)),
+				Amount:   float64(int(totalQty)),
 				Rate:     toFixed(orderPrice, 8),
 				Type:     "Limit",
 				Side:     "Sell",
 			}
-			asks = append(asks, order)
+			newAsks = append(newAsks, order)
 			totalQty = 0.0
 		}
 	}
 
 	// Get open buys, buys, open sells, sells, with matches filtered out
-	var openBuys []iex.WSOrder
-	var openSells []iex.WSOrder
+	var openBids []iex.WSOrder
+	var openAsks []iex.WSOrder
 
-	log.Println("openOrders", openOrders)
 	for _, order := range openOrders {
 		if strings.ToLower(order.Side) == "buy" {
-			openBuys = append(openBuys, order)
+			openBids = append(openBids, order)
 		} else if strings.ToLower(order.Side) == "sell" {
-			openSells = append(openSells, order)
+			openAsks = append(openAsks, order)
 		}
 	}
-	log.Println("openSells", openSells)
 
 	// Make a local sifting function
 	siftMatches := func(open []iex.WSOrder, new []iex.Order) ([]iex.WSOrder, []iex.Order) {
@@ -107,22 +105,22 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	}
 
 	// Call local sifting function to get rid of matches
-	openBuys, bids = siftMatches(openBuys, bids)
-	openSells, asks = siftMatches(openSells, asks)
+	openBids, newBids = siftMatches(openBids, newBids)
+	openAsks, newAsks = siftMatches(openAsks, newAsks)
 
 	// Sort buy and sell orders by priority
-	sort.Slice(bids, func(a, b int) bool {
-		return bids[a].Rate > bids[b].Rate
+	sort.Slice(newBids, func(a, b int) bool {
+		return newBids[a].Rate > newBids[b].Rate
 	})
-	sort.Slice(asks, func(a, b int) bool {
-		return asks[a].Rate < asks[b].Rate
+	sort.Slice(newAsks, func(a, b int) bool {
+		return newAsks[a].Rate < newAsks[b].Rate
 	})
 
-	sort.Slice(openBuys, func(a, b int) bool {
-		return openBuys[a].Price > openBuys[b].Price
+	sort.Slice(openBids, func(a, b int) bool {
+		return openBids[a].Price > openBids[b].Price
 	})
-	sort.Slice(openSells, func(a, b int) bool {
-		return openSells[a].Price < openSells[b].Price
+	sort.Slice(openAsks, func(a, b int) bool {
+		return openAsks[a].Price < openAsks[b].Price
 	})
 
 	cancel := func(order iex.WSOrder) {
@@ -137,58 +135,61 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	}
 
 	place := func(order iex.Order) {
-		uuid, err := ex.PlaceOrder(order)
+		_, err := ex.PlaceOrder(order)
 		if err != nil {
 			log.Fatal(err)
-		} else {
-			log.Println("Placed BUY", uuid)
 		}
 	}
 
-	buyIndex := 0
-	sellIndex := 0
-	buyCont := len(bids) != 0
-	sellCont := len(asks) != 0
+	bidIndex := 0
+	askIndex := 0
+	buyCont := len(newBids) != 0
+	sellCont := len(newAsks) != 0
+
 	for buyCont || sellCont {
 		if buyCont && sellCont {
-			buyDiff := math.Abs(bids[buyIndex].Rate - a.Market.Price)
-			sellDiff := math.Abs(asks[sellIndex].Rate - a.Market.Price)
+			buyDiff := math.Abs(newBids[bidIndex].Rate - a.Market.Price)
+			sellDiff := math.Abs(newAsks[askIndex].Rate - a.Market.Price)
 			if buyDiff < sellDiff {
 				// cancel buy
-				if len(openBuys) > buyIndex {
-					cancel(openBuys[buyIndex])
-					place(bids[buyIndex])
-					buyIndex++
+				if len(openBids) > bidIndex {
+					cancel(openBids[bidIndex])
 				}
+				if len(newBids) > bidIndex {
+					place(newBids[bidIndex])
+				}
+				bidIndex++
 			} else {
 				// cancel sell
-				if len(openSells) > sellIndex {
-					cancel(openSells[sellIndex])
-					place(asks[sellIndex])
-					sellIndex++
+				if len(openAsks) > askIndex {
+					cancel(openAsks[askIndex])
 				}
+				if len(newAsks) > askIndex {
+					place(newAsks[askIndex])
+				}
+				askIndex++
 			}
-		} else if !buyCont {
-			// finish the rest of the sells
-			for i := sellIndex; i < len(openSells); i++ {
-				cancel(openSells[i])
+		} else {
+			// finish the rest of the orders
+			for i := askIndex; i < len(openAsks); i++ {
+				cancel(openAsks[i])
 			}
 
-			for i := sellIndex; i < len(asks); i++ {
-				place(asks[i])
+			for i := askIndex; i < len(newAsks); i++ {
+				place(newAsks[i])
 			}
-		} else if !sellCont {
-			// finish the rest of the buys
-			for i := buyIndex; i < len(openBuys); i++ {
-				cancel(openBuys[i])
+
+			for i := bidIndex; i < len(openBids); i++ {
+				cancel(openBids[i])
 			}
-			for i := sellIndex; i < len(bids); i++ {
-				place(bids[i])
+
+			for i := askIndex; i < len(newBids); i++ {
+				place(newBids[i])
 			}
 			break
 		}
-		buyCont = (buyIndex < len(bids))
-		sellCont = (sellIndex < len(asks))
+		buyCont = (bidIndex < len(newBids))
+		sellCont = (askIndex < len(newAsks))
 	}
 }
 

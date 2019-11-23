@@ -223,6 +223,8 @@ github.com/tantralabs/tradeapi v0.0.0-20191118044312-701a0c56e3f1 h1:S62DhZGP0qE
 github.com/tantralabs/tradeapi v0.0.0-20191118044312-701a0c56e3f1/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tantralabs/tradeapi v0.0.0-20191123222451-470f415b4ffc h1:VipycSJFUWaBVk0fHxhroFhvyomKDxhMULg/te8A/kw=
 github.com/tantralabs/tradeapi v0.0.0-20191123222451-470f415b4ffc/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v0.0.0-20191123230305-5288c1dcc494 h1:tGjhAXqtpR737WvzQ6bdBlIDV5y1RoeCIsp8oyb80t8=
+github.com/tantralabs/tradeapi v0.0.0-20191123230305-5288c1dcc494/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tidwall/gjson v1.3.2 h1:+7p3qQFaH3fOMXAJSrdZwGKcOO/lYdGS0HqGhPqDdTI=
 github.com/tidwall/gjson v1.3.2/go.mod h1:P256ACg0Mn+j1RXIDXoss50DeIABTYK1PULOJHhxOls=
 github.com/tidwall/match v1.0.1 h1:PnKP62LPNxHKTwvHHZZzdOAOCtsJTjo6dZLCwpKm5xc=

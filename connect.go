@@ -3,6 +3,7 @@ package algo
 import (
 	"fmt"
 	"log"
+	"math"
 	"strings"
 
 	"github.com/tantralabs/TheAlgoV2/models"
@@ -80,7 +81,6 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		fmt.Println(err)
 	}
 
-	log.Println("openOrders", openOrders)
 	for i := range openOrders.Bids {
 		oo := openOrders.Bids[i]
 		order := iex.WSOrder{
@@ -115,14 +115,14 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		select {
 		case positions := <-channels.PositionChan:
 			log.Println("Position Update:", positions)
-			// position := positions[0]
-			// algo.Asset.Quantity = float64(position.CurrentQty)
-			// if math.Abs(algo.Market.BaseAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
-			// 	algo.Asset.AverageCost = position.AvgCostPrice
-			// } else if position.CurrentQty == 0 {
-			// 	algo.Asset.AverageCost = 0
-			// }
-			// log.Println("AvgCostPrice", algo.Asset.AverageCost, "Quantity", algo.Asset.Quantity)
+			position := positions[0]
+			algo.Market.BaseAsset.Quantity = float64(position.CurrentQty)
+			if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
+				algo.Market.AverageCost = position.AvgCostPrice
+			} else if position.CurrentQty == 0 {
+				algo.Market.AverageCost = 0
+			}
+			log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
 			// algo.logState()
 		case trade := <-channels.TradeBinChan:
 			log.Println("Trade Update:", trade)
