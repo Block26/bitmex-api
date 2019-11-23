@@ -30,6 +30,8 @@ github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2/go.mod h1:PkYb9DJNAw
 github.com/c-bata/go-prompt v0.2.2/go.mod h1:VzqtzE2ksDBcdln8G7mk2RX9QyGjH+OVqOCSiVIqS34=
 github.com/c-bata/goptuna v0.1.0 h1:bw8hJNL2Gc5suQ//TV1tcgQPUfLMGliU14bXlB2KMd4=
 github.com/c-bata/goptuna v0.1.0/go.mod h1:Sn2amgMAWoP9y4kdTJhNWyWymdu0NFy/vM/KvETBH6Y=
+github.com/c-bata/goptuna v0.1.1-0.20191111040524-81338bb530f0 h1:Q/Ed7m7SDbf34TTezmSYV/zJT9NC2tX71P8nwcZV1lI=
+github.com/c-bata/goptuna v0.1.1-0.20191111040524-81338bb530f0/go.mod h1:oFGcPHSv7ChMD/L1PxWtHuXKvgpHfcPpTZEDiznEexg=
 github.com/caarlos0/ctrlc v1.0.0/go.mod h1:CdXpj4rmq0q/1Eb44M9zi2nKB0QraNKuRGYGrrHhcQw=
 github.com/campoy/unique v0.0.0-20180121183637-88950e537e7e/go.mod h1:9IOqJGCPMSc6E5ydlp5NIonxObaeu/Iub/X03EKPVYo=
 github.com/carterjones/go-cloudflare-scraper v0.1.2 h1:GNmlJEfhIVPVXaEItnPSDtwOpuJo6rFH2SFWuAjeEuM=

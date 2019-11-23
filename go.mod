@@ -9,7 +9,7 @@ go 1.13
 require (
 	firebase.google.com/go v3.10.0+incompatible
 	github.com/aws/aws-sdk-go v1.25.28
-	github.com/c-bata/goptuna v0.1.0
+	github.com/c-bata/goptuna v0.1.1-0.20191111040524-81338bb530f0
 	github.com/fatih/structs v1.1.0
 	github.com/gocarina/gocsv v0.0.0-20190927101021-3ecffd272576
 	github.com/google/uuid v1.1.1
