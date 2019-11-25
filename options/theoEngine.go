@@ -109,7 +109,7 @@ func AdjustForSlippage(theo models.OptionTheo, premium float64, side string) flo
 func GetExpiredOptions(currentTime int, options []models.OptionContract) []models.OptionContract {
 	var expiredOptions []models.OptionContract
 	for _, option := range options {
-		if option.Expiry >= currentTime && option.Position != 0 {
+		if option.Expiry >= currentTime && option.Status != "expired" {
 			option.Status = "expired"
 			expiredOptions = append(expiredOptions, option)
 		}
@@ -120,7 +120,7 @@ func GetExpiredOptions(currentTime int, options []models.OptionContract) []model
 func AggregateOptionPnl(options []models.OptionContract, currentTime int, currentPrice float64) {
 	for _, option := range GetExpiredOptions(currentTime, options) {
 		option.Profit = option.Position * (option.OptionTheo.GetExpiryValue(currentPrice) - option.AverageCost)
-		fmt.Printf("Aggregated profit for %v %v: %v with position %v", option.Strike, option.OptionType, option.Profit, option.Position)
+		fmt.Printf("Aggregated profit for %v with position %v\n", option.OptionTheo.String(), option.Position)
 		option.Position = 0
 	}
 }

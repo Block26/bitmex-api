@@ -1,7 +1,10 @@
 package models
 
 import (
+	"fmt"
 	"math"
+	"strconv"
+	"time"
 
 	"github.com/chobie/go-gaussian"
 )
@@ -42,6 +45,19 @@ func NewOptionTheo(optionType string, UnderlyingPrice float64, strike float64,
 		Theo:            theo,
 	}
 	return o
+}
+
+func (o *OptionTheo) String() string {
+	return fmt.Sprintf("OptionTheo %v with expiry %v, strike %v\n", o.OptionType, o.GetExpiryString(), o.Strike)
+}
+
+func (o *OptionTheo) GetExpiryString() string {
+	fmt.Printf("Getting expiry string for %v\n", o.Expiry/1000)
+	timeInt, err := strconv.ParseInt(string(o.Expiry/1000), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return time.Unix(timeInt, 0).String()
 }
 
 // Times in ms; return time in days

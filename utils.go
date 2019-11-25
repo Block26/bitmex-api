@@ -271,11 +271,11 @@ func ToTimeObject(timeString string) time.Time {
 }
 
 func TimestampToTime(timestamp int) time.Time {
-	timeString, err := strconv.ParseInt(string(timestamp/1000), 10, 64)
+	timeInt, err := strconv.ParseInt(string(timestamp/1000), 10, 64)
 	if err != nil {
 		panic(err)
 	}
-	return time.Unix(timeString, 0)
+	return time.Unix(timeInt, 0)
 }
 
 func Round(x, unit float64) float64 {
