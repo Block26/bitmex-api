@@ -39,7 +39,7 @@ func Arange(start, stop, step float64) []float64 {
 // 						impliedVol := GetNearestVol(impliedVolData, int(time))
 // 						// fmt.Printf("Got nearest vol: %v\n", impliedVol)
 // 						o := NewOptionTheo(optionType, currentPrice, strike, int(time), int(time+timeToExpiry), 0, impliedVol, -1)
-// 						o.calcBlackScholesTheo(calcGreeks)
+// 						o.CalcBlackScholesTheo(calcGreeks)
 // 						// fmt.Printf("Got theo %v for %v option with strike %v, days to expiration %v\n", o.theo, optionType, strike, o.timeLeft*365)
 // 						// if calcGreeks {
 // 						// 	fmt.Printf("Delta: %v, Gamma: %v, Theta: %v, Vega: %v\n", o.delta, o.gamma, o.theta, o.vega)
@@ -73,7 +73,7 @@ func TestBinomialTree(t *testing.T) {
 						impliedVol := GetNearestVol(impliedVolData, int(time))
 						// fmt.Printf("Got nearest vol: %v\n", impliedVol)
 						o := NewOptionTheo(optionType, currentPrice, strike, int(time), int(time+(timeToExpiry*86400)), 0, impliedVol, -1)
-						o.calcBinomialTreeTheo(.5, 15)
+						o.CalcBinomialTreeTheo(.5, 15)
 						fmt.Printf("Got theo %v for %v option with strike %v, days to expiration %v\n", o.binomialTheo, optionType, strike, o.timeLeft*365)
 						numOptions += 1
 					}
@@ -83,8 +83,8 @@ func TestBinomialTree(t *testing.T) {
 	}
 
 	// o := NewOptionTheo("call", 8000, 10000, int(end), int(end+(10*86400000)), 0, .75, -1)
-	// o.calcBinomialTreeTheo(.01, .5, 3600)
-	// o.calcBinomialTreeTheo(.5, 20)
+	// o.CalcBinomialTreeTheo(.01, .5, 3600)
+	// o.CalcBinomialTreeTheo(.5, 20)
 
 	duration := float64(time.Now().UnixNano()-testStart) / 1000000000
 	fmt.Printf("Processed %v options in %v seconds.\n", numOptions, duration)

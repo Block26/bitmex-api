@@ -220,9 +220,9 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	var priceArr []float64
 
 	if weight == 1 {
-		priceArr = arange(xStart, xEnd-float64(TickSize), float64(TickSize))
+		priceArr = Arange(xStart, xEnd-float64(TickSize), float64(TickSize))
 	} else {
-		priceArr = arange(xStart, xEnd, float64(TickSize))
+		priceArr = Arange(xStart, xEnd, float64(TickSize))
 	}
 
 	temp := divArr(priceArr, xStart)
@@ -231,7 +231,7 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	normalizer := 1 / sumArr(dist)
 	orderArr := mulArr(dist, normalizer)
 	if weight == 1 {
-		orderArr = reverseArr(orderArr)
+		orderArr = ReverseArr(orderArr)
 	}
 
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
@@ -253,8 +253,7 @@ func GetOHLCBars(bars []algoModels.Bar) ([]float64, []float64, []float64, []floa
 }
 
 func ToIntTimestamp(timeString string) int {
-	//TODO: debug layout
-	layout := "2006-01-02T15:04:05.000Z"
+	layout := "2006-01-02 15:04:05"
 	currentTime, err := time.Parse(layout, timeString)
 	if err != nil {
 		fmt.Printf("Error parsing timeString: %v", err)
@@ -263,8 +262,7 @@ func ToIntTimestamp(timeString string) int {
 }
 
 func ToTimeObject(timeString string) time.Time {
-	//TODO: debug layout
-	layout := "2006-01-02T15:04:05.000Z"
+	layout := "2006-01-02 15:04:05"
 	currentTime, err := time.Parse(layout, timeString)
 	if err != nil {
 		fmt.Printf("Error parsing timeString: %v", err)
@@ -372,6 +370,6 @@ func toFixed(num float64, precision int) float64 {
 	return float64(round(num*output)) / output
 }
 
-func roundToNearest(num float64, interval float64) float64 {
+func RoundToNearest(num float64, interval float64) float64 {
 	return math.Round(num/interval) * interval
 }

@@ -25,9 +25,9 @@ import (
 
 // var MinimumOrderSize = 25
 var currentRunUUID time.Time
-//TODO: use implied vol data as global var here
-var volData []models.ImpliedVol
 
+//TODO: use implied vol data as global var here
+var VolData []models.ImpliedVol
 
 func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	currentRunUUID = time.Now()
@@ -66,10 +66,10 @@ func RunBacktest(bars []models.Bar, a Algo, rebalance func(float64, Algo) Algo, 
 	// fmt.Println(unsafe.Sizeof(bars))
 	// Initialize volData
 	start := ToIntTimestamp(bars[0].Timestamp)
-	end := ToIntTimestamp(bars[len(bars)].Timestamp)
+	end := ToIntTimestamp(bars[len(bars)-1].Timestamp)
 	fmt.Printf("Vol data start: %v, end: %v\n", start, end)
-	volData = tantradb.LoadImpliedVols("XBTUSD", start, end)
-	fmt.Printf("Got implied vol data: %v\n", volData)
+	VolData = tantradb.LoadImpliedVols("XBTUSD", start, end)
+	// fmt.Printf("Got implied vol data: %v\n", VolData)
 	setupData(&bars, a)
 	score := runSingleTest(&bars, a, rebalance)
 	log.Println("Score", score)

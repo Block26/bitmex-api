@@ -48,7 +48,7 @@ func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
 	for _, data := range volData {
 		timeDiff := time - data.Timestamp
 		if timeDiff < 0 {
-			vol = data.IV
+			vol = data.IV / 100 //Assume volData quotes IV in pct
 			break
 		}
 	}
@@ -56,7 +56,7 @@ func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
 }
 
 //TODO: Formatting
-func GetDeribitOptionSymbol(expiry float64, strike float64, currency string, optionType string) string {
+func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionType string) string {
 	expiryTime := time.Unix(int64(expiry/1000), 0)
 	year, month, day := expiryTime.Date()
 	return "BTC-" + string(day) + string(month) + string(year) + "-" + optionType
@@ -74,6 +74,7 @@ func GetLastFridayOfMonth(currentTime time.Time) time.Time {
 	year, month, _ := currentTime.Date()
 	firstOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 	lastOfMonth := firstOfMonth.AddDate(0, 1, -1).Day()
+	currentTime = time.Date(year, month, lastOfMonth, 0, 0, 0, 0, time.UTC)
 	for i := lastOfMonth; i > 0; i-- {
 		if currentTime.Weekday() == 5 {
 			return currentTime
@@ -87,11 +88,12 @@ func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
 	year, month, _ := currentTime.Add(time.Hour * time.Duration(24)).Date()
 	// Get nearest quarterly month
 	quarterlyMonth := month + (month % 4)
-	if quarterlyMonth > 12 {
+	if quarterlyMonth >= 12 {
 		year += 1
 		quarterlyMonth = quarterlyMonth % 12
 	}
-	return GetLastFridayOfMonth(time.Date(year, month, 1, 0, 0, 0, 0, time.UTC))
+	lastFriday := GetLastFridayOfMonth(time.Date(year, month, 1, 0, 0, 0, 0, time.UTC))
+	return lastFriday
 }
 
 func AdjustForSlippage(theo models.OptionTheo, premium float64, side string) float64 {
@@ -104,20 +106,21 @@ func AdjustForSlippage(theo models.OptionTheo, premium float64, side string) flo
 	return adjPremium
 }
 
-func GetExpiredOptions(currentTime int, options *[]models.OptionContract) []*models.OptionContract {
-	var expiredOptions []*models.OptionContract
-	for _, option := range *options {
-		if option.Expiry >= currentTime {
+func GetExpiredOptions(currentTime int, options []models.OptionContract) []models.OptionContract {
+	var expiredOptions []models.OptionContract
+	for _, option := range options {
+		if option.Expiry >= currentTime && option.Position != 0 {
 			option.Status = "expired"
-			expiredOptions = append(expiredOptions, &option)
+			expiredOptions = append(expiredOptions, option)
 		}
 	}
 	return expiredOptions
 }
 
-func AggregateOptionPnl(options *[]models.OptionContract, currentTime int, currentPrice float64) {
+func AggregateOptionPnl(options []models.OptionContract, currentTime int, currentPrice float64) {
 	for _, option := range GetExpiredOptions(currentTime, options) {
-		option.Profit = option.Position * (option.OptionTheo.getExpiryValue(currentPrice) - option.AverageCost)
+		option.Profit = option.Position * (option.OptionTheo.GetExpiryValue(currentPrice) - option.AverageCost)
+		fmt.Printf("Aggregated profit for %v %v: %v with position %v", option.Strike, option.OptionType, option.Profit, option.Position)
 		option.Position = 0
 	}
 }
@@ -148,9 +151,9 @@ func BuildAvailableOptions(underlyingPrice float64, currentTime time.Time, volat
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
 				optionTheo := models.NewOptionTheo(optionType, underlyingPrice, strike, int(currentTime.UnixNano()/int64(time.Millisecond)), expiry, 0, volatility, -1)
-				symbol := GetDeribitOptionSymbol(float64(expiry), strike, "BTC", optionType)
-				optionContract := models.OptionContract(symbol, strike, expiry, optionType, TickSize, MakerFee,
-					TakerFee, MinimumOrderSize, orderArray, orderArray, 0., optionTheo)
+				symbol := GetDeribitOptionSymbol(expiry, strike, "BTC", optionType)
+				optionContract := models.OptionContract{symbol, strike, expiry, optionType, 0, 0, TickSize, MakerFee,
+					TakerFee, MinimumOrderSize, orderArray, orderArray, 0., *optionTheo, "open"}
 				optionContracts = append(optionContracts, optionContract)
 			}
 		}
