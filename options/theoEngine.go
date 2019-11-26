@@ -85,7 +85,7 @@ func GetLastFridayOfMonth(currentTime time.Time) time.Time {
 }
 
 func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
-	year, month, _ := currentTime.Add(time.Hour * time.Duration(24)).Date()
+	year, month, _ := currentTime.Add(time.Hour * time.Duration(24*minDays)).Date()
 	// Get nearest quarterly month
 	quarterlyMonth := month + (month % 4)
 	if quarterlyMonth >= 12 {
@@ -107,22 +107,32 @@ func AdjustForSlippage(theo models.OptionTheo, premium float64, side string) flo
 	return adjPremium
 }
 
-func GetExpiredOptions(currentTime int, options []models.OptionContract) []*models.OptionContract {
+func GetExpiredOptions(currentTime int, options []*models.OptionContract) []*models.OptionContract {
 	var expiredOptions []*models.OptionContract
 	for _, option := range options {
 		if option.Expiry <= currentTime && option.Status != "expired" {
 			fmt.Printf("Found expired option %v at time %v\n", option.OptionTheo.String(), currentTime)
 			option.Status = "expired"
-			expiredOptions = append(expiredOptions, &option)
+			expiredOptions = append(expiredOptions, option)
 		}
 	}
 	return expiredOptions
 }
 
-func AggregateOptionPnl(options []models.OptionContract, currentTime int, currentPrice float64) {
+func GetOpenOptions(options []*models.OptionContract) []*models.OptionContract {
+	var openOptions []*models.OptionContract
+	for _, option := range options {
+		if option.Status == "open" {
+			openOptions = append(openOptions, option)
+		}
+	}
+	return openOptions
+}
+
+func AggregateOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64) {
 	for _, option := range GetExpiredOptions(currentTime, options) {
 		option.Profit = option.Position * (option.OptionTheo.GetExpiryValue(currentPrice) - option.AverageCost)
-		fmt.Printf("Aggregated profit for %v with position %v\n", option.OptionTheo.String(), option.Position)
+		fmt.Printf("Aggregated profit at price %v for %v with position %v: %v\n", currentPrice, option.OptionTheo.String(), option.Position, option.Profit)
 		option.Position = 0
 	}
 }

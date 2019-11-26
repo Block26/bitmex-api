@@ -28,6 +28,7 @@ var currentRunUUID time.Time
 
 //TODO: use implied vol data as global var here
 var VolData []models.ImpliedVol
+var lastOptionBalance = 0.
 
 func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	currentRunUUID = time.Now()
@@ -74,6 +75,7 @@ func RunBacktest(bars []models.Bar, a Algo, rebalance func(float64, Algo) Algo, 
 	score := runSingleTest(&bars, a, rebalance)
 	log.Println("Score", score)
 	// optimize(bars)
+	fmt.Printf("Last option balance: %v\n", lastOptionBalance)
 	return score
 }
 
@@ -167,7 +169,7 @@ func runSingleTest(data *[]models.Bar, algo Algo, rebalance func(float64, Algo) 
 		"score":               score,
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
-
+	os.Remove("balance.csv")
 	historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		panic(err)
@@ -291,6 +293,32 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 		}
 		// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity - fee
 	}
+	algo.updateOptionBalance()
+}
+
+func (algo *Algo) updateOptionBalance() {
+	optionBalance := 0.
+	for _, option := range algo.Market.Options {
+		// Calculate unrealized pnl
+		option.OptionTheo.UnderlyingPrice = algo.Market.Price
+		option.OptionTheo.CalcBlackScholesTheo(false)
+		optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
+		// fmt.Printf("%v with underlying price %v theo %v\n", option.OptionTheo.String(), algo.Market.Price, option.OptionTheo.Theo)
+		// if OptionModel == "blackScholes" {
+		// 	option.OptionTheo.CalcBlackScholesTheo(false)
+		// 	optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
+		// } else if OptionModel == "binomialTree" {
+		// 	option.OptionTheo.CalcBinomialTreeTheo(Prob, NumTimesteps)
+		// 	optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
+		// }
+
+		// Calculate realized pnl
+		optionBalance += option.Profit
+	}
+	fmt.Printf("Got option balance: %v\n", optionBalance)
+	diff := optionBalance - lastOptionBalance
+	algo.Market.BaseAsset.Quantity += diff
+	lastOptionBalance = optionBalance
 }
 
 func calculateDifference(x float64, y float64) float64 {
