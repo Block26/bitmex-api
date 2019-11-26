@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 	"math"
-	"strconv"
+	// "strconv"
 	"time"
 
 	"github.com/chobie/go-gaussian"
@@ -52,12 +52,12 @@ func (o *OptionTheo) String() string {
 }
 
 func (o *OptionTheo) GetExpiryString() string {
-	fmt.Printf("Getting expiry string for %v\n", o.Expiry/1000)
-	timeInt, err := strconv.ParseInt(string(o.Expiry/1000), 10, 64)
-	if err != nil {
-		panic(err)
-	}
-	return time.Unix(timeInt, 0).String()
+	// fmt.Printf("Getting expiry string for %v\n", o.Expiry/1000)
+	// timeInt, err := strconv.ParseInt(string(o.Expiry/1000), 10, 64)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	return time.Unix(int64(o.Expiry/1000), 0).String()
 }
 
 // Times in ms; return time in days

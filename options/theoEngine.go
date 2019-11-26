@@ -93,6 +93,7 @@ func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
 		quarterlyMonth = quarterlyMonth % 12
 	}
 	lastFriday := GetLastFridayOfMonth(time.Date(year, month, 1, 0, 0, 0, 0, time.UTC))
+	fmt.Printf("Got quarterly expiry %v\n", lastFriday)
 	return lastFriday
 }
 
@@ -106,12 +107,13 @@ func AdjustForSlippage(theo models.OptionTheo, premium float64, side string) flo
 	return adjPremium
 }
 
-func GetExpiredOptions(currentTime int, options []models.OptionContract) []models.OptionContract {
-	var expiredOptions []models.OptionContract
+func GetExpiredOptions(currentTime int, options []models.OptionContract) []*models.OptionContract {
+	var expiredOptions []*models.OptionContract
 	for _, option := range options {
-		if option.Expiry >= currentTime && option.Status != "expired" {
+		if option.Expiry <= currentTime && option.Status != "expired" {
+			fmt.Printf("Found expired option %v at time %v\n", option.OptionTheo.String(), currentTime)
 			option.Status = "expired"
-			expiredOptions = append(expiredOptions, option)
+			expiredOptions = append(expiredOptions, &option)
 		}
 	}
 	return expiredOptions
