@@ -171,16 +171,34 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			}
 		} else {
 			// finish the rest of the orders
-			for i := askIndex; i < len(openAsks); i++ {
-				cancel(openAsks[i])
-			}
 
-			for i := askIndex; i < len(newAsks); i++ {
-				place(newAsks[i])
+			//Bulk cancel
+			cancelStr := ""
+			for i := askIndex; i < len(openAsks); i++ {
+				cancelStr += openAsks[i].OrderID + ","
 			}
 
 			for i := bidIndex; i < len(openBids); i++ {
-				cancel(openBids[i])
+				cancelStr += openBids[i].OrderID + ","
+			}
+
+			cancelStr = strings.TrimSuffix(cancelStr, ",")
+			if len(cancelStr) > 0 {
+				log.Println("Trying to bulk cancel")
+				log.Println(cancelStr)
+				err := ex.CancelOrder(iex.CancelOrderF{
+					Market: a.Market.Symbol,
+					Uuid:   cancelStr,
+				})
+
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+
+			// end bulk cancel
+			for i := askIndex; i < len(newAsks); i++ {
+				place(newAsks[i])
 			}
 
 			for i := askIndex; i < len(newBids); i++ {
