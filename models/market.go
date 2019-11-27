@@ -23,6 +23,9 @@ type Market struct {
 	BuyOrders        OrderArray
 	SellOrders       OrderArray
 
-	Futures bool
-	Options []OptionContract
+	QuantityPrecision   int
+	PricePrecision      int
+	Futures             bool
+	BulkCancelSupported bool
+	Options             []OptionContract
 }

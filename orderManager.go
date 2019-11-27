@@ -29,8 +29,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			order := iex.Order{
 				Market:   a.Market.BaseAsset.Symbol,
 				Currency: a.Market.QuoteAsset.Symbol,
-				Amount:   float64(int(totalQty)),
-				Rate:     ToFixed(orderPrice, 8),
+				Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+				Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
 				Type:     "Limit",
 				Side:     "Buy",
 			}
@@ -47,8 +47,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			order := iex.Order{
 				Market:   a.Market.BaseAsset.Symbol,
 				Currency: a.Market.QuoteAsset.Symbol,
-				Amount:   float64(int(totalQty)),
-				Rate:     ToFixed(orderPrice, 8),
+				Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+				Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
 				Type:     "Limit",
 				Side:     "Sell",
 			}
@@ -172,31 +172,39 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		} else {
 			// finish the rest of the orders
 
-			//Bulk cancel
-			cancelStr := ""
-			for i := askIndex; i < len(openAsks); i++ {
-				cancelStr += openAsks[i].OrderID + ","
-			}
+			if a.Market.BulkCancelSupported {
+				cancelStr := ""
+				for i := askIndex; i < len(openAsks); i++ {
+					cancelStr += openAsks[i].OrderID + ","
+				}
 
-			for i := bidIndex; i < len(openBids); i++ {
-				cancelStr += openBids[i].OrderID + ","
-			}
+				for i := bidIndex; i < len(openBids); i++ {
+					cancelStr += openBids[i].OrderID + ","
+				}
 
-			cancelStr = strings.TrimSuffix(cancelStr, ",")
-			if len(cancelStr) > 0 {
-				log.Println("Trying to bulk cancel")
-				log.Println(cancelStr)
-				err := ex.CancelOrder(iex.CancelOrderF{
-					Market: a.Market.Symbol,
-					Uuid:   cancelStr,
-				})
+				cancelStr = strings.TrimSuffix(cancelStr, ",")
+				if len(cancelStr) > 0 {
+					log.Println("Trying to bulk cancel")
+					log.Println(cancelStr)
+					err := ex.CancelOrder(iex.CancelOrderF{
+						Market: a.Market.Symbol,
+						Uuid:   cancelStr,
+					})
 
-				if err != nil {
-					log.Fatal(err)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+			} else {
+				for i := askIndex; i < len(openAsks); i++ {
+					cancel(openAsks[i])
+				}
+
+				for i := bidIndex; i < len(openBids); i++ {
+					cancel(openBids[i])
 				}
 			}
 
-			// end bulk cancel
 			for i := askIndex; i < len(newAsks); i++ {
 				place(newAsks[i])
 			}

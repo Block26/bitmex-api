@@ -111,7 +111,8 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	localOrders = UpdateLocalOrders(emptyOrders, localOrders)
 	balances, err := ex.GetBalances()
 	algo.updateAlgoBalances(balances)
-	algo.logState()
+
+	firstTrade := true
 	for {
 		select {
 		case positions := <-channels.PositionChan:
@@ -129,6 +130,10 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			log.Println("Trade Update:", trade)
 			algo.Market.Price = trade[0].Close
 			localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
+			if firstTrade {
+				algo.logState()
+				firstTrade = false
+			}
 			// log.Println("Bars", len(localBars))
 			setupData(&localBars, algo)
 			algo.Index = len(localBars) - 1
@@ -137,12 +142,12 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 				algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price))
 				algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price))
 			} else {
-				log.Println("Buying", algo.Market.Buying, algo.Market.BuyOrders.Quantity)
-				log.Println("Selling", algo.Market.Selling, algo.Market.SellOrders.Quantity)
+				//log.Println("Buying", algo.Market.Buying, algo.Market.BuyOrders.Quantity)
+				//log.Println("Selling", algo.Market.Selling, algo.Market.SellOrders.Quantity)
 				algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price))
 				algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price))
-				log.Println("Buying", algo.Market.Buying, algo.Market.BuyOrders.Quantity)
-				log.Println("Selling", algo.Market.Selling, algo.Market.SellOrders.Quantity)
+				//log.Println("Buying", algo.Market.Buying, algo.Market.BuyOrders.Quantity)
+				//log.Println("Selling", algo.Market.Selling, algo.Market.SellOrders.Quantity)
 			}
 			algo.PlaceOrdersOnBook(ex, localOrders)
 			algo.logState()

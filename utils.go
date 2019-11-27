@@ -68,7 +68,7 @@ func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 		if side == "buy" {
 			return percentage * a.Market.QuoteAsset.Quantity
 		}
-		return percentage * (a.Market.QuoteAsset.Quantity / a.Market.Price)
+		return percentage * (a.Market.BaseAsset.Quantity * a.Market.Price)
 	}
 }
 
@@ -88,11 +88,12 @@ func (algo *Algo) logState(timestamp ...string) {
 	var balance float64
 	if algo.Market.Futures {
 		balance = algo.Market.BaseAsset.Quantity
-		algo.Market.Leverage = (math.Abs(algo.Market.QuoteAsset.Quantity) / algo.Market.Price) / algo.Market.BaseAsset.Quantity
+		algo.Market.Leverage = math.Abs(algo.Market.QuoteAsset.Quantity) / (algo.Market.AverageCost * balance)
 	} else {
-		balance = algo.Market.BaseAsset.Quantity + (algo.Market.QuoteAsset.Quantity * algo.Market.Price)
+		balance = algo.Market.BaseAsset.Quantity + (algo.Market.QuoteAsset.Quantity / algo.Market.AverageCost)
 		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
-		algo.Market.Leverage = (math.Abs(algo.Market.QuoteAsset.Quantity)) / (algo.Market.BaseAsset.Quantity * algo.Market.Price)
+		algo.Market.Leverage = 1 - ((math.Abs(algo.Market.QuoteAsset.Quantity)) / (algo.Market.BaseAsset.Quantity * algo.Market.Price))
+		log.Println("BaseAsset Quantity", algo.Market.BaseAsset.Quantity, "QuoteAsset Quantity", algo.Market.QuoteAsset.Quantity, "Leverage", algo.Market.Leverage)
 	}
 
 	algo.Market.Profit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price) * algo.Market.Leverage)
