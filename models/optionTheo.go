@@ -24,6 +24,7 @@ type OptionTheo struct {
 	Theta           float64 // Change in theo wrt. 1 day decrease in timeLeft
 	Gamma           float64 // Change in delta wrt. 1 USD change in UnderlyingPrice
 	Vega            float64 // Change in theo wrt. 1% increase in volatility
+	WeightedVega	float64 // Vega / Vega of ATM option
 }
 
 const PI float64 = 3.14159265359
@@ -86,7 +87,7 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 			o.Theo = o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)
 		}
 	} else if o.Volatility < 0 {
-		o.Volatility = o.impliedVol()
+		o.Volatility = o.calcVol()
 	}
 	if calcGreeks {
 		if o.OptionType == "call" {
@@ -106,24 +107,40 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 }
 
 // Use newton raphson method to find volatility
-func (o *OptionTheo) impliedVol() float64 {
+func (o *OptionTheo) calcVol() float64 {
 	norm := gaussian.NewGaussian(0, 1)
 	v := math.Sqrt(2*PI/o.TimeLeft) * o.Theo / o.UnderlyingPrice
 	for i := 0; i < 100; i++ {
 		d1 := o.calcD1(v)
 		d2 := o.calcD2(v)
-		vega := o.UnderlyingPrice * norm.Pdf(d1) * math.Sqrt(o.TimeLeft)
+		Vega := o.UnderlyingPrice * norm.Pdf(d1) * math.Sqrt(o.TimeLeft)
 		cp := 1.0
 		if o.OptionType == "put" {
 			cp = -1.0
 		}
 		theo0 := cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2)
-		v = v - (theo0-o.Theo)/vega
+		v = v - (theo0-o.Theo)/Vega
 		if math.Abs(theo0-o.Theo) < math.Pow(10, -25) {
 			break
 		}
 	}
 	return v
+}
+
+func (o *OptionTheo) calcWeightedVega() float64 {
+	atmOption = NewOptionTheo(
+		o.OptionType,
+		o.UnderlyingPrice,
+		o.UnderlyingPrice,
+		o.CurrentTime,
+		o.Expiry,
+		o.InterestRate,
+		o.Volatility,		// TODO: should we assume ATM volatility here?
+		-1.
+	)
+	atmOption.calcVol()
+	o.calcVol()
+	self.WeightedVega = o.Vega / atmOption.Vega
 }
 
 // Get an option's PNL at expiration

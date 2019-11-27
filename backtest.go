@@ -315,7 +315,7 @@ func (algo *Algo) updateOptionBalance() {
 		// Calculate realized pnl
 		optionBalance += option.Profit
 	}
-	fmt.Printf("Got option balance: %v\n", optionBalance)
+	// fmt.Printf("Got option balance: %v\n", optionBalance)
 	diff := optionBalance - lastOptionBalance
 	algo.Market.BaseAsset.Quantity += diff
 	lastOptionBalance = optionBalance
