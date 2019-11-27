@@ -30,7 +30,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				Market:   a.Market.BaseAsset.Symbol,
 				Currency: a.Market.QuoteAsset.Symbol,
 				Amount:   float64(int(totalQty)),
-				Rate:     toFixed(orderPrice, 8),
+				Rate:     ToFixed(orderPrice, 8),
 				Type:     "Limit",
 				Side:     "Buy",
 			}
@@ -48,7 +48,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				Market:   a.Market.BaseAsset.Symbol,
 				Currency: a.Market.QuoteAsset.Symbol,
 				Amount:   float64(int(totalQty)),
-				Rate:     toFixed(orderPrice, 8),
+				Rate:     ToFixed(orderPrice, 8),
 				Type:     "Limit",
 				Side:     "Sell",
 			}

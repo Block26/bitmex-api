@@ -18,7 +18,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.2.0
 	github.com/tantralabs/exchanges v0.0.0-20191106215748-4d3dd77e096e
-	github.com/tantralabs/tradeapi v0.0.0-20191126194942-b5034f8f563e // indirect
+	github.com/tantralabs/tradeapi v0.0.0-20191126194942-b5034f8f563e
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	gonum.org/v1/gonum v0.0.0-20190724133715-a8659125a966
 	google.golang.org/api v0.13.0
