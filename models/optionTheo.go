@@ -67,11 +67,11 @@ func GetTimeLeft(currentTime int, expiry int) float64 {
 }
 
 func (o *OptionTheo) calcD1(volatility float64) float64 {
-	return (math.Log(o.UnderlyingPrice/o.Strike) + (o.InterestRate+math.Pow(o.Volatility, 2)/2)*o.TimeLeft) / (volatility * math.Sqrt(o.TimeLeft))
+	return (math.Log(o.UnderlyingPrice/o.Strike) + (o.InterestRate+(math.Pow(o.Volatility, 2))/2)*o.TimeLeft) / (volatility * math.Sqrt(o.TimeLeft))
 }
 
 func (o *OptionTheo) calcD2(volatility float64) float64 {
-	return (math.Log(o.UnderlyingPrice/o.Strike) + (o.InterestRate-math.Pow(o.Volatility, 2)/2)*o.TimeLeft) / (volatility * math.Sqrt(o.TimeLeft))
+	return o.calcD1(volatility) - (volatility * math.Sqrt(o.TimeLeft))
 }
 
 // Use Black-Scholes pricing model to calculate theoretical option value
@@ -106,6 +106,19 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 	o.Theo = o.Theo / o.UnderlyingPrice
 }
 
+func (o *OptionTheo) GetBlackScholesTheo(volatility float64) float64 {
+	norm := gaussian.NewGaussian(0, 1)
+	td1 := o.calcD1(volatility)
+	td2 := o.calcD2(volatility)
+	theo := 0.
+	if o.OptionType == "call" {
+		theo = o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)
+	} else if o.OptionType == "put" {
+		theo = o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)
+	}
+	return theo / o.UnderlyingPrice
+}
+
 // Use newton raphson method to find volatility
 func (o *OptionTheo) CalcVol() {
 	norm := gaussian.NewGaussian(0, 1)
@@ -113,18 +126,26 @@ func (o *OptionTheo) CalcVol() {
 	for i := 0; i < 100; i++ {
 		d1 := o.calcD1(v)
 		d2 := o.calcD2(v)
-		Vega := o.UnderlyingPrice * norm.Pdf(d1) * math.Sqrt(o.TimeLeft)
+		vega := o.UnderlyingPrice * norm.Pdf(d1) * math.Sqrt(o.TimeLeft)
 		cp := 1.0
 		if o.OptionType == "put" {
 			cp = -1.0
 		}
 		theo0 := cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2)
-		v = v - (theo0-o.Theo)/Vega
+		v = v - (theo0-o.Theo)/vega
 		if math.Abs(theo0-o.Theo) < math.Pow(10, -25) {
 			break
 		}
 	}
+	fmt.Printf("Calculated vol %v for %v\n", v, o.String())
 	o.Volatility = v
+}
+
+func (o *OptionTheo) CalcVega() {
+	volChange := .01
+	newTheo := o.GetBlackScholesTheo(o.Volatility + volChange)
+	// fmt.Printf("newTheo %v, original theo %v\n", newTheo, o.Theo)
+	o.Vega = newTheo - o.Theo
 }
 
 func (o *OptionTheo) CalcWeightedVega() {
@@ -138,9 +159,11 @@ func (o *OptionTheo) CalcWeightedVega() {
 		o.Volatility, // TODO: should we assume ATM volatility here?
 		-1.,
 	)
-	atmOption.CalcVol()
-	o.CalcVol()
+	atmOption.CalcBlackScholesTheo(false)
+	atmOption.CalcVega()
+	o.CalcVega()
 	o.WeightedVega = o.Vega / atmOption.Vega
+	// fmt.Printf("%v: vega %v, atm vega %v\n", o.String(), o.Vega, atmOption.Vega)
 }
 
 // Get an option's PNL at expiration
