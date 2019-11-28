@@ -1,59 +1,22 @@
 package algo
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"math"
 	"time"
 
-	"github.com/c-bata/goptuna"
-	"github.com/c-bata/goptuna/successivehalving"
-	"github.com/c-bata/goptuna/tpe"
 	"github.com/google/uuid"
 
 	"gonum.org/v1/gonum/stat"
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
-	"golang.org/x/sync/errgroup"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
 // var minimumOrderSize = 25
 var currentRunUUID time.Time
-
-func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
-	currentRunUUID = time.Now()
-	study, err := goptuna.CreateStudy(
-		"optmm",
-		goptuna.StudyOptionSampler(tpe.NewSampler()),
-		goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMaximize),
-		goptuna.StudyOptionPruner(successivehalving.NewOptunaPruner()),
-		// goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMinimize),
-	)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	//Multithread
-	eg, ctx := errgroup.WithContext(context.Background())
-	study.WithContext(ctx)
-	for i := 0; i < 12; i++ {
-		eg.Go(func() error {
-			return study.Optimize(objective, episodes)
-		})
-	}
-	if err := eg.Wait(); err != nil {
-		log.Fatal(err)
-	}
-
-	// Print the best evaluation value and the parameters.
-	v, _ := study.GetBestValue()
-	p, _ := study.GetBestParams()
-	log.Printf("Best evaluation value=%f", v)
-	log.Println(p)
-}
 
 func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) Algo {
 	setupData(&data, algo)

@@ -7,6 +7,8 @@ firebase.google.com/go v3.10.0+incompatible h1:GVdqx1+ZmPg9qd2S+8K9NHgkUUmZsGJxD
 firebase.google.com/go v3.10.0+incompatible/go.mod h1:xlah6XbEyW6tbfSklcfe5FHJIwjt8toICdV5Wh9ptHs=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/Masterminds/semver v1.4.2/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
+github.com/MaxHalford/eaopt v0.1.0 h1:eeAxFfy4zEcv7AZzQCHeYGRutifxN0EA/XZzv70Uaus=
+github.com/MaxHalford/eaopt v0.1.0/go.mod h1:/BtsvPTut6WckNrjS1D7MQRv9IOXnPN0lnrWIqyCFQI=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=

@@ -8,6 +8,7 @@ go 1.13
 
 require (
 	firebase.google.com/go v3.10.0+incompatible
+	github.com/MaxHalford/eaopt v0.1.0
 	github.com/aws/aws-sdk-go v1.25.28
 	github.com/c-bata/goptuna v0.1.1-0.20191111040524-81338bb530f0
 	github.com/fatih/structs v1.1.0
