@@ -87,8 +87,18 @@ func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Alg
 	}
 
 	mean, std := stat.MeanStdDev(percentReturn, nil)
+	// log.Println("mean", mean, "std", std)
 	score := mean / std
+	// TODO change the scoring based on 1h / 1m
 	score = score * math.Sqrt(365*24*60)
+
+	if math.IsNaN(score) {
+		score = -100
+	}
+
+	if algo.History[historyLength-1].Balance < 0 {
+		score = -100
+	}
 
 	fmt.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s",
 		algo.History[historyLength-1].Balance,

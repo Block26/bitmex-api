@@ -111,7 +111,11 @@ func (algo *Algo) logState(timestamp ...string) {
 		}
 
 		if algo.Market.Futures {
-			history.UBalance = balance + algo.Market.Profit
+			if math.IsNaN(algo.Market.Profit) {
+				history.UBalance = balance
+			} else {
+				history.UBalance = balance + algo.Market.Profit
+			}
 		} else {
 			history.UBalance = (algo.Market.BaseAsset.Quantity * algo.Market.Price) + algo.Market.QuoteAsset.Quantity
 		}
