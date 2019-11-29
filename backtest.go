@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"time"
 
+	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
 
 	"gonum.org/v1/gonum/stat"
@@ -86,9 +88,9 @@ func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Alg
 
 	mean, std := stat.MeanStdDev(percentReturn, nil)
 	score := mean / std
-	score = score * math.Sqrt(365*24)
+	score = score * math.Sqrt(365*24*60)
 
-	fmt.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Order Size %0.4f \n Sharpe %0.4f \n Params: %s",
+	fmt.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s",
 		algo.History[historyLength-1].Balance,
 		algo.History[historyLength-1].AverageCost,
 		algo.History[historyLength-1].Quantity,
@@ -96,7 +98,8 @@ func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Alg
 		drawdown,
 		maxProfit,
 		minProfit,
-		algo.OrderSize,
+		algo.EntryOrderSize,
+		algo.ExitOrderSize,
 		score,
 		createKeyValuePairs(algo.Params),
 	)
@@ -113,17 +116,17 @@ func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Alg
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
 
-	// os.Remove("balance.csv")
-	// historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer historyFile.Close()
+	os.Remove("balance.csv")
+	historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	defer historyFile.Close()
 
-	// err = gocsv.MarshalFile(&algo.History, historyFile) // Use this to save the CSV back to the file
-	// if err != nil {
-	// 	panic(err)
-	// }
+	err = gocsv.MarshalFile(&algo.History, historyFile) // Use this to save the CSV back to the file
+	if err != nil {
+		panic(err)
+	}
 
 	// LogBacktest(algo)
 	// score := ((math.Abs(minProfit) / algo.History[historyLength-1].Balance) + maxLeverage) - algo.History[historyLength-1].Balance // minimize
@@ -134,10 +137,9 @@ func (algo *Algo) UpdateBalanceFromFill(fillPrice float64) {
 	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 	adding := currentWeight == float64(algo.Market.Weight)
 	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.Market.MaxLeverage && algo.Market.Weight != 0 {
-		//TODO track if we are going from long to short and use OrderSize first
 		var tmpOrderSize float64
-		if algo.OrderSize < algo.Market.MaxLeverage-algo.Market.Leverage {
-			tmpOrderSize = algo.OrderSize
+		if algo.EntryOrderSize < algo.Market.MaxLeverage-algo.Market.Leverage {
+			tmpOrderSize = algo.EntryOrderSize
 		} else {
 			tmpOrderSize = algo.Market.MaxLeverage - algo.Market.Leverage
 		}
@@ -146,20 +148,22 @@ func (algo *Algo) UpdateBalanceFromFill(fillPrice float64) {
 		// log.Println("Adding To Position")
 	} else if !adding {
 		var tmpOrderSize float64
-		if algo.OrderSize > algo.Market.Leverage && algo.Market.Weight == 0 {
+		if algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0 {
 			tmpOrderSize = algo.Market.Leverage
 		} else {
-			tmpOrderSize = algo.OrderSize
+			tmpOrderSize = algo.ExitOrderSize
 		}
+		log.Println(tmpOrderSize)
+
 		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
-		algo.UpdateBalance(fillCost, ordersFilled*float64(algo.Market.Weight))
+		algo.UpdateBalance(fillCost, ordersFilled*float64(currentWeight*-1))
 		// log.Println("Removing From Position")
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
 		var tmpOrderSize float64
-		if algo.OrderSize > algo.Market.Leverage {
-			tmpOrderSize = algo.OrderSize
-		} else {
+		if algo.ExitOrderSize > algo.Market.Leverage {
 			tmpOrderSize = algo.Market.Leverage
+		} else {
+			tmpOrderSize = algo.ExitOrderSize
 		}
 		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
 		if algo.Market.Futures {

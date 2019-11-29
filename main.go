@@ -16,7 +16,8 @@ type Algo struct {
 	Market models.Market
 
 	FillType            string
-	OrderSize           float64
+	EntryOrderSize      float64
+	ExitOrderSize       float64
 	DeleverageOrderSize float64
 
 	State map[string]interface{}
