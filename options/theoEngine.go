@@ -97,7 +97,7 @@ func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
 	return lastFriday
 }
 
-func AdjustForSlippage(theo models.OptionTheo, premium float64, side string) float64 {
+func AdjustForSlippage(premium float64, side string) float64 {
 	adjPremium := premium
 	if side == "buy" {
 		adjPremium = premium * (1 - (Slippage / 100.))
