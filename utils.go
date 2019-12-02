@@ -271,7 +271,7 @@ func ToTimeObject(timeString string) time.Time {
 }
 
 func TimestampToTime(timestamp int) time.Time {
-	timeInt, err := strconv.ParseInt(string(timestamp/1000), 10, 64)
+	timeInt, err := strconv.ParseInt(strconv.Itoa(timestamp/1000), 10, 64)
 	if err != nil {
 		panic(err)
 	}
