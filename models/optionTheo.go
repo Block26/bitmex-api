@@ -58,7 +58,7 @@ func (o *OptionTheo) GetExpiryString() string {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	return time.Unix(int64(o.Expiry/1000), 0).String()
+	return time.Unix(int64(o.Expiry/1000), 0).UTC().String()
 }
 
 // Times in ms; return time in days
