@@ -111,7 +111,7 @@ func GetExpiredOptions(currentTime int, options []*models.OptionContract) []*mod
 	var expiredOptions []*models.OptionContract
 	for _, option := range options {
 		if option.Expiry <= currentTime && option.Status != "expired" {
-			fmt.Printf("Found expired option %v at time %v\n", option.OptionTheo.String(), currentTime)
+			// fmt.Printf("Found expired option %v at time %v\n", option.OptionTheo.String(), currentTime)
 			option.Status = "expired"
 			expiredOptions = append(expiredOptions, option)
 		}
@@ -132,7 +132,7 @@ func GetOpenOptions(options []*models.OptionContract) []*models.OptionContract {
 func AggregateOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64) {
 	for _, option := range GetExpiredOptions(currentTime, options) {
 		option.Profit = option.Position * (option.OptionTheo.GetExpiryValue(currentPrice) - option.AverageCost)
-		fmt.Printf("Aggregated profit at price %v for %v with position %v: %v\n", currentPrice, option.OptionTheo.String(), option.Position, option.Profit)
+		// fmt.Printf("Aggregated profit at price %v for %v with position %v: %v\n", currentPrice, option.OptionTheo.String(), option.Position, option.Profit)
 		option.Position = 0
 	}
 }
