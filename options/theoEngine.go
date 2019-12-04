@@ -32,7 +32,7 @@ const TakerFee = .0004
 const MinimumOrderSize = .1
 
 // Assume Slippage percent loss on market orders
-const Slippage = 5.
+const Slippage = 0.
 
 func (t *TheoEngine) getOptions(backtest bool) *[]models.OptionContract {
 	if backtest {

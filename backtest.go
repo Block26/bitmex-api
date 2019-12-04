@@ -14,16 +14,25 @@ import (
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/TheAlgoV2/tantradb"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
 // var MinimumOrderSize = 25
 var currentRunUUID time.Time
 
+var VolData []models.ImpliedVol
+var lastOptionBalance = 0.
+
 func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) Algo {
 	setupData(&data, algo)
 	start := time.Now()
 	// starting_algo.Market.BaseBalance := 0
+	volStart := ToIntTimestamp(data[0].Timestamp)
+	volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
+	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
+	VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
+	fmt.Printf("Len vol data: %v\n", len(VolData))
 	timestamp := ""
 	idx := 0
 	log.Println("Running", len(data), "bars")
@@ -99,6 +108,8 @@ func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Alg
 	if algo.History[historyLength-1].Balance < 0 {
 		score = -100
 	}
+
+	fmt.Printf("Last option balance: %v\n", lastOptionBalance)
 
 	fmt.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s",
 		algo.History[historyLength-1].Balance,

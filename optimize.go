@@ -10,14 +10,10 @@ import (
 	"github.com/c-bata/goptuna"
 	// "github.com/c-bata/goptuna/successivehalving"
 	"github.com/c-bata/goptuna/tpe"
-	"github.com/tantralabs/TheAlgoV2/models"
 	"golang.org/x/sync/errgroup"
 
 	eaopt "github.com/MaxHalford/eaopt"
 )
-
-var VolData []models.ImpliedVol
-var lastOptionBalance = 0.
 
 func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	currentRunUUID = time.Now()
