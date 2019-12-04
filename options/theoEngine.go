@@ -33,6 +33,8 @@ const MinimumOrderSize = .1
 
 // Assume Slippage percent loss on market orders
 const Slippage = 0.
+const MaxProfitPct = 50
+const MaxLossPct = 50
 
 func (t *TheoEngine) getOptions(backtest bool) *[]models.OptionContract {
 	if backtest {
@@ -129,11 +131,29 @@ func GetOpenOptions(options []*models.OptionContract) []*models.OptionContract {
 	return openOptions
 }
 
-func AggregateOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64) {
+func AggregateExpiredOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64) {
 	for _, option := range GetExpiredOptions(currentTime, options) {
 		option.Profit = option.Position * (option.OptionTheo.GetExpiryValue(currentPrice) - option.AverageCost)
 		// fmt.Printf("Aggregated profit at price %v for %v with position %v: %v\n", currentPrice, option.OptionTheo.String(), option.Position, option.Profit)
 		option.Position = 0
+	}
+}
+
+func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64, method string) {
+	for _, option := range options {
+		if option.Position != 0 {
+			option.OptionTheo.CurrentTime = currentTime
+			option.OptionTheo.UnderlyingPrice = currentPrice
+			theo := 0.
+			if method == "BlackScholes" {
+				option.OptionTheo.CalcBlackScholesTheo(false)
+				theo = option.OptionTheo.Theo
+			} else if method == "BinomialTree" {
+				option.OptionTheo.CalcBinomialTreeTheo(.5, 15)
+				theo = option.OptionTheo.BinomialTheo
+			}
+			option.Profit = option.Position * (theo - option.AverageCost)
+		}
 	}
 }
 
