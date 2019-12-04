@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/fatih/structs"
@@ -205,31 +206,31 @@ func (algo *Algo) LogLiveState() {
 }
 
 //Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
-func CreateSpread(weight int32, confidence float64, price float64, spread float64, tickSize float64, maxOrders int32) models.OrderArray {
+func CreateSpread(weight int32, confidence float64, price float64, spread float64, TickSize float64, maxOrders int32) models.OrderArray {
 	xStart := 0.0
 	if weight == 1 {
 		xStart = price - (price * spread)
 	} else {
 		xStart = price
 	}
-	xStart = Round(xStart, tickSize)
+	xStart = Round(xStart, TickSize)
 
 	xEnd := xStart + (xStart * spread)
-	xEnd = Round(xEnd, tickSize)
+	xEnd = Round(xEnd, TickSize)
 
 	diff := xEnd - xStart
 
-	if diff/tickSize >= float64(maxOrders) {
+	if diff/TickSize >= float64(maxOrders) {
 		newTickSize := diff / (float64(maxOrders) - 1)
-		tickSize = Round(newTickSize, tickSize)
+		TickSize = Round(newTickSize, TickSize)
 	}
 
 	var priceArr []float64
 
 	if weight == 1 {
-		priceArr = arange(xStart, xEnd-float64(tickSize), float64(tickSize))
+		priceArr = Arange(xStart, xEnd-float64(TickSize), float64(TickSize))
 	} else {
-		priceArr = arange(xStart, xEnd, float64(tickSize))
+		priceArr = Arange(xStart, xEnd, float64(TickSize))
 	}
 
 	temp := divArr(priceArr, xStart)
@@ -238,7 +239,7 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	normalizer := 1 / sumArr(dist)
 	orderArr := mulArr(dist, normalizer)
 	if weight == 1 {
-		orderArr = reverseArr(orderArr)
+		orderArr = ReverseArr(orderArr)
 	}
 
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
@@ -259,11 +260,37 @@ func GetOHLCBars(bars []models.Bar) ([]float64, []float64, []float64, []float64)
 	return open, high, low, close
 }
 
+func ToIntTimestamp(timeString string) int {
+	layout := "2006-01-02 15:04:05"
+	currentTime, err := time.Parse(layout, timeString)
+	if err != nil {
+		fmt.Printf("Error parsing timeString: %v", err)
+	}
+	return int(currentTime.UnixNano() / int64(time.Millisecond))
+}
+
+func ToTimeObject(timeString string) time.Time {
+	layout := "2006-01-02 15:04:05"
+	currentTime, err := time.Parse(layout, timeString)
+	if err != nil {
+		fmt.Printf("Error parsing timeString: %v", err)
+	}
+	return currentTime
+}
+
+func TimestampToTime(timestamp int) time.Time {
+	timeInt, err := strconv.ParseInt(strconv.Itoa(timestamp/1000), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return time.Unix(timeInt, 0)
+}
+
 func Round(x, unit float64) float64 {
 	return math.Round(x/unit) * unit
 }
 
-func reverseArr(a []float64) []float64 {
+func ReverseArr(a []float64) []float64 {
 	for i := len(a)/2 - 1; i >= 0; i-- {
 		opp := len(a) - 1 - i
 		a[i], a[opp] = a[opp], a[i]
@@ -271,7 +298,7 @@ func reverseArr(a []float64) []float64 {
 	return a
 }
 
-func arange(min float64, max float64, step float64) []float64 {
+func Arange(min float64, max float64, step float64) []float64 {
 	a := make([]float64, int32((max-min)/step)+1)
 	for i := range a {
 		a[i] = float64(min+step) + (float64(i) * step)
@@ -349,4 +376,8 @@ func round(num float64) int {
 func ToFixed(num float64, precision int) float64 {
 	output := math.Pow(10, float64(precision))
 	return float64(round(num*output)) / output
+}
+
+func RoundToNearest(num float64, interval float64) float64 {
+	return math.Round(num/interval) * interval
 }

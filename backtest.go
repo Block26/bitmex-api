@@ -17,7 +17,7 @@ import (
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
-// var minimumOrderSize = 25
+// var MinimumOrderSize = 25
 var currentRunUUID time.Time
 
 func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) Algo {
@@ -126,7 +126,6 @@ func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Alg
 		"score":               score,
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
-
 	os.Remove("balance.csv")
 	historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
@@ -259,6 +258,32 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 
 		// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity - fee
 	}
+	algo.updateOptionBalance()
+}
+
+func (algo *Algo) updateOptionBalance() {
+	optionBalance := 0.
+	for _, option := range algo.Market.Options {
+		// Calculate unrealized pnl
+		option.OptionTheo.UnderlyingPrice = algo.Market.Price
+		option.OptionTheo.CalcBlackScholesTheo(false)
+		optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
+		// fmt.Printf("%v with underlying price %v theo %v\n", option.OptionTheo.String(), algo.Market.Price, option.OptionTheo.Theo)
+		// if OptionModel == "blackScholes" {
+		// 	option.OptionTheo.CalcBlackScholesTheo(false)
+		// 	optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
+		// } else if OptionModel == "binomialTree" {
+		// 	option.OptionTheo.CalcBinomialTreeTheo(Prob, NumTimesteps)
+		// 	optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
+		// }
+
+		// Calculate realized pnl
+		optionBalance += option.Profit
+	}
+	// fmt.Printf("Got option balance: %v\n", optionBalance)
+	diff := optionBalance - lastOptionBalance
+	algo.Market.BaseAsset.Quantity += diff
+	lastOptionBalance = optionBalance
 }
 
 func calculateDifference(x float64, y float64) float64 {

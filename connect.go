@@ -90,7 +90,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			OrderQty:  oo.Quantity,
 			OrderID:   oo.UUID,
 			OrdStatus: oo.Status,
-			Side:      oo.Side,
+			// Side:      oo.Side,
 		}
 		localOrders = append(localOrders, order)
 	}
@@ -103,7 +103,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			OrderQty:  oo.Quantity,
 			OrderID:   oo.UUID,
 			OrdStatus: oo.Status,
-			Side:      oo.Side,
+			// Side:      oo.Side,
 		}
 		localOrders = append(localOrders, order)
 	}
