@@ -32,9 +32,9 @@ const TakerFee = .0004
 const MinimumOrderSize = .1
 
 // Assume Slippage percent loss on market orders
-const Slippage = 0.
-const MaxProfitPct = 50
-const MaxLossPct = 50
+const Slippage = 5.
+const MaxProfitPct = 50.
+const MaxLossPct = 50.
 
 func (t *TheoEngine) getOptions(backtest bool) *[]models.OptionContract {
 	if backtest {
@@ -153,6 +153,7 @@ func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, c
 				theo = option.OptionTheo.BinomialTheo
 			}
 			option.Profit = option.Position * (theo - option.AverageCost)
+			// fmt.Printf("Calculated profit for option %v: %v with position %v and theo %v, vol %v, timeToExpiry %v, underlying %v\n", option.OptionTheo.String(), option.Profit, option.Position, option.OptionTheo.Theo, option.OptionTheo.Volatility, option.OptionTheo.TimeLeft, option.OptionTheo.UnderlyingPrice)
 		}
 	}
 }

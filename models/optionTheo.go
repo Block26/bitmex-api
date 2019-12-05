@@ -80,13 +80,14 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 	td1 := o.calcD1(o.Volatility)
 	td2 := o.calcD2(o.Volatility)
 	nPrime := math.Pow((2*PI), -(1/2)) * math.Exp(math.Pow(-0.5*(td1), 2))
-	if o.Theo < 0 {
-		if o.OptionType == "call" {
-			o.Theo = o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)
-		} else if o.OptionType == "put" {
-			o.Theo = o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)
-		}
-	} else if o.Volatility < 0 {
+	// fmt.Printf("Calcing blackscholes for %v with td1 %v td2 %v nPrime %v\n", o.String(), td1, td2, nPrime)
+	if o.OptionType == "call" {
+		// fmt.Printf("Cdf 1: %v, cdf 2: %v, exp interest time %v\n", norm.Cdf(td1), norm.Cdf(td2), math.Exp(-o.InterestRate*o.TimeLeft))
+		o.Theo = o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)
+	} else if o.OptionType == "put" {
+		o.Theo = o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)
+	}
+	if o.Volatility < 0 {
 		o.CalcVol()
 	}
 	if calcGreeks {
@@ -137,14 +138,17 @@ func (o *OptionTheo) CalcVol() {
 			break
 		}
 	}
-	fmt.Printf("Calculated vol %v for %v\n", v, o.String())
+	// fmt.Printf("Calculated vol %v for %v\n", v, o.String())
 	o.Volatility = v
 }
 
 func (o *OptionTheo) CalcVega() {
+	// fmt.Printf("O theo for %v: %v\n", o.String(), o.Theo)
 	volChange := .01
 	newTheo := o.GetBlackScholesTheo(o.Volatility + volChange)
-	// fmt.Printf("newTheo %v, original theo %v\n", newTheo, o.Theo)
+	// fmt.Printf("newTheo %v, original theo %v with vol %v\n", newTheo, o.Theo, o.Volatility)
+	o.CalcBlackScholesTheo(false)
+	// fmt.Printf("O theo after calc: %v\n", o.Theo)
 	o.Vega = newTheo - o.Theo
 }
 
@@ -161,6 +165,7 @@ func (o *OptionTheo) CalcWeightedVega() {
 	)
 	atmOption.CalcBlackScholesTheo(false)
 	atmOption.CalcVega()
+	o.CalcBlackScholesTheo(false)
 	o.CalcVega()
 	o.WeightedVega = o.Vega / atmOption.Vega
 	// fmt.Printf("%v: vega %v, atm vega %v\n", o.String(), o.Vega, atmOption.Vega)
