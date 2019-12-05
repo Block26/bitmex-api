@@ -16,9 +16,12 @@ type Algo struct {
 	Market models.Market
 
 	FillType            string
+	LeverageTarget      float64
 	EntryOrderSize      float64
 	ExitOrderSize       float64
 	DeleverageOrderSize float64
+	AutoOrderSizing     bool
+	CanBuyBasedOnMax    bool
 
 	State map[string]interface{}
 

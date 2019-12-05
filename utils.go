@@ -82,13 +82,35 @@ func (algo *Algo) CurrentProfit(price float64) float64 {
 	}
 }
 
+func (algo *Algo) getExitOrderSize(orderSizeGreaterThanPositionSize bool) float64 {
+	if orderSizeGreaterThanPositionSize {
+		return algo.Market.Leverage
+	} else {
+		if algo.AutoOrderSizing {
+			return algo.ExitOrderSize //* (1 - (algo.Market.MaxLeverage / algo.Market.Leverage))
+		}
+		return algo.ExitOrderSize
+	}
+}
+
+func (algo *Algo) getEntryOrderSize(orderSizeGreaterThanMaxPositionSize bool) float64 {
+	if orderSizeGreaterThanMaxPositionSize {
+		return algo.Market.MaxLeverage - algo.Market.Leverage
+	} else {
+		if algo.AutoOrderSizing {
+			return algo.EntryOrderSize //* (1 - (algo.Market.MaxLeverage / algo.Market.Leverage))
+		}
+		return algo.EntryOrderSize
+	}
+}
+
 //Log the state of the algo and update variables like leverage
 func (algo *Algo) logState(timestamp ...string) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
 	var balance float64
 	if algo.Market.Futures {
 		balance = algo.Market.BaseAsset.Quantity
-		algo.Market.Leverage = math.Abs(algo.Market.QuoteAsset.Quantity) / (algo.Market.AverageCost * balance)
+		algo.Market.Leverage = math.Abs(algo.Market.QuoteAsset.Quantity) / (algo.Market.Price * balance)
 	} else {
 		if algo.Market.AverageCost == 0 {
 			algo.Market.AverageCost = algo.Market.Price

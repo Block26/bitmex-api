@@ -146,36 +146,31 @@ func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Alg
 
 func (algo *Algo) UpdateBalanceFromFill(fillPrice float64) {
 	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+	if algo.Market.QuoteAsset.Quantity == 0 {
+		currentWeight = float64(algo.Market.Weight)
+	}
 	adding := currentWeight == float64(algo.Market.Weight)
-	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.Market.MaxLeverage && algo.Market.Weight != 0 {
-		var tmpOrderSize float64
-		if algo.EntryOrderSize < algo.Market.MaxLeverage-algo.Market.Leverage {
-			tmpOrderSize = algo.EntryOrderSize
-		} else {
-			tmpOrderSize = algo.Market.MaxLeverage - algo.Market.Leverage
-		}
+	// Need a check for current weight against the last weight, CURRENT WEIGHT is positive //
+	// fmt.Println(algo.Timestamp, algo.Market.BaseAsset.Quantity, algo.Market.MaxLeverage, algo.Market.Leverage)
+	// fmt.Println(algo.Timestamp, currentWeight, algo.Market.Weight)
+	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
+		tmpOrderSize := algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
 		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
 		algo.UpdateBalance(fillCost, ordersFilled*float64(algo.Market.Weight))
-		// log.Println("Adding To Position")
 	} else if !adding {
-		var tmpOrderSize float64
-		if algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0 {
-			tmpOrderSize = algo.Market.Leverage
-		} else {
-			tmpOrderSize = algo.ExitOrderSize
-		}
-		log.Println(tmpOrderSize)
-
+		tmpOrderSize := algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
+		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
+		algo.UpdateBalance(fillCost, ordersFilled*float64(currentWeight*-1))
+		// log.Println("Removing From Position")
+	} else if algo.Market.Leverage > algo.LeverageTarget && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget {
+		tmpOrderSize := algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
+		fmt.Println("===========")
+		fmt.Println(algo.Timestamp, "Order Size", tmpOrderSize)
 		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
 		algo.UpdateBalance(fillCost, ordersFilled*float64(currentWeight*-1))
 		// log.Println("Removing From Position")
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
-		var tmpOrderSize float64
-		if algo.ExitOrderSize > algo.Market.Leverage {
-			tmpOrderSize = algo.Market.Leverage
-		} else {
-			tmpOrderSize = algo.ExitOrderSize
-		}
+		tmpOrderSize := algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
 		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
 		if algo.Market.Futures {
 			algo.UpdateBalance(fillCost, -math.Copysign(ordersFilled, algo.Market.QuoteAsset.Quantity))
@@ -183,23 +178,6 @@ func (algo *Algo) UpdateBalanceFromFill(fillPrice float64) {
 			algo.UpdateBalance(fillCost, -ordersFilled)
 		}
 	}
-
-	// } else if algo.Market.Leverage-algo.DeleverageOrderSize > algo.Market.MaxLeverage {
-	// 	var tmpOrderSize float64
-	// 	tmpLev := algo.Market.Leverage - algo.DeleverageOrderSize
-	// 	// log.Println(algo.Market.Leverage, algo.DeleverageOrderSize)
-	// 	// log.Println(tmpLev)
-	// 	if algo.DeleverageOrderSize > tmpLev {
-	// 		tmpOrderSize = algo.DeleverageOrderSize
-	// 	} else {
-	// 		tmpOrderSize = algo.Market.Leverage - tmpLev
-	// 	}
-	// 	fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
-	// 	if algo.Market.Futures {
-	// 		algo.UpdateBalance(fillCost, -math.Copysign(ordersFilled, algo.Market.QuoteAsset.Quantity))
-	// 	} else {
-	// 		algo.UpdateBalance(fillCost, -ordersFilled)
-	// 	}
 }
 
 func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
@@ -209,7 +187,17 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 		currentCost := (algo.Market.QuoteAsset.Quantity * algo.Market.AverageCost)
 		var newQuantity float64
 		if algo.Market.Futures {
-			newQuantity = fillCost * fillAmount
+			var canBuy float64
+			if algo.CanBuyBasedOnMax {
+				canBuy = (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.Market.MaxLeverage
+			} else {
+				canBuy = (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.LeverageTarget
+			}
+			newQuantity := canBuy * fillAmount
+			// fmt.Println(algo.Timestamp, algo.Market.Leverage, fillAmount, newQuantity, " quantity", algo.Market.QuoteAsset.Quantity)
+			if fillAmount == algo.Market.Leverage || fillAmount == algo.Market.Leverage*(-1) {
+				newQuantity = ((algo.Market.QuoteAsset.Quantity) * -1)
+			}
 			totalQuantity := algo.Market.QuoteAsset.Quantity + newQuantity
 			newCost := fillCost * newQuantity
 
