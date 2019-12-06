@@ -102,9 +102,9 @@ func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
 func AdjustForSlippage(premium float64, side string) float64 {
 	adjPremium := premium
 	if side == "buy" {
-		adjPremium = premium * (1 - (Slippage / 100.))
-	} else if side == "sell" {
 		adjPremium = premium * (1 + (Slippage / 100.))
+	} else if side == "sell" {
+		adjPremium = premium * (1 - (Slippage / 100.))
 	}
 	return adjPremium
 }
