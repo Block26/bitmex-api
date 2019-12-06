@@ -95,7 +95,7 @@ func (algo *Algo) getExitOrderSize(orderSizeGreaterThanPositionSize bool) float6
 
 func (algo *Algo) getEntryOrderSize(orderSizeGreaterThanMaxPositionSize bool) float64 {
 	if orderSizeGreaterThanMaxPositionSize {
-		return algo.Market.MaxLeverage - algo.Market.Leverage
+		return algo.LeverageTarget - algo.Market.Leverage //-algo.LeverageTarget
 	} else {
 		if algo.AutoOrderSizing {
 			return algo.EntryOrderSize //* (1 - (algo.Market.MaxLeverage / algo.Market.Leverage))
