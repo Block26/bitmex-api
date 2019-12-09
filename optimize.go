@@ -47,9 +47,11 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	log.Println(p)
 }
 
-func EAOptimize(Evaluate func([]float64) float64, numberOfParams uint) {
+func EAOptimize(Evaluate func([]float64) float64, paramsDomain []float64) {
+	currentRunUUID = time.Now()
 	// var spso, err = eaopt.NewDefaultSPSO()
-	var ga, err = eaopt.NewDiffEvo(40, 100, 0, 20, 0.5, 0.2, false, nil)
+	// var ga, err = eaopt.NewDiffEvo(40, 100, 0, 0.1, 0.5, 0.2, false, nil)
+	var ga, err = eaopt.NewOES(1000, 30, 10, 0.05, false, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -59,7 +61,7 @@ func EAOptimize(Evaluate func([]float64) float64, numberOfParams uint) {
 	ga.GA.RNG = rand.New(rand.NewSource(42))
 
 	// Run minimization
-	_, y, err := ga.Minimize(Evaluate, numberOfParams)
+	_, y, err := ga.Minimize(Evaluate, paramsDomain)
 	if err != nil {
 		fmt.Println(err)
 		return
