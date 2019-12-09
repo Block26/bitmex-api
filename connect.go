@@ -13,8 +13,10 @@ import (
 )
 
 var orderStatus iex.OrderStatus
+var firstTrade bool
 
-func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) {
+func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) {
+	firstTrade = false
 	config = loadConfiguration(settingsFile, secret)
 	// We instantiate a new repository targeting the given path (the .git folder)
 	// r, err := git.PlainOpen(".")
@@ -39,9 +41,9 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	}
 	orderStatus = ex.GetPotentialOrderStatus()
 
-	// localBars := make([]models.Bar, 0) //data.GetData(algo.Market.Symbol, "1m", algo.DataLength)
-	localBars := data.GetData(algo.Market.Symbol, "1m", algo.DataLength)
-	// log.Println(len(localBars), "downloaded")
+	// localBars := make([]*models.Bar, 0)
+	localBars := data.GetData(algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
+	log.Println(len(localBars), "downloaded")
 
 	// channels to subscribe to
 	symbol := strings.ToLower(algo.Market.Symbol)
@@ -112,7 +114,6 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	balances, err := ex.GetBalances()
 	algo.updateAlgoBalances(balances)
 
-	firstTrade := true
 	for {
 		select {
 		case positions := <-channels.PositionChan:
@@ -127,28 +128,9 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
 			// algo.logState()
 		case trade := <-channels.TradeBinChan:
-			log.Println("Trade Update:", trade)
-			algo.Market.Price = trade[0].Close
-			localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
-			if firstTrade {
-				algo.logState()
-				firstTrade = false
-			}
-			// log.Println("Bars", len(localBars))
-			setupData(&localBars, algo)
-			algo.Index = len(localBars) - 1
+			algo.updateState(trade[0], &localBars, setupData)
 			algo = rebalance(trade[0].Close, algo)
-			if algo.Market.Futures {
-				algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price))
-				algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price))
-			} else {
-				//log.Println("Buying", algo.Market.Buying, algo.Market.BuyOrders.Quantity)
-				//log.Println("Selling", algo.Market.Selling, algo.Market.SellOrders.Quantity)
-				algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price))
-				algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price))
-				//log.Println("Buying", algo.Market.Buying, algo.Market.BuyOrders.Quantity)
-				//log.Println("Selling", algo.Market.Selling, algo.Market.SellOrders.Quantity)
-			}
+			algo.setupOrders()
 			algo.PlaceOrdersOnBook(ex, localOrders)
 			algo.logState()
 		case newOrders := <-channels.OrderChan:
@@ -174,6 +156,33 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 				algo.Market.QuoteAsset.Quantity = walletAmount
 				fmt.Printf("QuoteAsset: %+v \n", walletAmount)
 			}
+		}
+	}
+}
+
+func (algo *Algo) updateState(trade iex.TradeBin, localBars *[]*models.Bar, setupData func([]*models.Bar, Algo)) {
+	log.Println("Trade Update:", trade)
+	algo.Market.Price = trade.Close
+	data.UpdateLocalBars(localBars, data.GetData(algo.Market.Symbol, algo.DecisionInterval, 2))
+	setupData(*localBars, *algo)
+	algo.Index = len(*localBars) - 1
+	log.Println("algo.Index", algo.Index)
+	if firstTrade {
+		algo.logState()
+		firstTrade = false
+	}
+}
+
+func (algo *Algo) setupOrders() {
+	if algo.AutoOrderPlacement {
+
+	} else {
+		if algo.Market.Futures {
+			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price))
+			algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price))
+		} else {
+			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price))
+			algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price))
 		}
 	}
 }

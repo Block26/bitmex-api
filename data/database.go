@@ -5,9 +5,9 @@ import (
 	"log"
 	"strings"
 
-	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/tantralabs/TheAlgoV2/models"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 	dbname   = "bmex_data"
 )
 
-func GetData(symbol string, bin string, count int) []models.Bar {
+func GetData(symbol string, bin string, count int) []*models.Bar {
 
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
@@ -30,7 +30,7 @@ func GetData(symbol string, bin string, count int) []models.Bar {
 		log.Fatal(err)
 	}
 
-	bars := []models.Bar{}
+	bars := []*models.Bar{}
 	tableName := strings.ToLower(symbol + "_" + bin)
 	cmd := fmt.Sprintf("SELECT timestamp, open, high, low, close, volume FROM public.%s ORDER BY \"timestamp\" DESC LIMIT %d", tableName, count)
 	err = db.Select(&bars, cmd)

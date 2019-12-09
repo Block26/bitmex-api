@@ -38,8 +38,8 @@ func loadConfiguration(file string, secret bool) settings.Config {
 	}
 }
 
-func LoadBars(csvFile string) []models.Bar {
-	var bars []models.Bar
+func LoadBars(csvFile string) []*models.Bar {
+	var bars []*models.Bar
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -75,7 +75,9 @@ func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 // Calculate the current % profit of the position vs
 func (algo *Algo) CurrentProfit(price float64) float64 {
 	//TODO this doesnt work on a spot backtest
-	if algo.Market.QuoteAsset.Quantity < 0 {
+	if algo.Market.QuoteAsset.Quantity == 0 {
+		return 0
+	} else if algo.Market.QuoteAsset.Quantity < 0 {
 		return calculateDifference(algo.Market.AverageCost, price)
 	} else {
 		return calculateDifference(price, algo.Market.AverageCost)
@@ -267,7 +269,7 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 }
 
 // Break down the bars into open, high, low, close arrays that are easier to manipulate.
-func GetOHLCBars(bars []models.Bar) ([]float64, []float64, []float64, []float64) {
+func GetOHLCBars(bars []*models.Bar) ([]float64, []float64, []float64, []float64) {
 	open := make([]float64, len(bars))
 	high := make([]float64, len(bars))
 	low := make([]float64, len(bars))

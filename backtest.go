@@ -20,8 +20,8 @@ import (
 // var minimumOrderSize = 25
 var currentRunUUID time.Time
 
-func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) Algo {
-	setupData(&data, algo)
+func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
+	setupData(data, algo)
 	start := time.Now()
 	// starting_algo.Market.BaseBalance := 0
 	timestamp := ""
@@ -52,9 +52,9 @@ func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Alg
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
 				algo.UpdateBalance(fillCost, algo.Market.Selling*-fillPercentage)
 			} else if algo.FillType == "close" {
-				algo.UpdateBalanceFromFill(bar.Close)
+				algo.updateBalanceFromFill(bar.Close)
 			} else if algo.FillType == "open" {
-				algo.UpdateBalanceFromFill(bar.Open)
+				algo.updateBalanceFromFill(bar.Open)
 			}
 			// updateBalanceXBTStrat(bar)
 			algo.logState(timestamp)
@@ -144,40 +144,33 @@ func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Alg
 	return algo //algo.History.Balance[len(algo.History.Balance)-1] / (maxLeverage + 1)
 }
 
-func (algo *Algo) UpdateBalanceFromFill(fillPrice float64) {
+func (algo *Algo) updateBalanceFromFill(fillPrice float64) {
+	orderSize, side := algo.setOrderSize(fillPrice)
+	fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{orderSize})
+	algo.UpdateBalance(fillCost, ordersFilled*side)
+}
+
+func (algo *Algo) setOrderSize(currentPrice float64) (orderSize float64, side float64) {
 	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 	if algo.Market.QuoteAsset.Quantity == 0 {
 		currentWeight = float64(algo.Market.Weight)
 	}
 	adding := currentWeight == float64(algo.Market.Weight)
-	// Need a check for current weight against the last weight, CURRENT WEIGHT is positive //
-	// fmt.Println(algo.Timestamp, algo.Market.BaseAsset.Quantity, algo.Market.MaxLeverage, algo.Market.Leverage)
-	// fmt.Println(algo.Timestamp, currentWeight, algo.Market.Weight)
 	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
-		tmpOrderSize := algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
-		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
-		algo.UpdateBalance(fillCost, ordersFilled*float64(algo.Market.Weight))
+		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
+		side = float64(algo.Market.Weight)
 	} else if !adding {
-		tmpOrderSize := algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
-		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
-		algo.UpdateBalance(fillCost, ordersFilled*float64(currentWeight*-1))
-		// log.Println("Removing From Position")
+		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
+		side = float64(currentWeight * -1)
 	} else if algo.Market.Leverage > algo.LeverageTarget && adding {
-		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{algo.DeleverageOrderSize})
-		fmt.Println("===========")
-		fmt.Println(algo.Timestamp, "Order Size", tmpOrderSize)
-		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
-		algo.UpdateBalance(fillCost, ordersFilled*float64(currentWeight*-1))
-		// log.Println("Removing From Position")
+		orderSize = algo.DeleverageOrderSize
+		side = float64(currentWeight * -1)
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
-		tmpOrderSize := algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
-		fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{tmpOrderSize})
-		if algo.Market.Futures {
-			algo.UpdateBalance(fillCost, -math.Copysign(ordersFilled, algo.Market.QuoteAsset.Quantity))
-		} else {
-			algo.UpdateBalance(fillCost, -ordersFilled)
-		}
+		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
+		//side = Opposite of the quantity
+		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 	}
+	return
 }
 
 func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
