@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/tantralabs/tradeapi/iex"
 )
@@ -132,6 +133,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		if err != nil {
 			log.Fatal(err)
 		}
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	place := func(order iex.Order) {
@@ -139,6 +141,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		if err != nil {
 			log.Fatal(err)
 		}
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	bidIndex := 0
