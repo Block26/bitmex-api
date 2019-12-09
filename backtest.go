@@ -162,7 +162,7 @@ func (algo *Algo) setOrderSize(currentPrice float64) (orderSize float64, side fl
 	} else if !adding {
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
 		side = float64(currentWeight * -1)
-	} else if algo.Market.Leverage > algo.LeverageTarget && adding {
+	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy(algo.CanBuyBasedOnMax)*(1+algo.DeleverageOrderSize) && adding {
 		orderSize = algo.DeleverageOrderSize
 		side = float64(currentWeight * -1)
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
@@ -180,15 +180,9 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 		currentCost := (algo.Market.QuoteAsset.Quantity * algo.Market.AverageCost)
 		var newQuantity float64
 		if algo.Market.Futures {
-			var canBuy float64
-			if algo.CanBuyBasedOnMax {
-				canBuy = (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.Market.MaxLeverage
-			} else {
-				canBuy = (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.LeverageTarget
-			}
+			canBuy := algo.canBuy(algo.CanBuyBasedOnMax)
 			newQuantity := canBuy * fillAmount
 			currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-			// fmt.Println(algo.Timestamp, algo.Market.Leverage, fillAmount, newQuantity, " quantity", algo.Market.QuoteAsset.Quantity)
 			if currentWeight != float64(algo.Market.Weight) && (fillAmount == algo.Market.Leverage || fillAmount == algo.Market.Leverage*(-1)) {
 				newQuantity = ((algo.Market.QuoteAsset.Quantity) * -1)
 			}
