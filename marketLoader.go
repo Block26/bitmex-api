@@ -91,6 +91,35 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
 		}
+	} else if exchange == "deribit" {
+		switch m := market; m {
+		case "BTC-PERPETUAL":
+			return models.Market{
+				Symbol:      "BTC-PERPETUAL",
+				Exchange:    "deribit",
+				ExchangeURL: "testapp.deribit.com",
+				WSStream:    "testapp.deribit.com",
+				BaseAsset: models.Asset{
+					Symbol:   "BTC",
+					Quantity: 1,
+				},
+				QuoteAsset: models.Asset{
+					Symbol:   "USD",
+					Quantity: 0,
+				},
+				MinimumOrderSize:    10,
+				TickSize:            .5,
+				QuantityPrecision:   0,
+				PricePrecision:      2,
+				MaxOrders:           20,
+				MakerFee:            -0.00025,
+				TakerFee:            0.00075,
+				Futures:             true,
+				BulkCancelSupported: true,
+			}, nil
+		default:
+			log.Println(m, "is not supported for exchange", exchange)
+		}
 	}
 	err = errors.New("error: exchange not supported")
 	return

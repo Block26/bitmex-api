@@ -16,6 +16,7 @@ var orderStatus iex.OrderStatus
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) {
 	config = loadConfiguration(settingsFile, secret)
+	fmt.Printf("Loaded config: %v\n", config)
 	// We instantiate a new repository targeting the given path (the .git folder)
 	// r, err := git.PlainOpen(".")
 	// CheckIfError(err)
@@ -128,6 +129,38 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			// algo.logState()
 		case trade := <-channels.TradeBinChan:
 			log.Println("Trade Update:", trade)
+			if algo.Market.Options != nil {
+				markets, _ := ex.GetMarkets(algo.Market.BaseAsset.Symbol, "option")
+				fmt.Printf("Got markets from API: %v\n", markets)
+				for _, market := range markets {
+					containsSymbol := false
+					for _, option := range algo.Market.Options {
+						if option.Symbol == market.Symbol {
+							containsSymbol = true
+						}
+					}
+					if !containsSymbol {
+						expiry := market.Expiry * 1000
+						optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
+						optionContract := models.OptionContract{
+							Symbol:           market.Symbol,
+							Strike:           market.Strike,
+							Expiry:           expiry,
+							OptionType:       market.OptionType,
+							AverageCost:      0,
+							Profit:           0,
+							TickSize:         market.TickSize,
+							MakerFee:         market.MakerCommission,
+							TakerFee:         market.TakerCommission,
+							MinimumOrderSize: market.MinTradeAmount,
+							Position:         0,
+							OptionTheo:       *optionTheo,
+							Status:           "open",
+						}
+						algo.Market.Options = append(algo.Market.Options, optionContract)
+					}
+				}
+			}
 			algo.Market.Price = trade[0].Close
 			localBars = data.UpdateLocalBars(localBars, data.GetData("XBTUSD", "1m", 2))
 			if firstTrade {
