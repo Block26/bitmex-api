@@ -104,6 +104,14 @@ func (algo *Algo) getEntryOrderSize(orderSizeGreaterThanMaxPositionSize bool) fl
 	}
 }
 
+func (algo *Algo) canBuy(canBuyBasedOnMax bool) float64 {
+	if canBuyBasedOnMax {
+		return (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.Market.MaxLeverage
+	} else {
+		return (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.LeverageTarget
+	}
+}
+
 //Log the state of the algo and update variables like leverage
 func (algo *Algo) logState(timestamp ...string) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
