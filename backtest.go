@@ -24,8 +24,8 @@ var currentRunUUID time.Time
 var VolData []models.ImpliedVol
 var lastOptionBalance = 0.
 
-func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) Algo {
-	setupData(&data, algo)
+func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
+	setupData(data, algo)
 	start := time.Now()
 	// starting_algo.Market.BaseBalance := 0
 	volStart := ToIntTimestamp(data[0].Timestamp)
