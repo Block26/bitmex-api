@@ -129,7 +129,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
 			// algo.logState()
 		case trade := <-channels.TradeBinChan:
-			algo.updateState(trade[0], &localBars, setupData)
+			algo.updateState(ex, trade[0], &localBars, setupData)
 			algo = rebalance(trade[0].Close, algo)
 			algo.setupOrders()
 			algo.PlaceOrdersOnBook(ex, localOrders)
@@ -161,7 +161,7 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 	}
 }
 
-func (algo *Algo) updateState(trade iex.TradeBin, localBars *[]*models.Bar, setupData func([]*models.Bar, Algo)) {
+func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[]*models.Bar, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
 	algo.Market.Price = trade.Close
 	data.UpdateLocalBars(localBars, data.GetData(algo.Market.Symbol, algo.DecisionInterval, 2))
@@ -171,6 +171,39 @@ func (algo *Algo) updateState(trade iex.TradeBin, localBars *[]*models.Bar, setu
 	if firstTrade {
 		algo.logState()
 		firstTrade = false
+	}
+	// Update active option contracts from API
+	if algo.Market.Options != nil {
+		markets, _ := ex.GetMarkets(algo.Market.BaseAsset.Symbol, "option")
+		fmt.Printf("Got markets from API: %v\n", markets)
+		for _, market := range markets {
+			containsSymbol := false
+			for _, option := range algo.Market.Options {
+				if option.Symbol == market.Symbol {
+					containsSymbol = true
+				}
+			}
+			if !containsSymbol {
+				expiry := market.Expiry * 1000
+				optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
+				optionContract := models.OptionContract{
+					Symbol:           market.Symbol,
+					Strike:           market.Strike,
+					Expiry:           expiry,
+					OptionType:       market.OptionType,
+					AverageCost:      0,
+					Profit:           0,
+					TickSize:         market.TickSize,
+					MakerFee:         market.MakerCommission,
+					TakerFee:         market.TakerCommission,
+					MinimumOrderSize: market.MinTradeAmount,
+					Position:         0,
+					OptionTheo:       *optionTheo,
+					Status:           "open",
+				}
+				algo.Market.Options = append(algo.Market.Options, optionContract)
+			}
+		}
 	}
 }
 
