@@ -18,7 +18,7 @@ var firstTrade bool
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) {
 	firstTrade = false
 	config := loadConfiguration(settingsFile, secret)
-	fmt.Printf("Loaded config for %v with api key %v and secret %v\n", algo.Market.Exchange, config.APIKey, config.APISecret)
+	fmt.Printf("Loaded config for %v \n", algo.Market.Exchange)
 	// We instantiate a new repository targeting the given path (the .git folder)
 	// r, err := git.PlainOpen(".")
 	// CheckIfError(err)
