@@ -6,7 +6,6 @@ import (
 	"math"
 	"strings"
 
-	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
@@ -17,8 +16,8 @@ var firstTrade bool
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) {
 	firstTrade = false
-	config = loadConfiguration(settingsFile, secret)
-	fmt.Printf("Loaded config: %v\n", config)
+	config := loadConfiguration(settingsFile, secret)
+	fmt.Printf("Loaded config for %v with api key %v and secret %v\n", algo.Market.Exchange, config.APIKey, config.APISecret)
 	// We instantiate a new repository targeting the given path (the .git folder)
 	// r, err := git.PlainOpen(".")
 	// CheckIfError(err)
@@ -33,17 +32,22 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		ApiSecret:      config.APISecret,
 		ApiKey:         config.APIKey,
 		AccountID:      "test",
-		OutputResponse: false,
+		OutputResponse: true,
 	}
 
+	fmt.Printf("Connecting to %v with key %v and secret %v, id %v\n", exchangeVars.Exchange, exchangeVars.ApiKey, exchangeVars.ApiSecret, exchangeVars.AccountID)
 	ex, err := tradeapi.New(exchangeVars)
 	if err != nil {
 		fmt.Println(err)
 	}
+	fmt.Printf("Getting potential order status...\n")
 	orderStatus = ex.GetPotentialOrderStatus()
+	fmt.Printf("Got potential order status %v\n", orderStatus)
 
-	// localBars := make([]*models.Bar, 0)
-	localBars := data.GetData(algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
+	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
+	localBars := make([]*models.Bar, 0)
+	// localBars := data.GetData(algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
+	fmt.Printf("Got local bars: %v\n", localBars)
 	log.Println(len(localBars), "downloaded")
 
 	// channels to subscribe to
@@ -77,43 +81,6 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	}
 
 	var localOrders []iex.WSOrder
-
-	//Setup local orders - Some exchanges don't send orders on WS connection so we prepopulate from restful api
-	openOrders, err := ex.OpenOrders(iex.OpenOrderF{Market: algo.Market.BaseAsset.Symbol, Currency: algo.Market.QuoteAsset.Symbol})
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	for i := range openOrders.Bids {
-		oo := openOrders.Bids[i]
-		order := iex.WSOrder{
-			Symbol:    oo.Market,
-			Price:     oo.Price,
-			OrderQty:  oo.Quantity,
-			OrderID:   oo.UUID,
-			OrdStatus: oo.Status,
-			// Side:      oo.Side,
-		}
-		localOrders = append(localOrders, order)
-	}
-
-	for i := range openOrders.Asks {
-		oo := openOrders.Asks[i]
-		order := iex.WSOrder{
-			Symbol:    oo.Market,
-			Price:     oo.Price,
-			OrderQty:  oo.Quantity,
-			OrderID:   oo.UUID,
-			OrdStatus: oo.Status,
-			// Side:      oo.Side,
-		}
-		localOrders = append(localOrders, order)
-	}
-	var emptyOrders []iex.WSOrder
-	localOrders = UpdateLocalOrders(emptyOrders, localOrders)
-	balances, err := ex.GetBalances()
-	algo.updateAlgoBalances(balances)
 
 	for {
 		select {
@@ -164,7 +131,7 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[]*models.Bar, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
 	algo.Market.Price = trade.Close
-	data.UpdateLocalBars(localBars, data.GetData(algo.Market.Symbol, algo.DecisionInterval, 2))
+	// data.UpdateLocalBars(localBars, data.GetData(algo.Market.Symbol, algo.DecisionInterval, 2))
 	setupData(*localBars, *algo)
 	algo.Index = len(*localBars) - 1
 	log.Println("algo.Index", algo.Index)
