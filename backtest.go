@@ -14,16 +14,25 @@ import (
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/TheAlgoV2/tantradb"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
-// var minimumOrderSize = 25
+// var MinimumOrderSize = 25
 var currentRunUUID time.Time
 
-func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
-	setupData(data, algo)
+var VolData []models.ImpliedVol
+var lastOptionBalance = 0.
+
+func RunBacktest(data []models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func(*[]models.Bar, Algo)) Algo {
+	setupData(&data, algo)
 	start := time.Now()
 	// starting_algo.Market.BaseBalance := 0
+	volStart := ToIntTimestamp(data[0].Timestamp)
+	volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
+	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
+	VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
+	fmt.Printf("Len vol data: %v\n", len(VolData))
 	timestamp := ""
 	idx := 0
 	log.Println("Running", len(data), "bars")
@@ -100,6 +109,8 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		score = -100
 	}
 
+	fmt.Printf("Last option balance: %v\n", lastOptionBalance)
+
 	fmt.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s",
 		algo.History[historyLength-1].Balance,
 		algo.History[historyLength-1].AverageCost,
@@ -126,7 +137,6 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		"score":               score,
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
-
 	os.Remove("balance.csv")
 	historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
@@ -235,6 +245,32 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 
 		// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity - fee
 	}
+	algo.updateOptionBalance()
+}
+
+func (algo *Algo) updateOptionBalance() {
+	optionBalance := 0.
+	for _, option := range algo.Market.Options {
+		// Calculate unrealized pnl
+		option.OptionTheo.UnderlyingPrice = algo.Market.Price
+		option.OptionTheo.CalcBlackScholesTheo(false)
+		optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
+		// fmt.Printf("%v with underlying price %v theo %v\n", option.OptionTheo.String(), algo.Market.Price, option.OptionTheo.Theo)
+		// if OptionModel == "blackScholes" {
+		// 	option.OptionTheo.CalcBlackScholesTheo(false)
+		// 	optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
+		// } else if OptionModel == "binomialTree" {
+		// 	option.OptionTheo.CalcBinomialTreeTheo(Prob, NumTimesteps)
+		// 	optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
+		// }
+
+		// Calculate realized pnl
+		optionBalance += option.Profit
+	}
+	// fmt.Printf("Got option balance: %v\n", optionBalance)
+	diff := optionBalance - lastOptionBalance
+	algo.Market.BaseAsset.Quantity += diff
+	lastOptionBalance = optionBalance
 }
 
 func calculateDifference(x float64, y float64) float64 {

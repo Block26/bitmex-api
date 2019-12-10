@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/c-bata/goptuna"
-	"github.com/c-bata/goptuna/successivehalving"
+	// "github.com/c-bata/goptuna/successivehalving"
 	"github.com/c-bata/goptuna/tpe"
 	"golang.org/x/sync/errgroup"
 
@@ -21,7 +21,7 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 		"optmm",
 		goptuna.StudyOptionSampler(tpe.NewSampler()),
 		goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMaximize),
-		goptuna.StudyOptionPruner(successivehalving.NewOptunaPruner()),
+		// goptuna.StudyOptionPruner(successivehalving.NewOptunaPruner()),
 		// goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMinimize),
 	)
 
