@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
@@ -45,8 +46,8 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	fmt.Printf("Got potential order status %v\n", orderStatus)
 
 	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
-	localBars := make([]*models.Bar, 0)
-	// localBars := data.GetData(algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
+	// localBars := make([]*models.Bar, 0)
+	localBars := data.GetData("XBTUSD", algo.DecisionInterval, algo.DataLength+1)
 	fmt.Printf("Got local bars: %v\n", localBars)
 	log.Println(len(localBars), "downloaded")
 
@@ -57,7 +58,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		{Name: iex.WS_WALLET, Symbol: symbol},
 		{Name: iex.WS_ORDER, Symbol: symbol},
 		{Name: iex.WS_POSITION, Symbol: symbol},
-		{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol},
+		{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol, Market: iex.WSMarketType{Contract: iex.WS_SWAP}},
 	}
 
 	// Channels for recieving websocket response.
@@ -67,6 +68,9 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		WalletChan:   make(chan *iex.WSWallet, 2),
 		OrderChan:    make(chan []iex.WSOrder, 2),
 	}
+
+	// markets, err := ex.GetMarkets("BTC")
+	// fmt.Printf("Got markets: %v\n", markets)
 
 	// Start the websocket.
 	err = ex.StartWS(&iex.WsConfig{Host: algo.Market.WSStream, //"testnet.bitmex.com", //"stream.binance.us:9443",
@@ -141,34 +145,36 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 	}
 	// Update active option contracts from API
 	if algo.Market.Options != nil {
-		markets, _ := ex.GetMarkets(algo.Market.BaseAsset.Symbol, "option")
-		fmt.Printf("Got markets from API: %v\n", markets)
-		for _, market := range markets {
-			containsSymbol := false
-			for _, option := range algo.Market.Options {
-				if option.Symbol == market.Symbol {
-					containsSymbol = true
+		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, "option")
+		if err != nil {
+			fmt.Printf("Got markets from API: %v\n", markets)
+			for _, market := range markets {
+				containsSymbol := false
+				for _, option := range algo.Market.Options {
+					if option.Symbol == market.Symbol {
+						containsSymbol = true
+					}
 				}
-			}
-			if !containsSymbol {
-				expiry := market.Expiry * 1000
-				optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
-				optionContract := models.OptionContract{
-					Symbol:           market.Symbol,
-					Strike:           market.Strike,
-					Expiry:           expiry,
-					OptionType:       market.OptionType,
-					AverageCost:      0,
-					Profit:           0,
-					TickSize:         market.TickSize,
-					MakerFee:         market.MakerCommission,
-					TakerFee:         market.TakerCommission,
-					MinimumOrderSize: market.MinTradeAmount,
-					Position:         0,
-					OptionTheo:       *optionTheo,
-					Status:           "open",
+				if !containsSymbol {
+					expiry := market.Expiry * 1000
+					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
+					optionContract := models.OptionContract{
+						Symbol:           market.Symbol,
+						Strike:           market.Strike,
+						Expiry:           expiry,
+						OptionType:       market.OptionType,
+						AverageCost:      0,
+						Profit:           0,
+						TickSize:         market.TickSize,
+						MakerFee:         market.MakerCommission,
+						TakerFee:         market.TakerCommission,
+						MinimumOrderSize: market.MinTradeAmount,
+						Position:         0,
+						OptionTheo:       *optionTheo,
+						Status:           "open",
+					}
+					algo.Market.Options = append(algo.Market.Options, optionContract)
 				}
-				algo.Market.Options = append(algo.Market.Options, optionContract)
 			}
 		}
 	}
