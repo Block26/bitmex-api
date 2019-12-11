@@ -58,6 +58,46 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 
+	//Parse option orders
+	totalQty = 0.0
+	for _, option := range a.Market.Options {
+		for i, qty := range option.BuyOrders.Quantity {
+			totalQty += qty
+			if totalQty > option.MinimumOrderSize {
+				orderPrice := option.BuyOrders.Price[i]
+				order := iex.Order{
+					Market:   option.Symbol,
+					Currency: a.Market.QuoteAsset.Symbol,
+					Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+					Type:     "Limit",
+					Side:     "Buy",
+				}
+				newBids = append(newBids, order)
+				totalQty = 0.0
+			}
+		}
+	}
+	totalQty = 0.0
+	for _, option := range a.Market.Options {
+		for i, qty := range option.SellOrders.Quantity {
+			totalQty += qty
+			if totalQty > option.MinimumOrderSize {
+				orderPrice := option.SellOrders.Price[i]
+				order := iex.Order{
+					Market:   option.Symbol,
+					Currency: a.Market.QuoteAsset.Symbol,
+					Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+					Type:     "Limit",
+					Side:     "Sell",
+				}
+				newAsks = append(newAsks, order)
+				totalQty = 0.0
+			}
+		}
+	}
+
 	log.Println("New orders")
 	log.Println(newAsks)
 	log.Println(newBids)
