@@ -65,12 +65,19 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			totalQty += qty
 			if totalQty > option.MinimumOrderSize {
 				orderPrice := option.BuyOrders.Price[i]
+				// Assume a price of 0 indicates market order
+				var orderType string
+				if orderPrice == 0 {
+					orderType = "Market"
+				} else {
+					orderType = "Limit"
+				}
 				order := iex.Order{
 					Market:   option.Symbol,
 					Currency: a.Market.QuoteAsset.Symbol,
 					Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
 					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
-					Type:     "Limit",
+					Type:     orderType,
 					Side:     "Buy",
 				}
 				newBids = append(newBids, order)
@@ -84,12 +91,19 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			totalQty += qty
 			if totalQty > option.MinimumOrderSize {
 				orderPrice := option.SellOrders.Price[i]
+				// Assume a price of 0 indicates market order
+				var orderType string
+				if orderPrice == 0 {
+					orderType = "Market"
+				} else {
+					orderType = "Limit"
+				}
 				order := iex.Order{
 					Market:   option.Symbol,
 					Currency: a.Market.QuoteAsset.Symbol,
 					Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
 					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
-					Type:     "Limit",
+					Type:     orderType,
 					Side:     "Sell",
 				}
 				newAsks = append(newAsks, order)
