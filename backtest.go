@@ -155,32 +155,9 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 }
 
 func (algo *Algo) updateBalanceFromFill(fillPrice float64) {
-	orderSize, side := algo.setOrderSize(fillPrice)
+	orderSize, side := algo.getOrderSize(fillPrice)
 	fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{orderSize})
 	algo.UpdateBalance(fillCost, ordersFilled*side)
-}
-
-func (algo *Algo) setOrderSize(currentPrice float64) (orderSize float64, side float64) {
-	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-	if algo.Market.QuoteAsset.Quantity == 0 {
-		currentWeight = float64(algo.Market.Weight)
-	}
-	adding := currentWeight == float64(algo.Market.Weight)
-	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
-		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
-		side = float64(algo.Market.Weight)
-	} else if !adding {
-		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
-		side = float64(currentWeight * -1)
-	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy(algo.CanBuyBasedOnMax)*(1+algo.DeleverageOrderSize) && adding {
-		orderSize = algo.DeleverageOrderSize
-		side = float64(currentWeight * -1)
-	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
-		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
-		//side = Opposite of the quantity
-		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-	}
-	return
 }
 
 func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
@@ -189,7 +166,9 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 		// fee := math.Abs(fillAmount/fillCost) * algo.Market.MakerFee
 		currentCost := (algo.Market.QuoteAsset.Quantity * algo.Market.AverageCost)
 		var newQuantity float64
+		// log.Printf("fillCost %.8f -> fillAmount %.8f -> newQuantity %0.8f\n", fillCost, fillAmount, newQuantity)
 		if algo.Market.Futures {
+
 			canBuy := algo.canBuy(algo.CanBuyBasedOnMax)
 			newQuantity := canBuy * fillAmount
 			currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)

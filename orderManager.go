@@ -58,6 +58,9 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 
+	log.Println("New orders")
+	log.Println(newAsks)
+	log.Println(newBids)
 	// Get open buys, buys, open sells, sells, with matches filtered out
 	var openBids []iex.WSOrder
 	var openAsks []iex.WSOrder

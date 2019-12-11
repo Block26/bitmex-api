@@ -49,7 +49,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
 	// localBars := make([]*models.Bar, 0)
 	localBars := data.GetData("XBTUSD", algo.DecisionInterval, algo.DataLength+1)
-	fmt.Printf("Got local bars: %v\n", localBars)
+	fmt.Printf("Got local bars: %v\n", len(localBars))
 	log.Println(len(localBars), "downloaded")
 
 	// channels to subscribe to
@@ -136,7 +136,8 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[]*models.Bar, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
 	algo.Market.Price = trade.Close
-	// data.UpdateLocalBars(localBars, data.GetData(algo.Market.Symbol, algo.DecisionInterval, 2))
+	//TODO this is delayed by 1 min -> when we ask the database for 1m bars it returns the previous minute
+	data.UpdateLocalBars(localBars, data.GetData("XBTUSD", algo.DecisionInterval, 2))
 	setupData(*localBars, *algo)
 	algo.Index = len(*localBars) - 1
 	algo.Timestamp = time.Now().Truncate(time.Second).UTC().String()
@@ -184,7 +185,24 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 
 func (algo *Algo) setupOrders() {
 	if algo.AutoOrderPlacement {
-
+		orderSize, side := algo.getOrderSize(algo.Market.Price)
+		var quantity float64
+		if algo.Market.Futures {
+			quantity = orderSize * (algo.Market.BaseAsset.Quantity * algo.Market.Price)
+		} else {
+			quantity = orderSize * (algo.Market.BaseAsset.Quantity / algo.Market.Price)
+		}
+		if side == 1 {
+			algo.Market.BuyOrders = models.OrderArray{
+				Quantity: []float64{quantity},
+				Price:    []float64{algo.Market.Price},
+			}
+		} else if side == -1 {
+			algo.Market.SellOrders = models.OrderArray{
+				Quantity: []float64{quantity},
+				Price:    []float64{algo.Market.Price},
+			}
+		}
 	} else {
 		if algo.Market.Futures {
 			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price))

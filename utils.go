@@ -168,6 +168,29 @@ func (algo *Algo) logState(timestamp ...string) {
 	}
 }
 
+func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side float64) {
+	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+	if algo.Market.QuoteAsset.Quantity == 0 {
+		currentWeight = float64(algo.Market.Weight)
+	}
+	adding := currentWeight == float64(algo.Market.Weight)
+	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
+		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
+		side = float64(algo.Market.Weight)
+	} else if !adding {
+		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
+		side = float64(currentWeight * -1)
+	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy(algo.CanBuyBasedOnMax)*(1+algo.DeleverageOrderSize) && adding {
+		orderSize = algo.DeleverageOrderSize
+		side = float64(currentWeight * -1)
+	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
+		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
+		//side = Opposite of the quantity
+		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+	}
+	return
+}
+
 //Log the state of the algo to influx db
 func (algo *Algo) LogLiveState() {
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
