@@ -168,9 +168,7 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 		var newQuantity float64
 		// log.Printf("fillCost %.8f -> fillAmount %.8f -> newQuantity %0.8f\n", fillCost, fillAmount, newQuantity)
 		if algo.Market.Futures {
-
-			canBuy := algo.canBuy(algo.CanBuyBasedOnMax)
-			newQuantity := canBuy * fillAmount
+			newQuantity := algo.canBuy() * fillAmount
 			currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 			if currentWeight != float64(algo.Market.Weight) && (fillAmount == algo.Market.Leverage || fillAmount == algo.Market.Leverage*(-1)) {
 				newQuantity = ((algo.Market.QuoteAsset.Quantity) * -1)

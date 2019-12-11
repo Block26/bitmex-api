@@ -90,9 +90,6 @@ func (algo *Algo) getExitOrderSize(orderSizeGreaterThanPositionSize bool) float6
 	if orderSizeGreaterThanPositionSize {
 		return algo.Market.Leverage
 	} else {
-		if algo.AutoOrderSizing {
-			return algo.ExitOrderSize //* (1 - (algo.Market.MaxLeverage / algo.Market.Leverage))
-		}
 		return algo.ExitOrderSize
 	}
 }
@@ -101,15 +98,12 @@ func (algo *Algo) getEntryOrderSize(orderSizeGreaterThanMaxPositionSize bool) fl
 	if orderSizeGreaterThanMaxPositionSize {
 		return algo.LeverageTarget - algo.Market.Leverage //-algo.LeverageTarget
 	} else {
-		if algo.AutoOrderSizing {
-			return algo.EntryOrderSize //* (1 - (algo.Market.MaxLeverage / algo.Market.Leverage))
-		}
 		return algo.EntryOrderSize
 	}
 }
 
-func (algo *Algo) canBuy(canBuyBasedOnMax bool) float64 {
-	if canBuyBasedOnMax {
+func (algo *Algo) canBuy() float64 {
+	if algo.CanBuyBasedOnMax {
 		return (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.Market.MaxLeverage
 	} else {
 		return (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.LeverageTarget
@@ -180,7 +174,7 @@ func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side fl
 	} else if !adding {
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
 		side = float64(currentWeight * -1)
-	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy(algo.CanBuyBasedOnMax)*(1+algo.DeleverageOrderSize) && adding {
+	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
 		orderSize = algo.DeleverageOrderSize
 		side = float64(currentWeight * -1)
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {

@@ -53,7 +53,13 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	// localBars := make([]*models.Bar, 0)
 	localBars := data.GetData("XBTUSD", algo.DecisionInterval, algo.DataLength+1)
 	fmt.Printf("Got local bars: %v\n", len(localBars))
-	log.Println(len(localBars), "downloaded")
+	// log.Println(len(localBars), "downloaded")
+
+	// SETUP ALGO WITH RESTFUL CALLS
+	balances, _ := ex.GetBalances()
+	algo.updateAlgoBalances(balances)
+
+	// SUBSCRIBE TO WEBSOCKETS
 
 	// channels to subscribe to
 	symbol := strings.ToLower(algo.Market.Symbol)
@@ -72,9 +78,6 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		WalletChan:   make(chan *iex.WSWallet, 2),
 		OrderChan:    make(chan []iex.WSOrder, 2),
 	}
-
-	// markets, err := ex.GetMarkets("BTC")
-	// fmt.Printf("Got markets: %v\n", markets)
 
 	// Start the websocket.
 	err = ex.StartWS(&iex.WsConfig{Host: algo.Market.WSStream, //"testnet.bitmex.com", //"stream.binance.us:9443",
@@ -214,13 +217,20 @@ func (algo *Algo) setupOrders() {
 		// Get the difference of what we have and what we should have, thats what we should order
 		quantityToOrder := shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
 
-		// Don't over order to go nuetral
+		// Don't over order while adding to the position
+		orderSide := math.Copysign(1, quantityToOrder)
+		quantitySide := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+
+		if orderSide == quantitySide && math.Abs(shouldHaveQuantity) > algo.canBuy() {
+			shouldHaveQuantity = algo.canBuy() * quantitySide
+		}
+
+		// Don't over order to go neutral
 		if algo.Market.Weight == 0 && math.Abs(quantityToOrder) > math.Abs(algo.Market.QuoteAsset.Quantity) {
-			log.Println("Don't over order")
 			shouldHaveQuantity = 0
 			quantityToOrder = -algo.Market.QuoteAsset.Quantity
 		}
-		log.Println("shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder)
+		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder)
 
 		if side == 1 {
 			algo.Market.BuyOrders = models.OrderArray{
