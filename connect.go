@@ -59,6 +59,8 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	balances, _ := ex.GetBalances()
 	algo.updateAlgoBalances(balances)
 
+	positions, _ := ex.GetPositions()
+	algo.updatePositions(positions)
 	// SUBSCRIBE TO WEBSOCKETS
 
 	// channels to subscribe to
@@ -114,17 +116,19 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 
 func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 	log.Println("Position Update:", positions)
-	position := positions[0]
-	algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
-	if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
-		algo.Market.AverageCost = position.AvgCostPrice
-	} else if position.CurrentQty == 0 {
-		algo.Market.AverageCost = 0
-	}
-	log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
-	if firstPositionUpdate {
-		shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
-		firstPositionUpdate = false
+	if len(positions) > 0 {
+		position := positions[0]
+		algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
+		if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
+			algo.Market.AverageCost = position.AvgCostPrice
+		} else if position.CurrentQty == 0 {
+			algo.Market.AverageCost = 0
+		}
+		log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
+		if firstPositionUpdate {
+			shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
+			firstPositionUpdate = false
+		}
 	}
 	// algo.logState()
 }
@@ -200,6 +204,9 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 func (algo *Algo) setupOrders() {
 	if algo.AutoOrderPlacement {
 		orderSize, side := algo.getOrderSize(algo.Market.Price)
+		if side == 0 {
+			return
+		}
 		var quantity float64
 		if algo.Market.Futures {
 			quantity = orderSize * (algo.Market.BaseAsset.Quantity * algo.Market.Price)
@@ -223,6 +230,12 @@ func (algo *Algo) setupOrders() {
 
 		if orderSide == quantitySide && math.Abs(shouldHaveQuantity) > algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy() * quantitySide
+			quantityToOrder = shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+		}
+
+		// When reducing to meet canBuy don't go lower than can buy
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) < algo.canBuy() {
+			shouldHaveQuantity = algo.canBuy()
 		}
 
 		// Don't over order to go neutral
@@ -230,6 +243,7 @@ func (algo *Algo) setupOrders() {
 			shouldHaveQuantity = 0
 			quantityToOrder = -algo.Market.QuoteAsset.Quantity
 		}
+
 		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder)
 
 		if side == 1 {
