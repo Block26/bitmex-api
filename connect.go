@@ -15,9 +15,12 @@ import (
 
 var orderStatus iex.OrderStatus
 var firstTrade bool
+var firstPositionUpdate bool
+var shouldHaveQuantity float64
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) {
-	firstTrade = false
+	firstTrade = true
+	firstPositionUpdate = true
 	config := loadConfiguration(settingsFile, secret)
 	fmt.Printf("Loaded config for %v \n", algo.Market.Exchange)
 	// We instantiate a new repository targeting the given path (the .git folder)
@@ -34,7 +37,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		ApiSecret:      config.APISecret,
 		ApiKey:         config.APIKey,
 		AccountID:      "test",
-		OutputResponse: true,
+		OutputResponse: false,
 	}
 
 	fmt.Printf("Connecting to %v with key %v and secret %v, id %v\n", exchangeVars.Exchange, exchangeVars.ApiKey, exchangeVars.ApiSecret, exchangeVars.AccountID)
@@ -90,16 +93,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	for {
 		select {
 		case positions := <-channels.PositionChan:
-			log.Println("Position Update:", positions)
-			position := positions[0]
-			algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
-			if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
-				algo.Market.AverageCost = position.AvgCostPrice
-			} else if position.CurrentQty == 0 {
-				algo.Market.AverageCost = 0
-			}
-			log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
-			// algo.logState()
+			algo.updatePositions(positions)
 		case trade := <-channels.TradeBinChan:
 			algo.updateState(ex, trade[0], &localBars, setupData)
 			algo = rebalance(trade[0].Close, algo)
@@ -113,6 +107,23 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			algo.updateAlgoBalances(update.Balance)
 		}
 	}
+}
+
+func (algo *Algo) updatePositions(positions []iex.WsPosition) {
+	log.Println("Position Update:", positions)
+	position := positions[0]
+	algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
+	if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
+		algo.Market.AverageCost = position.AvgCostPrice
+	} else if position.CurrentQty == 0 {
+		algo.Market.AverageCost = 0
+	}
+	log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
+	if firstPositionUpdate {
+		shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
+		firstPositionUpdate = false
+	}
+	// algo.logState()
 }
 
 func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
@@ -192,17 +203,37 @@ func (algo *Algo) setupOrders() {
 		} else {
 			quantity = orderSize * (algo.Market.BaseAsset.Quantity / algo.Market.Price)
 		}
+
+		// Keep track of what we should have so the orders we place will grow and shrink
+		if shouldHaveQuantity == 0 {
+			shouldHaveQuantity = quantity * side
+		} else {
+			shouldHaveQuantity += quantity * side
+		}
+
+		// Get the difference of what we have and what we should have, thats what we should order
+		quantityToOrder := shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+
+		// Don't over order to go nuetral
+		if algo.Market.Weight == 0 && math.Abs(quantityToOrder) > math.Abs(algo.Market.QuoteAsset.Quantity) {
+			log.Println("Don't over order")
+			shouldHaveQuantity = 0
+			quantityToOrder = -algo.Market.QuoteAsset.Quantity
+		}
+		log.Println("shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder)
+
 		if side == 1 {
 			algo.Market.BuyOrders = models.OrderArray{
-				Quantity: []float64{quantity},
-				Price:    []float64{algo.Market.Price},
+				Quantity: []float64{math.Abs(quantityToOrder)},
+				Price:    []float64{algo.Market.Price - algo.Market.TickSize},
 			}
 		} else if side == -1 {
 			algo.Market.SellOrders = models.OrderArray{
-				Quantity: []float64{quantity},
-				Price:    []float64{algo.Market.Price},
+				Quantity: []float64{math.Abs(quantityToOrder)},
+				Price:    []float64{algo.Market.Price + algo.Market.TickSize},
 			}
 		}
+
 	} else {
 		if algo.Market.Futures {
 			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price))

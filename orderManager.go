@@ -22,40 +22,59 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	var newBids []iex.Order
 	var newAsks []iex.Order
+
+	createBid := func(i int, totalQty float64) {
+		orderPrice := a.Market.BuyOrders.Price[i]
+		order := iex.Order{
+			Market:   a.Market.BaseAsset.Symbol,
+			Currency: a.Market.QuoteAsset.Symbol,
+			Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+			Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+			Type:     "Limit",
+			Side:     "Buy",
+		}
+		newBids = append(newBids, order)
+	}
+
+	createAsk := func(i int, totalQty float64) {
+		orderPrice := a.Market.SellOrders.Price[i]
+		order := iex.Order{
+			Market:   a.Market.BaseAsset.Symbol,
+			Currency: a.Market.QuoteAsset.Symbol,
+			Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+			Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+			Type:     "Limit",
+			Side:     "Sell",
+		}
+		newAsks = append(newAsks, order)
+	}
+
 	totalQty := 0.0
 	for i, qty := range a.Market.BuyOrders.Quantity {
 		totalQty = totalQty + qty
 		if totalQty > a.Market.MinimumOrderSize {
-			orderPrice := a.Market.BuyOrders.Price[i]
-			order := iex.Order{
-				Market:   a.Market.BaseAsset.Symbol,
-				Currency: a.Market.QuoteAsset.Symbol,
-				Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
-				Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
-				Type:     "Limit",
-				Side:     "Buy",
-			}
-			newBids = append(newBids, order)
+			createBid(i, totalQty)
 			totalQty = 0.0
 		}
+	}
+
+	if totalQty > 0.0 {
+		index := len(a.Market.BuyOrders.Quantity) - 1
+		createBid(index, totalQty)
 	}
 
 	totalQty = 0.0
 	for i, qty := range a.Market.SellOrders.Quantity {
 		totalQty = totalQty + qty
 		if totalQty > a.Market.MinimumOrderSize {
-			orderPrice := a.Market.SellOrders.Price[i]
-			order := iex.Order{
-				Market:   a.Market.BaseAsset.Symbol,
-				Currency: a.Market.QuoteAsset.Symbol,
-				Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
-				Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
-				Type:     "Limit",
-				Side:     "Sell",
-			}
-			newAsks = append(newAsks, order)
+			createAsk(i, totalQty)
 			totalQty = 0.0
 		}
+	}
+
+	if totalQty > 0.0 {
+		index := len(a.Market.SellOrders.Quantity) - 1
+		createAsk(index, totalQty)
 	}
 
 	//Parse option orders
