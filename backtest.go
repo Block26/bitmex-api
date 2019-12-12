@@ -31,6 +31,7 @@ const TakerFee = .001
 func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
 	setupData(data, algo)
 	start := time.Now()
+	var history []models.History
 	// starting_algo.Market.BaseBalance := 0
 	volStart := ToIntTimestamp(data[0].Timestamp)
 	volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
