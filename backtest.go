@@ -24,6 +24,13 @@ var currentRunUUID time.Time
 var VolData []models.ImpliedVol
 var lastOptionBalance = 0.
 
+//TODO: these should be a config somewhere
+const StrikeInterval = 250.
+const TickSize = .1
+const MinTradeAmount = .1
+const MakerFee = 0.
+const TakerFee = .001
+
 func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
 	setupData(data, algo)
 	start := time.Now()
@@ -32,6 +39,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
 	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
 	VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
+	algo.Market.Options = generateActiveOptions(&algo)
 	fmt.Printf("Len vol data: %v\n", len(VolData))
 	timestamp := ""
 	idx := 0
@@ -48,6 +56,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		if idx > algo.DataLength {
 			algo.Index = idx
 			algo.Market.Price = bar.Close
+			algo.updateActiveOptions()
 			algo = rebalance(bar.Open, algo)
 
 			if algo.FillType == "limit" {
@@ -60,6 +69,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 				pricesFilled, ordersFilled = getFilledAskOrders(algo.Market.SellOrders.Price, algo.Market.SellOrders.Quantity, bar.High)
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
 				algo.UpdateBalance(fillCost, algo.Market.Selling*-fillPercentage)
+				algo.updateOptionsPositions()
 			} else if algo.FillType == "close" {
 				algo.updateBalanceFromFill(bar.Close)
 			} else if algo.FillType == "open" {
@@ -364,4 +374,114 @@ func LogBacktest(algo Algo) {
 	err = client.Client.Write(influx, bp)
 	CheckIfError(err)
 	influx.Close()
+}
+
+//Options backtesting functionality
+
+func (algo *Algo) updateOptionsPositions() {
+	//Aggregate positions
+	for _, option := range algo.Market.Options {
+		total := 0.
+		avgPrice := 0.
+		for i, qty := range option.BuyOrders.Quantity {
+			adjPrice := AdjustForSlippage(option.BuyOrders.Price[i], "buy", .05)
+			avgPrice = ((avgPrice * total) + (adjPrice * qty)) / (total + qty)
+			total += qty
+		}
+		for i, qty := range option.SellOrders.Quantity {
+			adjPrice := AdjustForSlippage(option.SellOrders.Price[i], "sell", .05)
+			avgPrice = ((avgPrice * total) + (adjPrice * qty)) / (total + qty)
+			total -= qty
+		}
+		//Fill open orders
+		option.AverageCost = avgPrice
+		option.Position = total
+		option.BuyOrders = models.OrderArray{
+			Quantity: []float64{},
+			Price:    []float64{},
+		}
+		option.SellOrders = models.OrderArray{
+			Quantity: []float64{},
+			Price:    []float64{},
+		}
+	}
+}
+
+func generateActiveOptions(algo *Algo) []models.OptionContract {
+	const numWeeklys = 3
+	const numMonthlys = 5
+	//TODO: these should be based on underlying price
+	const minStrike = 5000.
+	const maxStrike = 20000.
+	//Build expirys
+	var expirys []int
+	currentTime := ToTimeObject(algo.Timestamp)
+	for i := 0; i < numWeeklys; i++ {
+		expiry := TimeToTimestamp(GetNextFriday(currentTime))
+		expirys = append(expirys, expiry)
+		currentTime = currentTime.Add(time.Hour * 24 * 7)
+	}
+	currentTime = ToTimeObject(algo.Timestamp)
+	for i := 0; i < numMonthlys; i++ {
+		expiry := TimeToTimestamp(GetLastFridayOfMonth(currentTime))
+		if !intInSlice(expiry, expirys) {
+			expirys = append(expirys, expiry)
+		}
+		currentTime = currentTime.Add(time.Hour * 24 * 28)
+	}
+	fmt.Printf("Generated expirys: %v\n", expirys)
+	strikes := Arange(minStrike, maxStrike, StrikeInterval)
+	fmt.Printf("Generated strikes: %v\n", expirys)
+	var optionContracts []models.OptionContract
+	for _, expiry := range expirys {
+		for _, strike := range strikes {
+			for _, optionType := range []string{"call", "put"} {
+				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price, strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
+				optionContract := models.OptionContract{
+					Symbol:           GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
+					Strike:           strike,
+					Expiry:           expiry,
+					OptionType:       optionType,
+					AverageCost:      0,
+					Profit:           0,
+					TickSize:         TickSize,
+					MakerFee:         MakerFee,
+					TakerFee:         TakerFee,
+					MinimumOrderSize: MinTradeAmount,
+					Position:         0,
+					OptionTheo:       *optionTheo,
+					Status:           "open",
+				}
+				optionContracts = append(optionContracts, optionContract)
+			}
+		}
+	}
+	return optionContracts
+}
+
+func (algo *Algo) updateActiveOptions() {
+	activeOptions := generateActiveOptions(algo)
+	for _, activeOption := range activeOptions {
+		// Check to see if this option is already known
+		isNew := true
+		for _, option := range algo.Market.Options {
+			if option.Symbol == activeOption.Symbol {
+				isNew = false
+				break
+			}
+		}
+		if isNew {
+			algo.Market.Options = append(algo.Market.Options, activeOption)
+			fmt.Printf("Found new active option: %v\n", activeOption.OptionTheo.String())
+		}
+	}
+}
+
+func intInSlice(a int, list []int) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
