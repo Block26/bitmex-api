@@ -23,12 +23,14 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	var newBids []iex.Order
 	var newAsks []iex.Order
 
-	createBid := func(i int, totalQty float64) {
+	createBid := func(i int, qty float64) {
 		orderPrice := a.Market.BuyOrders.Price[i]
+		quantity := ToFixed(qty, a.Market.QuantityPrecision)
+		quantity = RoundToNearest(qty, float64(a.Market.QuantityTickSize))
 		order := iex.Order{
 			Market:   a.Market.BaseAsset.Symbol,
 			Currency: a.Market.QuoteAsset.Symbol,
-			Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+			Amount:   quantity,
 			Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
 			Type:     "Limit",
 			Side:     "Buy",
@@ -36,12 +38,14 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		newBids = append(newBids, order)
 	}
 
-	createAsk := func(i int, totalQty float64) {
+	createAsk := func(i int, qty float64) {
 		orderPrice := a.Market.SellOrders.Price[i]
+		quantity := ToFixed(qty, a.Market.QuantityPrecision)
+		quantity = RoundToNearest(qty, float64(a.Market.QuantityTickSize))
 		order := iex.Order{
 			Market:   a.Market.BaseAsset.Symbol,
 			Currency: a.Market.QuoteAsset.Symbol,
-			Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+			Amount:   quantity,
 			Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
 			Type:     "Limit",
 			Side:     "Sell",

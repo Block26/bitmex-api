@@ -28,6 +28,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
 				TickSize:            1,
+				QuantityTickSize:    1,
 				QuantityPrecision:   0,
 				PricePrecision:      2,
 				MaxOrders:           20,
@@ -110,13 +111,44 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				},
 				MinimumOrderSize:    10,
 				TickSize:            .5,
+				QuantityTickSize:    10,
 				QuantityPrecision:   0,
 				PricePrecision:      2,
 				MaxOrders:           20,
 				MakerFee:            -0.00025,
 				TakerFee:            0.00075,
 				Futures:             true,
-				BulkCancelSupported: true,
+				BulkCancelSupported: false,
+			}, nil
+		default:
+			log.Println(m, "is not supported for exchange", exchange)
+		}
+	} else if exchange == "deribit-test" {
+		switch m := market; m {
+		case "BTCPERPETUAL":
+			return models.Market{
+				Symbol:      "BTCPERPETUAL",
+				Exchange:    "deribit",
+				ExchangeURL: "test.deribit.com",
+				WSStream:    "test.deribit.com",
+				BaseAsset: models.Asset{
+					Symbol:   "BTC",
+					Quantity: 1,
+				},
+				QuoteAsset: models.Asset{
+					Symbol:   "PERPETUAL",
+					Quantity: 0,
+				},
+				MinimumOrderSize:    10,
+				TickSize:            .5,
+				QuantityTickSize:    10,
+				QuantityPrecision:   0,
+				PricePrecision:      2,
+				MaxOrders:           20,
+				MakerFee:            -0.00025,
+				TakerFee:            0.00075,
+				Futures:             true,
+				BulkCancelSupported: false,
 			}, nil
 		default:
 			log.Println(m, "is not supported for exchange", exchange)

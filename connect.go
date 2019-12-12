@@ -59,7 +59,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	balances, _ := ex.GetBalances()
 	algo.updateAlgoBalances(balances)
 
-	positions, _ := ex.GetPositions()
+	positions, _ := ex.GetPositions(algo.Market.BaseAsset.Symbol)
 	algo.updatePositions(positions)
 	// SUBSCRIBE TO WEBSOCKETS
 
