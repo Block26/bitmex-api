@@ -312,6 +312,11 @@ func GetOHLCBars(bars []*models.Bar) ([]float64, []float64, []float64, []float64
 
 func ToIntTimestamp(timeString string) int {
 	layout := "2006-01-02 15:04:05"
+	if strings.Contains(timeString, "+0000 UTC") {
+		timeString = strings.Replace(timeString, "+0000 UTC", "", 1)
+		fmt.Printf("Trimmed timestring: %v\n", timeString)
+	}
+	timeString = strings.TrimSpace(timeString)
 	currentTime, err := time.Parse(layout, timeString)
 	if err != nil {
 		fmt.Printf("Error parsing timeString: %v\n", err)
