@@ -111,7 +111,7 @@ func (algo *Algo) canBuy() float64 {
 }
 
 //Log the state of the algo and update variables like leverage
-func (algo *Algo) logState(timestamp ...string) {
+func (algo *Algo) logState(timestamp ...string) (state models.History) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
 	var balance float64
 	if algo.Market.Futures {
@@ -133,7 +133,7 @@ func (algo *Algo) logState(timestamp ...string) {
 
 	if timestamp != nil {
 		algo.Timestamp = timestamp[0]
-		history := models.History{
+		state = models.History{
 			Timestamp:   timestamp[0],
 			Balance:     balance,
 			Quantity:    algo.Market.QuoteAsset.Quantity,
@@ -145,21 +145,21 @@ func (algo *Algo) logState(timestamp ...string) {
 
 		if algo.Market.Futures {
 			if math.IsNaN(algo.Market.Profit) {
-				history.UBalance = balance
+				state.UBalance = balance
 			} else {
-				history.UBalance = balance + algo.Market.Profit
+				state.UBalance = balance + algo.Market.Profit
 			}
 		} else {
-			history.UBalance = (algo.Market.BaseAsset.Quantity * algo.Market.Price) + algo.Market.QuoteAsset.Quantity
+			state.UBalance = (algo.Market.BaseAsset.Quantity * algo.Market.Price) + algo.Market.QuoteAsset.Quantity
 		}
 
-		algo.History = append(algo.History, history)
 	} else {
 		algo.LogLiveState()
 	}
 	if algo.Debug {
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price+(algo.Market.QuoteAsset.Quantity), 0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price, algo.Market.AverageCost))
 	}
+	return
 }
 
 func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side float64) {

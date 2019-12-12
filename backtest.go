@@ -4,17 +4,14 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"os"
 	"time"
 
-	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
 
 	"gonum.org/v1/gonum/stat"
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
-	"github.com/tantralabs/TheAlgoV2/tantradb"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
@@ -76,12 +73,13 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 				algo.updateBalanceFromFill(bar.Open)
 			}
 			// updateBalanceXBTStrat(bar)
-			algo.logState(timestamp)
+			state := algo.logState(timestamp)
+			history = append(history, state)
 			// if algo.Market.Qua+(algo.Market.BaseBalance*algo.Market.Profit) < 0 {
 			// 	break
 			// }
-			// algo.History.Balance[len(algo.History.Balance)-1], == portfolio value
-			// portfolioValue := algo.History.Balance[len(algo.History.Balance)-1]
+			// history.Balance[len(history.Balance)-1], == portfolio value
+			// portfolioValue := history.Balance[len(history.Balance)-1]
 		}
 		idx++
 	}
@@ -89,20 +87,22 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	elapsed := time.Since(start)
 	log.Println("End Timestamp", timestamp)
 	//TODO do this during test instead of after the test
-	minProfit, maxProfit, _, maxLeverage, drawdown := MinMaxStats(algo.History)
-	// score := (algo.History[historyLength-1].Balance) + drawdown*3 //+ (minProfit * maxLeverage) - drawdown // maximize
-	// score := (algo.History[historyLength-1].Balance) * math.Abs(1/drawdown) //+ (minProfit * maxLeverage) - drawdown // maximize
+	minProfit, maxProfit, _, maxLeverage, drawdown := MinMaxStats(history)
+	// score := (history[historyLength-1].Balance) + drawdown*3 //+ (minProfit * maxLeverage) - drawdown // maximize
+	// score := (history[historyLength-1].Balance) * math.Abs(1/drawdown) //+ (minProfit * maxLeverage) - drawdown // maximize
 
-	historyLength := len(algo.History)
+	historyLength := len(history)
+	log.Println("historyLength", historyLength)
+	log.Println("Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
 	percentReturn := make([]float64, historyLength)
 	last := 0.0
-	for i := range algo.History {
+	for i := range history {
 		if i == 0 {
 			percentReturn[i] = 0
 		} else {
-			percentReturn[i] = calculateDifference(algo.History[i].UBalance, last)
+			percentReturn[i] = calculateDifference(history[i].UBalance, last)
 		}
-		last = algo.History[i].UBalance
+		last = history[i].UBalance
 	}
 
 	mean, std := stat.MeanStdDev(percentReturn, nil)
@@ -115,16 +115,16 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		score = -100
 	}
 
-	if algo.History[historyLength-1].Balance < 0 {
+	if history[historyLength-1].Balance < 0 {
 		score = -100
 	}
 
-	fmt.Printf("Last option balance: %v\n", lastOptionBalance)
+	// fmt.Printf("Last option balance: %v\n", lastOptionBalance)
 
 	fmt.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s",
-		algo.History[historyLength-1].Balance,
-		algo.History[historyLength-1].AverageCost,
-		algo.History[historyLength-1].Quantity,
+		history[historyLength-1].Balance,
+		history[historyLength-1].AverageCost,
+		history[historyLength-1].Quantity,
 		maxLeverage,
 		drawdown,
 		maxProfit,
@@ -135,10 +135,10 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		createKeyValuePairs(algo.Params),
 	)
 	log.Println("Execution Speed", elapsed)
-	// log.Println("History Length", len(algo.History), "Start Balance", algo.History[0].UBalance, "End Balance", algo.History[historyLength-1].UBalance)
+	// log.Println("History Length", len(history), "Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
 
 	algo.Result = map[string]interface{}{
-		"balance":             algo.History[historyLength-1].UBalance,
+		"balance":             history[historyLength-1].UBalance,
 		"max_leverage":        maxLeverage,
 		"max_position_profit": maxProfit,
 		"max_position_dd":     minProfit,
@@ -147,21 +147,21 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		"score":               score,
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
-	os.Remove("balance.csv")
-	historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
-	if err != nil {
-		panic(err)
-	}
-	defer historyFile.Close()
+	// os.Remove("balance.csv")
+	// historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer historyFile.Close()
 
-	err = gocsv.MarshalFile(&algo.History, historyFile) // Use this to save the CSV back to the file
-	if err != nil {
-		panic(err)
-	}
+	// err = gocsv.MarshalFile(&history, historyFile) // Use this to save the CSV back to the file
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	LogBacktest(algo)
-	// score := ((math.Abs(minProfit) / algo.History[historyLength-1].Balance) + maxLeverage) - algo.History[historyLength-1].Balance // minimize
-	return algo //algo.History.Balance[len(algo.History.Balance)-1] / (maxLeverage + 1)
+	// score := ((math.Abs(minProfit) / history[historyLength-1].Balance) + maxLeverage) - history[historyLength-1].Balance // minimize
+	return algo //history.Balance[len(history.Balance)-1] / (maxLeverage + 1)
 }
 
 func (algo *Algo) updateBalanceFromFill(fillPrice float64) {
@@ -371,8 +371,8 @@ func LogBacktest(algo Algo) {
 	)
 	bp.AddPoint(pt)
 
-	err = client.Client.Write(influx, bp)
-	CheckIfError(err)
+	client.Client.Write(influx, bp)
+	// CheckIfError(err)
 	influx.Close()
 }
 
