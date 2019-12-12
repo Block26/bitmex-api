@@ -165,7 +165,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 		firstTrade = false
 	}
 	// Update active option contracts from API
-	if algo.Market.Options != nil {
+	if algo.Market.Exchange == "deribit" {
 		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, "option")
 		if err != nil {
 			fmt.Printf("Got markets from API: %v\n", markets)
@@ -177,7 +177,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 					}
 				}
 				if !containsSymbol {
-					expiry := market.Expiry * 1000
+					expiry := market.Expiry
 					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
 					optionContract := models.OptionContract{
 						Symbol:           market.Symbol,
