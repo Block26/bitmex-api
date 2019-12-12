@@ -341,6 +341,10 @@ func TimestampToTime(timestamp int) time.Time {
 	return time.Unix(timeInt, 0)
 }
 
+func TimeToTimestamp(timeObject time.Time) int {
+	return timeObject.UTC().Nanosecond() / 1000000
+}
+
 func Round(x, unit float64) float64 {
 	return math.Round(x/unit) * unit
 }
@@ -435,4 +439,55 @@ func ToFixed(num float64, precision int) float64 {
 
 func RoundToNearest(num float64, interval float64) float64 {
 	return math.Round(num/interval) * interval
+}
+
+func AdjustForSlippage(premium float64, side string, slippage float64) float64 {
+	adjPremium := premium
+	if side == "buy" {
+		adjPremium = premium * (1 + (slippage / 100.))
+	} else if side == "sell" {
+		adjPremium = premium * (1 - (slippage / 100.))
+	}
+	return adjPremium
+}
+
+func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionType string) string {
+	expiryTime := time.Unix(int64(expiry/1000), 0)
+	year, month, day := expiryTime.Date()
+	return "BTC-" + string(day) + string(month) + string(year) + "-" + optionType
+}
+
+func GetNextFriday(currentTime time.Time) time.Time {
+	dayDiff := currentTime.Weekday()
+	if dayDiff <= 0 {
+		dayDiff += 7
+	}
+	return currentTime.Truncate(24 * time.Hour).Add(time.Hour * time.Duration(24*dayDiff))
+}
+
+func GetLastFridayOfMonth(currentTime time.Time) time.Time {
+	year, month, _ := currentTime.Date()
+	firstOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	lastOfMonth := firstOfMonth.AddDate(0, 1, -1).Day()
+	currentTime = time.Date(year, month, lastOfMonth, 0, 0, 0, 0, time.UTC)
+	for i := lastOfMonth; i > 0; i-- {
+		if currentTime.Weekday() == 5 {
+			return currentTime
+		}
+		currentTime = currentTime.Add(-time.Hour * time.Duration(24))
+	}
+	return currentTime
+}
+
+func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
+	year, month, _ := currentTime.Add(time.Hour * time.Duration(24*minDays)).Date()
+	// Get nearest quarterly month
+	quarterlyMonth := month + (month % 4)
+	if quarterlyMonth >= 12 {
+		year += 1
+		quarterlyMonth = quarterlyMonth % 12
+	}
+	lastFriday := GetLastFridayOfMonth(time.Date(year, month, 1, 0, 0, 0, 0, time.UTC))
+	// fmt.Printf("Got quarterly expiry %v\n", lastFriday)
+	return lastFriday
 }
