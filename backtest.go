@@ -160,7 +160,7 @@ func (algo *Algo) setOrderSize(currentPrice float64) (orderSize float64, side fl
 		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
 		side = float64(algo.Market.Weight)
 	} else if !adding {
-		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
+		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && (algo.Market.Weight == 0 || algo.Market.Weight != 0))
 		side = float64(currentWeight * -1)
 	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy(algo.CanBuyBasedOnMax)*(1+algo.DeleverageOrderSize) && adding {
 		orderSize = algo.DeleverageOrderSize

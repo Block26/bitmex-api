@@ -13,7 +13,7 @@ func GetNATR(high []float64, low []float64, close []float64, index int32, length
 
 func CreateNATREMA(high []float64, low []float64, close []float64, index int32, natrLength int32, emaLength int32) []float64 {
 	//TODO check live
-	natr := ta.Natr(high[index-natrLength-emaLength-1:index], low[index-natrLength-emaLength-1:index], close[index-natrLength-emaLength-1:index], natrLength)
+	natr := ta.Natr(high[index-natrLength-emaLength:index+1], low[index-natrLength-emaLength:index+1], close[index-natrLength-emaLength:index+1], natrLength)
 	ema := CreateEMA(natr, emaLength)
 	return ema
 }
