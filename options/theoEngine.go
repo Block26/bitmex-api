@@ -109,7 +109,7 @@ func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, c
 func BuildAvailableOptions(underlyingPrice float64, currentTime time.Time, volatility float64) []models.OptionContract {
 	// Get expiries
 	var expirys []int
-	nextFriday := GetNextFriday(currentTime)
+	nextFriday := base.GetNextFriday(currentTime)
 	for i := 0; i < NumWeekly; i++ {
 		expirys = append(expirys, int(nextFriday.UnixNano()/int64(time.Millisecond)))
 		nextFriday = nextFriday.Add(time.Hour * time.Duration(24*7))
@@ -132,7 +132,7 @@ func BuildAvailableOptions(underlyingPrice float64, currentTime time.Time, volat
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
 				optionTheo := models.NewOptionTheo(optionType, underlyingPrice, strike, int(currentTime.UnixNano()/int64(time.Millisecond)), expiry, 0, volatility, -1)
-				symbol := GetDeribitOptionSymbol(expiry, strike, "BTC", optionType)
+				symbol := base.GetDeribitOptionSymbol(expiry, strike, "BTC", optionType)
 				optionContract := models.OptionContract{symbol, strike, expiry, optionType, 0, 0, TickSize, MakerFee,
 					TakerFee, MinimumOrderSize, orderArray, orderArray, 0., *optionTheo, "open"}
 				optionContracts = append(optionContracts, optionContract)
