@@ -81,14 +81,15 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 	td2 := o.calcD2(o.Volatility)
 	nPrime := math.Pow((2*PI), -(1/2)) * math.Exp(math.Pow(-0.5*(td1), 2))
 	// fmt.Printf("Calcing blackscholes for %v with td1 %v td2 %v nPrime %v\n", o.String(), td1, td2, nPrime)
-	if o.OptionType == "call" {
-		// fmt.Printf("Cdf 1: %v, cdf 2: %v, exp interest time %v\n", norm.Cdf(td1), norm.Cdf(td2), math.Exp(-o.InterestRate*o.TimeLeft))
-		o.Theo = o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)
-	} else if o.OptionType == "put" {
-		o.Theo = o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)
-	}
 	if o.Volatility < 0 {
 		o.CalcVol()
+	} else {
+		if o.OptionType == "call" {
+			// fmt.Printf("Cdf 1: %v, cdf 2: %v, exp interest time %v\n", norm.Cdf(td1), norm.Cdf(td2), math.Exp(-o.InterestRate*o.TimeLeft))
+			o.Theo = o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)
+		} else if o.OptionType == "put" {
+			o.Theo = o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)
+		}
 	}
 	if calcGreeks {
 		if o.OptionType == "call" {

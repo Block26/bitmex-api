@@ -451,6 +451,7 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 					Position:         0,
 					OptionTheo:       *optionTheo,
 					Status:           "open",
+					MidMarketPrice:   -1.,
 				}
 				optionContracts = append(optionContracts, optionContract)
 			}

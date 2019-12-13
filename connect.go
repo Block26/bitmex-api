@@ -166,9 +166,9 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 	}
 	// Update active option contracts from API
 	if algo.Market.Exchange == "deribit" {
-		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, "option")
-		if err != nil {
-			fmt.Printf("Got markets from API: %v\n", markets)
+		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, true, "option")
+		if err == nil {
+			// fmt.Printf("Got markets from API: %v\n", markets)
 			for _, market := range markets {
 				containsSymbol := false
 				for _, option := range algo.Market.Options {
@@ -193,10 +193,13 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 						Position:         0,
 						OptionTheo:       *optionTheo,
 						Status:           "open",
+						MidMarketPrice:   market.MidMarketPrice,
 					}
 					algo.Market.Options = append(algo.Market.Options, optionContract)
 				}
 			}
+		} else {
+			fmt.Printf("Error getting markets: %v\n", err)
 		}
 	}
 }
