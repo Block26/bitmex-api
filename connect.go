@@ -117,14 +117,28 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 	log.Println("Position Update:", positions)
 	if len(positions) > 0 {
-		position := positions[0]
-		algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
-		if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
-			algo.Market.AverageCost = position.AvgCostPrice
-		} else if position.CurrentQty == 0 {
-			algo.Market.AverageCost = 0
+		for _, position := range positions {
+			if position.Symbol == algo.Market.QuoteAsset.Symbol {
+				algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
+				if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
+					algo.Market.AverageCost = position.AvgCostPrice
+				} else if position.CurrentQty == 0 {
+					algo.Market.AverageCost = 0
+				}
+				log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
+			} else if position.Symbol == algo.Market.BaseAsset.Symbol {
+				algo.Market.BaseAsset.Quantity = float64(position.CurrentQty)
+				log.Println("BaseAsset updated")
+			} else {
+				for _, option := range algo.Market.Options {
+					if option.Symbol == position.Symbol {
+						option.Position = position.CurrentQty
+						fmt.Printf("Updated position for %v: %v\n", option.Symbol, option.Position)
+						break
+					}
+				}
+			}
 		}
-		log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
 		if firstPositionUpdate {
 			shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
 			firstPositionUpdate = false
