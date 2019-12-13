@@ -36,7 +36,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	volStart := ToIntTimestamp(data[0].Timestamp)
 	volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
 	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
-	VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
+	// VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
 	algo.Market.Options = generateActiveOptions(&algo)
 	fmt.Printf("Len vol data: %v\n", len(VolData))
 	timestamp := ""
@@ -183,7 +183,7 @@ func (algo *Algo) setOrderSize(currentPrice float64) (orderSize float64, side fl
 	} else if !adding {
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && (algo.Market.Weight == 0 || algo.Market.Weight != 0))
 		side = float64(currentWeight * -1)
-	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy(algo.CanBuyBasedOnMax)*(1+algo.DeleverageOrderSize) && adding {
+	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
 		orderSize = algo.DeleverageOrderSize
 		side = float64(currentWeight * -1)
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
