@@ -11,6 +11,7 @@ require (
 	github.com/MaxHalford/eaopt v0.1.1-0.20191017133541-37dd3a71cb48
 	github.com/aws/aws-sdk-go v1.25.28
 	github.com/c-bata/goptuna v0.1.1-0.20191111040524-81338bb530f0
+	github.com/d4l3k/talib v0.0.0-20180425021108-1b10e6a1ad95
 	github.com/fatih/structs v1.1.0
 	github.com/gocarina/gocsv v0.0.0-20190927101021-3ecffd272576
 	github.com/google/uuid v1.1.1
