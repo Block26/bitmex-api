@@ -24,6 +24,7 @@ type Market struct {
 	SellOrders       OrderArray
 
 	QuantityPrecision   int
+	QuantityTickSize    int
 	PricePrecision      int
 	Futures             bool
 	BulkCancelSupported bool

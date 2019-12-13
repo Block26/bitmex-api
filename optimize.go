@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/c-bata/goptuna"
-	"github.com/c-bata/goptuna/successivehalving"
+	// "github.com/c-bata/goptuna/successivehalving"
 	"github.com/c-bata/goptuna/tpe"
 	"golang.org/x/sync/errgroup"
 
@@ -21,7 +21,7 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 		"optmm",
 		goptuna.StudyOptionSampler(tpe.NewSampler()),
 		goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMaximize),
-		goptuna.StudyOptionPruner(successivehalving.NewOptunaPruner()),
+		// goptuna.StudyOptionPruner(successivehalving.NewOptunaPruner()),
 		// goptuna.StudyOptionSetDirection(goptuna.StudyDirectionMinimize),
 	)
 
@@ -51,7 +51,8 @@ func EAOptimize(Evaluate func([]float64) float64, paramsDomain []float64) {
 	currentRunUUID = time.Now()
 	// var spso, err = eaopt.NewDefaultSPSO()
 	// var ga, err = eaopt.NewDiffEvo(40, 100, 0, 0.1, 0.5, 0.2, false, nil)
-	var ga, err = eaopt.NewOES(1000, 30, 10, 0.05, false, nil)
+	// var ga, err = eaopt.NewOES(1000, 30, 10, 0.05, true, nil)
+	var ga, err = eaopt.NewSPSO(1000, 10, 1, 10, 0.02, true, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -61,7 +62,7 @@ func EAOptimize(Evaluate func([]float64) float64, paramsDomain []float64) {
 	ga.GA.RNG = rand.New(rand.NewSource(42))
 
 	// Run minimization
-	_, y, err := ga.Minimize(Evaluate, paramsDomain)
+	_, y, err := ga.Minimize(Evaluate, 6)
 	if err != nil {
 		fmt.Println(err)
 		return

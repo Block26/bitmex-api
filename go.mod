@@ -2,15 +2,16 @@ module github.com/tantralabs/TheAlgoV2
 
 go 1.13
 
-// replace github.com/tantralabs/exchanges => ../../tantralabs/exchanges
+replace github.com/tantralabs/exchanges => ../../tantralabs/exchanges
 
-// replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
+replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
 
 require (
 	firebase.google.com/go v3.10.0+incompatible
 	github.com/MaxHalford/eaopt v0.1.1-0.20191017133541-37dd3a71cb48
 	github.com/aws/aws-sdk-go v1.25.28
 	github.com/c-bata/goptuna v0.1.1-0.20191111040524-81338bb530f0
+	github.com/chobie/go-gaussian v0.0.0-20150107165016-53c09d90eeaf
 	github.com/d4l3k/talib v0.0.0-20180425021108-1b10e6a1ad95
 	github.com/fatih/structs v1.1.0
 	github.com/gocarina/gocsv v0.0.0-20190927101021-3ecffd272576

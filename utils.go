@@ -7,6 +7,8 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fatih/structs"
@@ -88,9 +90,6 @@ func (algo *Algo) getExitOrderSize(orderSizeGreaterThanPositionSize bool) float6
 	if orderSizeGreaterThanPositionSize {
 		return algo.Market.Leverage
 	} else {
-		if algo.AutoOrderSizing {
-			return algo.ExitOrderSize //* (1 - (algo.Market.MaxLeverage / algo.Market.Leverage))
-		}
 		return algo.ExitOrderSize
 	}
 }
@@ -99,15 +98,12 @@ func (algo *Algo) getEntryOrderSize(orderSizeGreaterThanMaxPositionSize bool) fl
 	if orderSizeGreaterThanMaxPositionSize {
 		return algo.LeverageTarget - algo.Market.Leverage //-algo.LeverageTarget
 	} else {
-		if algo.AutoOrderSizing {
-			return algo.EntryOrderSize //* (1 - (algo.Market.MaxLeverage / algo.Market.Leverage))
-		}
 		return algo.EntryOrderSize
 	}
 }
 
-func (algo *Algo) canBuy(canBuyBasedOnMax bool) float64 {
-	if canBuyBasedOnMax {
+func (algo *Algo) canBuy() float64 {
+	if algo.CanBuyBasedOnMax {
 		return (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.Market.MaxLeverage
 	} else {
 		return (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.LeverageTarget
@@ -115,7 +111,7 @@ func (algo *Algo) canBuy(canBuyBasedOnMax bool) float64 {
 }
 
 //Log the state of the algo and update variables like leverage
-func (algo *Algo) logState(timestamp ...string) {
+func (algo *Algo) logState(timestamp ...string) (state models.History) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
 	var balance float64
 	if algo.Market.Futures {
@@ -137,7 +133,7 @@ func (algo *Algo) logState(timestamp ...string) {
 
 	if timestamp != nil {
 		algo.Timestamp = timestamp[0]
-		history := models.History{
+		state = models.History{
 			Timestamp:   timestamp[0],
 			Balance:     balance,
 			Quantity:    algo.Market.QuoteAsset.Quantity,
@@ -149,21 +145,44 @@ func (algo *Algo) logState(timestamp ...string) {
 
 		if algo.Market.Futures {
 			if math.IsNaN(algo.Market.Profit) {
-				history.UBalance = balance
+				state.UBalance = balance
 			} else {
-				history.UBalance = balance + algo.Market.Profit
+				state.UBalance = balance + algo.Market.Profit
 			}
 		} else {
-			history.UBalance = (algo.Market.BaseAsset.Quantity * algo.Market.Price) + algo.Market.QuoteAsset.Quantity
+			state.UBalance = (algo.Market.BaseAsset.Quantity * algo.Market.Price) + algo.Market.QuoteAsset.Quantity
 		}
 
-		algo.History = append(algo.History, history)
 	} else {
 		algo.LogLiveState()
 	}
 	if algo.Debug {
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price+(algo.Market.QuoteAsset.Quantity), 0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price, algo.Market.AverageCost))
 	}
+	return
+}
+
+func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side float64) {
+	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+	if algo.Market.QuoteAsset.Quantity == 0 {
+		currentWeight = float64(algo.Market.Weight)
+	}
+	adding := currentWeight == float64(algo.Market.Weight)
+	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
+		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
+		side = float64(algo.Market.Weight)
+	} else if !adding {
+		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
+		side = float64(currentWeight * -1)
+	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
+		orderSize = algo.DeleverageOrderSize
+		side = float64(currentWeight * -1)
+	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
+		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
+		//side = Opposite of the quantity
+		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+	}
+	return
 }
 
 //Log the state of the algo to influx db
@@ -237,31 +256,31 @@ func (algo *Algo) LogLiveState() {
 }
 
 //Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
-func CreateSpread(weight int32, confidence float64, price float64, spread float64, tickSize float64, maxOrders int32) models.OrderArray {
+func CreateSpread(weight int32, confidence float64, price float64, spread float64, TickSize float64, maxOrders int32) models.OrderArray {
 	xStart := 0.0
 	if weight == 1 {
 		xStart = price - (price * spread)
 	} else {
 		xStart = price
 	}
-	xStart = Round(xStart, tickSize)
+	xStart = Round(xStart, TickSize)
 
 	xEnd := xStart + (xStart * spread)
-	xEnd = Round(xEnd, tickSize)
+	xEnd = Round(xEnd, TickSize)
 
 	diff := xEnd - xStart
 
-	if diff/tickSize >= float64(maxOrders) {
+	if diff/TickSize >= float64(maxOrders) {
 		newTickSize := diff / (float64(maxOrders) - 1)
-		tickSize = Round(newTickSize, tickSize)
+		TickSize = Round(newTickSize, TickSize)
 	}
 
 	var priceArr []float64
 
 	if weight == 1 {
-		priceArr = arange(xStart, xEnd-float64(tickSize), float64(tickSize))
+		priceArr = Arange(xStart, xEnd-float64(TickSize), float64(TickSize))
 	} else {
-		priceArr = arange(xStart, xEnd, float64(tickSize))
+		priceArr = Arange(xStart, xEnd, float64(TickSize))
 	}
 
 	temp := divArr(priceArr, xStart)
@@ -270,7 +289,7 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	normalizer := 1 / sumArr(dist)
 	orderArr := mulArr(dist, normalizer)
 	if weight == 1 {
-		orderArr = reverseArr(orderArr)
+		orderArr = ReverseArr(orderArr)
 	}
 
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
@@ -291,11 +310,46 @@ func GetOHLCBars(bars []*models.Bar) ([]float64, []float64, []float64, []float64
 	return open, high, low, close
 }
 
+func ToIntTimestamp(timeString string) int {
+	layout := "2006-01-02 15:04:05"
+	currentTime, err := time.Parse(layout, timeString)
+	if err != nil {
+		fmt.Printf("Error parsing timeString: %v\n", err)
+	}
+	return int(currentTime.UnixNano() / int64(time.Millisecond))
+}
+
+func ToTimeObject(timeString string) time.Time {
+	layout := "2006-01-02 15:04:05"
+	if strings.Contains(timeString, "+0000 UTC") {
+		timeString = strings.Replace(timeString, "+0000 UTC", "", 1)
+		fmt.Printf("Trimmed timestring: %v\n", timeString)
+	}
+	timeString = strings.TrimSpace(timeString)
+	currentTime, err := time.Parse(layout, timeString)
+	if err != nil {
+		fmt.Printf("Error parsing timeString: %v", err)
+	}
+	return currentTime
+}
+
+func TimestampToTime(timestamp int) time.Time {
+	timeInt, err := strconv.ParseInt(strconv.Itoa(timestamp/1000), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return time.Unix(timeInt, 0)
+}
+
+func TimeToTimestamp(timeObject time.Time) int {
+	return timeObject.UTC().Nanosecond() / 1000000
+}
+
 func Round(x, unit float64) float64 {
 	return math.Round(x/unit) * unit
 }
 
-func reverseArr(a []float64) []float64 {
+func ReverseArr(a []float64) []float64 {
 	for i := len(a)/2 - 1; i >= 0; i-- {
 		opp := len(a) - 1 - i
 		a[i], a[opp] = a[opp], a[i]
@@ -303,7 +357,7 @@ func reverseArr(a []float64) []float64 {
 	return a
 }
 
-func arange(min float64, max float64, step float64) []float64 {
+func Arange(min float64, max float64, step float64) []float64 {
 	a := make([]float64, int32((max-min)/step)+1)
 	for i := range a {
 		a[i] = float64(min+step) + (float64(i) * step)
@@ -381,4 +435,59 @@ func round(num float64) int {
 func ToFixed(num float64, precision int) float64 {
 	output := math.Pow(10, float64(precision))
 	return float64(round(num*output)) / output
+}
+
+func RoundToNearest(num float64, interval float64) float64 {
+	return math.Round(num/interval) * interval
+}
+
+func AdjustForSlippage(premium float64, side string, slippage float64) float64 {
+	adjPremium := premium
+	if side == "buy" {
+		adjPremium = premium * (1 + (slippage / 100.))
+	} else if side == "sell" {
+		adjPremium = premium * (1 - (slippage / 100.))
+	}
+	return adjPremium
+}
+
+func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionType string) string {
+	expiryTime := time.Unix(int64(expiry/1000), 0)
+	year, month, day := expiryTime.Date()
+	return "BTC-" + string(day) + string(month) + string(year) + "-" + optionType
+}
+
+func GetNextFriday(currentTime time.Time) time.Time {
+	dayDiff := currentTime.Weekday()
+	if dayDiff <= 0 {
+		dayDiff += 7
+	}
+	return currentTime.Truncate(24 * time.Hour).Add(time.Hour * time.Duration(24*dayDiff))
+}
+
+func GetLastFridayOfMonth(currentTime time.Time) time.Time {
+	year, month, _ := currentTime.Date()
+	firstOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	lastOfMonth := firstOfMonth.AddDate(0, 1, -1).Day()
+	currentTime = time.Date(year, month, lastOfMonth, 0, 0, 0, 0, time.UTC)
+	for i := lastOfMonth; i > 0; i-- {
+		if currentTime.Weekday() == 5 {
+			return currentTime
+		}
+		currentTime = currentTime.Add(-time.Hour * time.Duration(24))
+	}
+	return currentTime
+}
+
+func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
+	year, month, _ := currentTime.Add(time.Hour * time.Duration(24*minDays)).Date()
+	// Get nearest quarterly month
+	quarterlyMonth := month + (month % 4)
+	if quarterlyMonth >= 12 {
+		year += 1
+		quarterlyMonth = quarterlyMonth % 12
+	}
+	lastFriday := GetLastFridayOfMonth(time.Date(year, month, 1, 0, 0, 0, 0, time.UTC))
+	// fmt.Printf("Got quarterly expiry %v\n", lastFriday)
+	return lastFriday
 }

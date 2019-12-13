@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
@@ -14,10 +15,14 @@ import (
 
 var orderStatus iex.OrderStatus
 var firstTrade bool
+var firstPositionUpdate bool
+var shouldHaveQuantity float64
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) {
-	firstTrade = false
-	config = loadConfiguration(settingsFile, secret)
+	firstTrade = true
+	firstPositionUpdate = true
+	config := loadConfiguration(settingsFile, secret)
+	fmt.Printf("Loaded config for %v \n", algo.Market.Exchange)
 	// We instantiate a new repository targeting the given path (the .git folder)
 	// r, err := git.PlainOpen(".")
 	// CheckIfError(err)
@@ -35,15 +40,28 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		OutputResponse: false,
 	}
 
+	fmt.Printf("Connecting to %v with key %v and secret %v, id %v\n", exchangeVars.Exchange, exchangeVars.ApiKey, exchangeVars.ApiSecret, exchangeVars.AccountID)
 	ex, err := tradeapi.New(exchangeVars)
 	if err != nil {
 		fmt.Println(err)
 	}
+	fmt.Printf("Getting potential order status...\n")
 	orderStatus = ex.GetPotentialOrderStatus()
+	fmt.Printf("Got potential order status %v\n", orderStatus)
 
+	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
 	// localBars := make([]*models.Bar, 0)
-	localBars := data.GetData(algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
-	log.Println(len(localBars), "downloaded")
+	localBars := data.GetData("XBTUSD", algo.DecisionInterval, algo.DataLength+1)
+	fmt.Printf("Got local bars: %v\n", len(localBars))
+	// log.Println(len(localBars), "downloaded")
+
+	// SETUP ALGO WITH RESTFUL CALLS
+	balances, _ := ex.GetBalances()
+	algo.updateAlgoBalances(balances)
+
+	positions, _ := ex.GetPositions(algo.Market.BaseAsset.Symbol)
+	algo.updatePositions(positions)
+	// SUBSCRIBE TO WEBSOCKETS
 
 	// channels to subscribe to
 	symbol := strings.ToLower(algo.Market.Symbol)
@@ -52,7 +70,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		{Name: iex.WS_WALLET, Symbol: symbol},
 		{Name: iex.WS_ORDER, Symbol: symbol},
 		{Name: iex.WS_POSITION, Symbol: symbol},
-		{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol},
+		{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol, Market: iex.WSMarketType{Contract: iex.WS_SWAP}},
 	}
 
 	// Channels for recieving websocket response.
@@ -77,58 +95,12 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 
 	var localOrders []iex.WSOrder
 
-	//Setup local orders - Some exchanges don't send orders on WS connection so we prepopulate from restful api
-	openOrders, err := ex.OpenOrders(iex.OpenOrderF{Market: algo.Market.BaseAsset.Symbol, Currency: algo.Market.QuoteAsset.Symbol})
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	for i := range openOrders.Bids {
-		oo := openOrders.Bids[i]
-		order := iex.WSOrder{
-			Symbol:    oo.Market,
-			Price:     oo.Price,
-			OrderQty:  oo.Quantity,
-			OrderID:   oo.UUID,
-			OrdStatus: oo.Status,
-			Side:      oo.Side,
-		}
-		localOrders = append(localOrders, order)
-	}
-
-	for i := range openOrders.Asks {
-		oo := openOrders.Asks[i]
-		order := iex.WSOrder{
-			Symbol:    oo.Market,
-			Price:     oo.Price,
-			OrderQty:  oo.Quantity,
-			OrderID:   oo.UUID,
-			OrdStatus: oo.Status,
-			Side:      oo.Side,
-		}
-		localOrders = append(localOrders, order)
-	}
-	var emptyOrders []iex.WSOrder
-	localOrders = UpdateLocalOrders(emptyOrders, localOrders)
-	balances, err := ex.GetBalances()
-	algo.updateAlgoBalances(balances)
-
 	for {
 		select {
 		case positions := <-channels.PositionChan:
-			log.Println("Position Update:", positions)
-			position := positions[0]
-			algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
-			if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
-				algo.Market.AverageCost = position.AvgCostPrice
-			} else if position.CurrentQty == 0 {
-				algo.Market.AverageCost = 0
-			}
-			log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
-			// algo.logState()
+			algo.updatePositions(positions)
 		case trade := <-channels.TradeBinChan:
-			algo.updateState(trade[0], &localBars, setupData)
+			algo.updateState(ex, trade[0], &localBars, setupData)
 			algo = rebalance(trade[0].Close, algo)
 			algo.setupOrders()
 			algo.PlaceOrdersOnBook(ex, localOrders)
@@ -140,6 +112,25 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			algo.updateAlgoBalances(update.Balance)
 		}
 	}
+}
+
+func (algo *Algo) updatePositions(positions []iex.WsPosition) {
+	log.Println("Position Update:", positions)
+	if len(positions) > 0 {
+		position := positions[0]
+		algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
+		if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
+			algo.Market.AverageCost = position.AvgCostPrice
+		} else if position.CurrentQty == 0 {
+			algo.Market.AverageCost = 0
+		}
+		log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
+		if firstPositionUpdate {
+			shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
+			firstPositionUpdate = false
+		}
+	}
+	// algo.logState()
 }
 
 func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
@@ -160,21 +151,112 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 	}
 }
 
-func (algo *Algo) updateState(trade iex.TradeBin, localBars *[]*models.Bar, setupData func([]*models.Bar, Algo)) {
+func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[]*models.Bar, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
 	algo.Market.Price = trade.Close
-	data.UpdateLocalBars(localBars, data.GetData(algo.Market.Symbol, algo.DecisionInterval, 2))
+	//TODO this is delayed by 1 min -> when we ask the database for 1m bars it returns the previous minute
+	data.UpdateLocalBars(localBars, data.GetData("XBTUSD", algo.DecisionInterval, 2))
 	setupData(*localBars, *algo)
 	algo.Index = len(*localBars) - 1
+	algo.Timestamp = time.Now().Truncate(time.Second).UTC().String()
 	log.Println("algo.Index", algo.Index)
 	if firstTrade {
 		algo.logState()
 		firstTrade = false
 	}
+	// Update active option contracts from API
+	if algo.Market.Options != nil {
+		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, "option")
+		if err != nil {
+			fmt.Printf("Got markets from API: %v\n", markets)
+			for _, market := range markets {
+				containsSymbol := false
+				for _, option := range algo.Market.Options {
+					if option.Symbol == market.Symbol {
+						containsSymbol = true
+					}
+				}
+				if !containsSymbol {
+					expiry := market.Expiry * 1000
+					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
+					optionContract := models.OptionContract{
+						Symbol:           market.Symbol,
+						Strike:           market.Strike,
+						Expiry:           expiry,
+						OptionType:       market.OptionType,
+						AverageCost:      0,
+						Profit:           0,
+						TickSize:         market.TickSize,
+						MakerFee:         market.MakerCommission,
+						TakerFee:         market.TakerCommission,
+						MinimumOrderSize: market.MinTradeAmount,
+						Position:         0,
+						OptionTheo:       *optionTheo,
+						Status:           "open",
+					}
+					algo.Market.Options = append(algo.Market.Options, optionContract)
+				}
+			}
+		}
+	}
 }
 
 func (algo *Algo) setupOrders() {
 	if algo.AutoOrderPlacement {
+		orderSize, side := algo.getOrderSize(algo.Market.Price)
+		if side == 0 {
+			return
+		}
+		var quantity float64
+		if algo.Market.Futures {
+			quantity = orderSize * (algo.Market.BaseAsset.Quantity * algo.Market.Price)
+		} else {
+			quantity = orderSize * (algo.Market.BaseAsset.Quantity / algo.Market.Price)
+		}
+
+		// Keep track of what we should have so the orders we place will grow and shrink
+		if shouldHaveQuantity == 0 {
+			shouldHaveQuantity = quantity * side
+		} else {
+			shouldHaveQuantity += quantity * side
+		}
+
+		// Get the difference of what we have and what we should have, thats what we should order
+		quantityToOrder := shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+
+		// Don't over order while adding to the position
+		orderSide := math.Copysign(1, quantityToOrder)
+		quantitySide := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+
+		if orderSide == quantitySide && math.Abs(shouldHaveQuantity) > algo.canBuy() {
+			shouldHaveQuantity = algo.canBuy() * quantitySide
+			quantityToOrder = shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+		}
+
+		// When reducing to meet canBuy don't go lower than can buy
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) < algo.canBuy() {
+			shouldHaveQuantity = algo.canBuy()
+		}
+
+		// Don't over order to go neutral
+		if algo.Market.Weight == 0 && math.Abs(quantityToOrder) > math.Abs(algo.Market.QuoteAsset.Quantity) {
+			shouldHaveQuantity = 0
+			quantityToOrder = -algo.Market.QuoteAsset.Quantity
+		}
+
+		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder)
+
+		if side == 1 {
+			algo.Market.BuyOrders = models.OrderArray{
+				Quantity: []float64{math.Abs(quantityToOrder)},
+				Price:    []float64{algo.Market.Price - algo.Market.TickSize},
+			}
+		} else if side == -1 {
+			algo.Market.SellOrders = models.OrderArray{
+				Quantity: []float64{math.Abs(quantityToOrder)},
+				Price:    []float64{algo.Market.Price + algo.Market.TickSize},
+			}
+		}
 
 	} else {
 		if algo.Market.Futures {

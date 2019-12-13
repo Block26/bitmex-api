@@ -22,42 +22,122 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	var newBids []iex.Order
 	var newAsks []iex.Order
+
+	createBid := func(i int, qty float64) {
+		orderPrice := a.Market.BuyOrders.Price[i]
+		quantity := ToFixed(qty, a.Market.QuantityPrecision)
+		quantity = RoundToNearest(qty, float64(a.Market.QuantityTickSize))
+		order := iex.Order{
+			Market:   a.Market.BaseAsset.Symbol,
+			Currency: a.Market.QuoteAsset.Symbol,
+			Amount:   quantity,
+			Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+			Type:     "Limit",
+			Side:     "Buy",
+		}
+		newBids = append(newBids, order)
+	}
+
+	createAsk := func(i int, qty float64) {
+		orderPrice := a.Market.SellOrders.Price[i]
+		quantity := ToFixed(qty, a.Market.QuantityPrecision)
+		quantity = RoundToNearest(qty, float64(a.Market.QuantityTickSize))
+		order := iex.Order{
+			Market:   a.Market.BaseAsset.Symbol,
+			Currency: a.Market.QuoteAsset.Symbol,
+			Amount:   quantity,
+			Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+			Type:     "Limit",
+			Side:     "Sell",
+		}
+		newAsks = append(newAsks, order)
+	}
+
 	totalQty := 0.0
 	for i, qty := range a.Market.BuyOrders.Quantity {
 		totalQty = totalQty + qty
 		if totalQty > a.Market.MinimumOrderSize {
-			orderPrice := a.Market.BuyOrders.Price[i]
-			order := iex.Order{
-				Market:   a.Market.BaseAsset.Symbol,
-				Currency: a.Market.QuoteAsset.Symbol,
-				Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
-				Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
-				Type:     "Limit",
-				Side:     "Buy",
-			}
-			newBids = append(newBids, order)
+			createBid(i, totalQty)
 			totalQty = 0.0
 		}
+	}
+
+	if totalQty > 0.0 {
+		index := len(a.Market.BuyOrders.Quantity) - 1
+		createBid(index, totalQty)
 	}
 
 	totalQty = 0.0
 	for i, qty := range a.Market.SellOrders.Quantity {
 		totalQty = totalQty + qty
 		if totalQty > a.Market.MinimumOrderSize {
-			orderPrice := a.Market.SellOrders.Price[i]
-			order := iex.Order{
-				Market:   a.Market.BaseAsset.Symbol,
-				Currency: a.Market.QuoteAsset.Symbol,
-				Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
-				Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
-				Type:     "Limit",
-				Side:     "Sell",
-			}
-			newAsks = append(newAsks, order)
+			createAsk(i, totalQty)
 			totalQty = 0.0
 		}
 	}
 
+	if totalQty > 0.0 {
+		index := len(a.Market.SellOrders.Quantity) - 1
+		createAsk(index, totalQty)
+	}
+
+	//Parse option orders
+	totalQty = 0.0
+	for _, option := range a.Market.Options {
+		for i, qty := range option.BuyOrders.Quantity {
+			totalQty += qty
+			if totalQty > option.MinimumOrderSize {
+				orderPrice := option.BuyOrders.Price[i]
+				// Assume a price of 0 indicates market order
+				var orderType string
+				if orderPrice == 0 {
+					orderType = "Market"
+				} else {
+					orderType = "Limit"
+				}
+				order := iex.Order{
+					Market:   option.Symbol,
+					Currency: a.Market.QuoteAsset.Symbol,
+					Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+					Type:     orderType,
+					Side:     "Buy",
+				}
+				newBids = append(newBids, order)
+				totalQty = 0.0
+			}
+		}
+	}
+	totalQty = 0.0
+	for _, option := range a.Market.Options {
+		for i, qty := range option.SellOrders.Quantity {
+			totalQty += qty
+			if totalQty > option.MinimumOrderSize {
+				orderPrice := option.SellOrders.Price[i]
+				// Assume a price of 0 indicates market order
+				var orderType string
+				if orderPrice == 0 {
+					orderType = "Market"
+				} else {
+					orderType = "Limit"
+				}
+				order := iex.Order{
+					Market:   option.Symbol,
+					Currency: a.Market.QuoteAsset.Symbol,
+					Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+					Type:     orderType,
+					Side:     "Sell",
+				}
+				newAsks = append(newAsks, order)
+				totalQty = 0.0
+			}
+		}
+	}
+
+	log.Println("New orders")
+	log.Println(newAsks)
+	log.Println(newBids)
 	// Get open buys, buys, open sells, sells, with matches filtered out
 	var openBids []iex.WSOrder
 	var openAsks []iex.WSOrder
