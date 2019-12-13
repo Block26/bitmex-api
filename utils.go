@@ -104,9 +104,9 @@ func (algo *Algo) getEntryOrderSize(orderSizeGreaterThanMaxPositionSize bool) fl
 
 func (algo *Algo) canBuy() float64 {
 	if algo.CanBuyBasedOnMax {
-		return (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.Market.MaxLeverage
+		return (algo.Market.BaseAsset.Quantity * algo.Market.PriceOpen) * algo.Market.MaxLeverage
 	} else {
-		return (algo.Market.BaseAsset.Quantity * algo.Market.Price) * algo.LeverageTarget
+		return (algo.Market.BaseAsset.Quantity * algo.Market.PriceOpen) * algo.LeverageTarget
 	}
 }
 
@@ -129,7 +129,10 @@ func (algo *Algo) logState(timestamp ...string) (state models.History) {
 		// log.Println("Leverage", algo.Market.Leverage)
 	}
 
+	fmt.Println(algo.Timestamp, "Funds", algo.Market.BaseAsset.Quantity, "Quantity", algo.Market.QuoteAsset.Quantity)
+	// fmt.Println(algo.Timestamp, algo.Market.BaseAsset.Quantity, algo.CurrentProfit(algo.Market.Price))
 	algo.Market.Profit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price) * algo.Market.Leverage)
+	// fmt.Println(algo.Timestamp, algo.Market.Profit)
 
 	if timestamp != nil {
 		algo.Timestamp = timestamp[0]
@@ -168,6 +171,7 @@ func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side fl
 		currentWeight = float64(algo.Market.Weight)
 	}
 	adding := currentWeight == float64(algo.Market.Weight)
+	// fmt.Println(algo.Timestamp, "Here", algo.canBuy(), (algo.Market.QuoteAsset.Quantity))
 	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
 		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
 		side = float64(algo.Market.Weight)
@@ -181,6 +185,11 @@ func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side fl
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
 		//side = Opposite of the quantity
 		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+	} else if algo.canBuy() > math.Abs(algo.Market.QuoteAsset.Quantity) {
+		// If I can buy more, place order to fill diff of canBuy and current quantity
+		orderSize = calculateDifference(algo.canBuy(), math.Abs(algo.Market.QuoteAsset.Quantity))
+		side = float64(algo.Market.Weight)
+		log.Println("Triggered canBuy purchase")
 	}
 	return
 }

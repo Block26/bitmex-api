@@ -9,6 +9,7 @@ type Market struct {
 	QuoteAsset       Asset
 	MaxOrders        int32
 	Weight           int32
+	PriceOpen        float64
 	Price            float64
 	Profit           float64
 	AverageCost      float64

@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
 
 	"gonum.org/v1/gonum/stat"
 
+	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
 	. "gopkg.in/src-d/go-git.v4/_examples"
@@ -33,12 +35,12 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	start := time.Now()
 	var history []models.History
 	// starting_algo.Market.BaseBalance := 0
-	volStart := ToIntTimestamp(data[0].Timestamp)
-	volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
-	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
+	// volStart := ToIntTimestamp(data[0].Timestamp)
+	// volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
+	// fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
 	// VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
-	algo.Market.Options = generateActiveOptions(&algo)
-	fmt.Printf("Len vol data: %v\n", len(VolData))
+	// algo.Market.Options = generateActiveOptions(&algo)
+	// fmt.Printf("Len vol data: %v\n", len(VolData))
 	timestamp := ""
 	idx := 0
 	log.Println("Running", len(data), "bars")
@@ -51,12 +53,14 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 			}
 		}
 		timestamp = bar.Timestamp
-		if idx > algo.DataLength {
+		if idx > algo.DataLength+1 {
 			algo.Index = idx
+			// algo.Market.PriceOpen = bar.Open
+			algo.Market.PriceOpen = bar.Open
 			algo.Market.Price = bar.Close
-			algo.updateActiveOptions()
+			// algo.updateActiveOptions()
 			algo = rebalance(bar.Open, algo)
-
+			// log.Println(data)
 			if algo.FillType == "limit" {
 				//Check which buys filled
 				pricesFilled, ordersFilled := getFilledBidOrders(algo.Market.BuyOrders.Price, algo.Market.BuyOrders.Quantity, bar.Low)
@@ -148,17 +152,17 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		"score":               score,
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
-	// os.Remove("balance.csv")
-	// historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer historyFile.Close()
+	os.Remove("balance.csv")
+	historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	defer historyFile.Close()
 
-	// err = gocsv.MarshalFile(&history, historyFile) // Use this to save the CSV back to the file
-	// if err != nil {
-	// 	panic(err)
-	// }
+	err = gocsv.MarshalFile(&history, historyFile) // Use this to save the CSV back to the file
+	if err != nil {
+		panic(err)
+	}
 
 	LogBacktest(algo)
 	// score := ((math.Abs(minProfit) / history[historyLength-1].Balance) + maxLeverage) - history[historyLength-1].Balance // minimize
@@ -169,29 +173,8 @@ func (algo *Algo) updateBalanceFromFill(fillPrice float64) {
 	orderSize, side := algo.getOrderSize(fillPrice)
 	fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{orderSize})
 	algo.UpdateBalance(fillCost, ordersFilled*side)
-}
+	fmt.Println(algo.Timestamp, "ave cost", algo.Market.AverageCost)
 
-func (algo *Algo) setOrderSize(currentPrice float64) (orderSize float64, side float64) {
-	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-	if algo.Market.QuoteAsset.Quantity == 0 {
-		currentWeight = float64(algo.Market.Weight)
-	}
-	adding := currentWeight == float64(algo.Market.Weight)
-	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
-		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
-		side = float64(algo.Market.Weight)
-	} else if !adding {
-		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && (algo.Market.Weight == 0 || algo.Market.Weight != 0))
-		side = float64(currentWeight * -1)
-	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
-		orderSize = algo.DeleverageOrderSize
-		side = float64(currentWeight * -1)
-	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
-		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
-		//side = Opposite of the quantity
-		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-	}
-	return
 }
 
 func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
@@ -204,12 +187,22 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 		if algo.Market.Futures {
 			newQuantity := algo.canBuy() * fillAmount
 			currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+			// Final order quantity is the min of the difference between canbuy and quantity or canbuy * ordersize
+			// if canBuy > math.Abs(algo.Market.QuoteAsset.Quantity) {
+			// 	if currentWeight == float64(algo.Market.Weight) && math.Abs(fillAmount) < algo.EntryOrderSize {
+			// 		newQuantity = (min(canBuy-math.Abs(algo.Market.QuoteAsset.Quantity), (canBuy * math.Abs(fillAmount))))
+			// 		if currentWeight < 0 {
+			// 			newQuantity *= -1
+			// 		}
+			// 		// 	log.Println("newQuantity", newQuantity)
+			// 	}
+			// }
+			// Leave entire position to have quantity 0
 			if currentWeight != float64(algo.Market.Weight) && (fillAmount == algo.Market.Leverage || fillAmount == algo.Market.Leverage*(-1)) {
 				newQuantity = ((algo.Market.QuoteAsset.Quantity) * -1)
 			}
 			totalQuantity := algo.Market.QuoteAsset.Quantity + newQuantity
 			newCost := fillCost * newQuantity
-
 			if (newQuantity >= 0 && algo.Market.QuoteAsset.Quantity >= 0) || (newQuantity <= 0 && algo.Market.QuoteAsset.Quantity <= 0) {
 				//Adding to position
 				algo.Market.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
@@ -217,23 +210,29 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 				//Position changed
 				var diff float64
 				if fillAmount > 0 {
-					diff = calculateDifference(algo.Market.AverageCost, fillCost)
+					diff = calculateDifference(algo.Market.AverageCost, algo.Market.PriceOpen)
 				} else {
-					diff = calculateDifference(fillCost, algo.Market.AverageCost)
+					diff = calculateDifference(algo.Market.PriceOpen, algo.Market.AverageCost)
 				}
 				// Only use the remaining position that was filled to calculate cost
 				portionFillQuantity := math.Abs(algo.Market.QuoteAsset.Quantity)
-				algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((portionFillQuantity * diff) / fillCost)
-				algo.Market.AverageCost = fillCost
+				algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((portionFillQuantity * diff) / algo.Market.AverageCost)
+				// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((math.Abs(newQuantity) / fillCost) * diff)
+				algo.Market.AverageCost = algo.Market.PriceOpen
 			} else {
 				//Leaving Position
 				var diff float64
 				if fillAmount > 0 {
-					diff = calculateDifference(algo.Market.AverageCost, fillCost)
+					diff = calculateDifference(algo.Market.AverageCost, algo.Market.PriceOpen)
 				} else {
-					diff = calculateDifference(fillCost, algo.Market.AverageCost)
+					diff = calculateDifference(algo.Market.PriceOpen, algo.Market.AverageCost)
 				}
-				algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((math.Abs(newQuantity) * diff) / fillCost)
+				fmt.Println(algo.Timestamp, "average Cost", algo.Market.AverageCost)
+				log.Println("ProfitAC", ((math.Abs(newQuantity) * diff) / algo.Market.AverageCost))
+				log.Println("quantityToSell", newQuantity, "diff", diff)
+
+				algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((math.Abs(newQuantity) * diff) / algo.Market.AverageCost)
+				// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((math.Abs(newQuantity) / fillCost) * diff)
 			}
 			algo.Market.QuoteAsset.Quantity = algo.Market.QuoteAsset.Quantity + newQuantity
 		} else {
@@ -253,7 +252,6 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 			// log.Println("Base", algo.Market.BaseAsset.Quantity, "Quote", algo.Market.QuoteAsset.Quantity)
 		}
 		// log.Printf("fillCost %.8f -> fillAmount %.8f -> newQuantity %0.8f\n", fillCost, fillAmount, newQuantity)
-
 		// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity - fee
 	}
 	algo.updateOptionBalance()
