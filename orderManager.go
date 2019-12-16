@@ -231,8 +231,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	for buyCont || sellCont {
 		if buyCont && sellCont {
-			buyDiff := math.Abs(newBids[bidIndex].Rate - a.Market.Price)
-			sellDiff := math.Abs(newAsks[askIndex].Rate - a.Market.Price)
+			buyDiff := math.Abs(newBids[bidIndex].Rate - a.Market.Price.Close)
+			sellDiff := math.Abs(newAsks[askIndex].Rate - a.Market.Price.Close)
 			if buyDiff < sellDiff {
 				// cancel buy
 				if len(openBids) > bidIndex {

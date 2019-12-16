@@ -55,9 +55,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		timestamp = bar.Timestamp
 		if idx > algo.DataLength+1 {
 			algo.Index = idx
-			// algo.Market.PriceOpen = bar.Open
-			algo.Market.PriceOpen = bar.Open
-			algo.Market.Price = bar.Close
+			algo.Market.Price = *bar
 			// algo.updateActiveOptions()
 			algo = rebalance(bar.Open, algo)
 			// log.Println(data)
@@ -173,8 +171,6 @@ func (algo *Algo) updateBalanceFromFill(fillPrice float64) {
 	orderSize, side := algo.getOrderSize(fillPrice)
 	fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{orderSize})
 	algo.UpdateBalance(fillCost, ordersFilled*side)
-	fmt.Println(algo.Timestamp, "ave cost", algo.Market.AverageCost)
-
 }
 
 func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
@@ -187,16 +183,6 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 		if algo.Market.Futures {
 			newQuantity := algo.canBuy() * fillAmount
 			currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-			// Final order quantity is the min of the difference between canbuy and quantity or canbuy * ordersize
-			// if canBuy > math.Abs(algo.Market.QuoteAsset.Quantity) {
-			// 	if currentWeight == float64(algo.Market.Weight) && math.Abs(fillAmount) < algo.EntryOrderSize {
-			// 		newQuantity = (min(canBuy-math.Abs(algo.Market.QuoteAsset.Quantity), (canBuy * math.Abs(fillAmount))))
-			// 		if currentWeight < 0 {
-			// 			newQuantity *= -1
-			// 		}
-			// 		// 	log.Println("newQuantity", newQuantity)
-			// 	}
-			// }
 			// Leave entire position to have quantity 0
 			if currentWeight != float64(algo.Market.Weight) && (fillAmount == algo.Market.Leverage || fillAmount == algo.Market.Leverage*(-1)) {
 				newQuantity = ((algo.Market.QuoteAsset.Quantity) * -1)
@@ -210,29 +196,27 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 				//Position changed
 				var diff float64
 				if fillAmount > 0 {
-					diff = calculateDifference(algo.Market.AverageCost, algo.Market.PriceOpen)
+					diff = calculateDifference(algo.Market.AverageCost, fillCost)
 				} else {
-					diff = calculateDifference(algo.Market.PriceOpen, algo.Market.AverageCost)
+					diff = calculateDifference(fillCost, algo.Market.AverageCost)
 				}
 				// Only use the remaining position that was filled to calculate cost
 				portionFillQuantity := math.Abs(algo.Market.QuoteAsset.Quantity)
 				algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((portionFillQuantity * diff) / algo.Market.AverageCost)
-				// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((math.Abs(newQuantity) / fillCost) * diff)
-				algo.Market.AverageCost = algo.Market.PriceOpen
+				algo.Market.AverageCost = fillCost
 			} else {
 				//Leaving Position
 				var diff float64
-				if fillAmount > 0 {
-					diff = calculateDifference(algo.Market.AverageCost, algo.Market.PriceOpen)
-				} else {
-					diff = calculateDifference(algo.Market.PriceOpen, algo.Market.AverageCost)
+				if algo.FillType == "close" {
+					fillCost = algo.Market.Price.Open
 				}
-				fmt.Println(algo.Timestamp, "average Cost", algo.Market.AverageCost)
-				log.Println("ProfitAC", ((math.Abs(newQuantity) * diff) / algo.Market.AverageCost))
-				log.Println("quantityToSell", newQuantity, "diff", diff)
-
+				// Use price open to calculate diff for filltype: close or open
+				if fillAmount > 0 {
+					diff = calculateDifference(algo.Market.AverageCost, fillCost)
+				} else {
+					diff = calculateDifference(fillCost, algo.Market.AverageCost)
+				}
 				algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((math.Abs(newQuantity) * diff) / algo.Market.AverageCost)
-				// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((math.Abs(newQuantity) / fillCost) * diff)
 			}
 			algo.Market.QuoteAsset.Quantity = algo.Market.QuoteAsset.Quantity + newQuantity
 		} else {
@@ -261,7 +245,7 @@ func (algo *Algo) updateOptionBalance() {
 	optionBalance := 0.
 	for _, option := range algo.Market.Options {
 		// Calculate unrealized pnl
-		option.OptionTheo.UnderlyingPrice = algo.Market.Price
+		option.OptionTheo.UnderlyingPrice = algo.Market.Price.Close
 		option.OptionTheo.CalcBlackScholesTheo(false)
 		optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
 		// fmt.Printf("%v with underlying price %v theo %v\n", option.OptionTheo.String(), algo.Market.Price, option.OptionTheo.Theo)
@@ -458,7 +442,7 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 	for _, expiry := range expirys {
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
-				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price, strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
+				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price.Close, strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
 				optionContract := models.OptionContract{
 					Symbol:           GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
 					Strike:           strike,

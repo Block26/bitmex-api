@@ -70,7 +70,7 @@ func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
 		if side == "buy" {
 			return percentage * a.Market.QuoteAsset.Quantity
 		}
-		return percentage * (a.Market.BaseAsset.Quantity * a.Market.Price)
+		return percentage * (a.Market.BaseAsset.Quantity * a.Market.Price.Close)
 	}
 }
 
@@ -104,9 +104,9 @@ func (algo *Algo) getEntryOrderSize(orderSizeGreaterThanMaxPositionSize bool) fl
 
 func (algo *Algo) canBuy() float64 {
 	if algo.CanBuyBasedOnMax {
-		return (algo.Market.BaseAsset.Quantity * algo.Market.PriceOpen) * algo.Market.MaxLeverage
+		return (algo.Market.BaseAsset.Quantity * algo.Market.Price.Open) * algo.Market.MaxLeverage
 	} else {
-		return (algo.Market.BaseAsset.Quantity * algo.Market.PriceOpen) * algo.LeverageTarget
+		return (algo.Market.BaseAsset.Quantity * algo.Market.Price.Open) * algo.LeverageTarget
 	}
 }
 
@@ -116,22 +116,22 @@ func (algo *Algo) logState(timestamp ...string) (state models.History) {
 	var balance float64
 	if algo.Market.Futures {
 		balance = algo.Market.BaseAsset.Quantity
-		algo.Market.Leverage = math.Abs(algo.Market.QuoteAsset.Quantity) / (algo.Market.Price * balance)
+		algo.Market.Leverage = math.Abs(algo.Market.QuoteAsset.Quantity) / (algo.Market.Price.Close * balance)
 	} else {
 		if algo.Market.AverageCost == 0 {
-			algo.Market.AverageCost = algo.Market.Price
+			algo.Market.AverageCost = algo.Market.Price.Close
 		}
-		balance = (algo.Market.BaseAsset.Quantity * algo.Market.Price) + algo.Market.QuoteAsset.Quantity
+		balance = (algo.Market.BaseAsset.Quantity * algo.Market.Price.Close) + algo.Market.QuoteAsset.Quantity
 		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
-		algo.Market.Leverage = (algo.Market.BaseAsset.Quantity * algo.Market.Price) / balance
+		algo.Market.Leverage = (algo.Market.BaseAsset.Quantity * algo.Market.Price.Close) / balance
 		// log.Println("BaseAsset Quantity", algo.Market.BaseAsset.Quantity, "QuoteAsset Value", algo.Market.QuoteAsset.Quantity/algo.Market.Price)
 		// log.Println("BaseAsset Value", algo.Market.BaseAsset.Quantity*algo.Market.Price, "QuoteAsset Quantity", algo.Market.QuoteAsset.Quantity)
 		// log.Println("Leverage", algo.Market.Leverage)
 	}
 
-	fmt.Println(algo.Timestamp, "Funds", algo.Market.BaseAsset.Quantity, "Quantity", algo.Market.QuoteAsset.Quantity)
+	// fmt.Println(algo.Timestamp, "Funds", algo.Market.BaseAsset.Quantity, "Quantity", algo.Market.QuoteAsset.Quantity)
 	// fmt.Println(algo.Timestamp, algo.Market.BaseAsset.Quantity, algo.CurrentProfit(algo.Market.Price))
-	algo.Market.Profit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price) * algo.Market.Leverage)
+	algo.Market.Profit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Close) * algo.Market.Leverage)
 	// fmt.Println(algo.Timestamp, algo.Market.Profit)
 
 	if timestamp != nil {
@@ -143,7 +143,7 @@ func (algo *Algo) logState(timestamp ...string) (state models.History) {
 			AverageCost: algo.Market.AverageCost,
 			Leverage:    algo.Market.Leverage,
 			Profit:      algo.Market.Profit,
-			Price:       algo.Market.Price,
+			Price:       algo.Market.Price.Close,
 		}
 
 		if algo.Market.Futures {
@@ -153,14 +153,14 @@ func (algo *Algo) logState(timestamp ...string) (state models.History) {
 				state.UBalance = balance + algo.Market.Profit
 			}
 		} else {
-			state.UBalance = (algo.Market.BaseAsset.Quantity * algo.Market.Price) + algo.Market.QuoteAsset.Quantity
+			state.UBalance = (algo.Market.BaseAsset.Quantity * algo.Market.Price.Close) + algo.Market.QuoteAsset.Quantity
 		}
 
 	} else {
 		algo.LogLiveState()
 	}
 	if algo.Debug {
-		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price+(algo.Market.QuoteAsset.Quantity), 0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price, algo.Market.AverageCost))
+		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price.Close+(algo.Market.QuoteAsset.Quantity), 0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price.Close, algo.Market.AverageCost))
 	}
 	return
 }
@@ -189,7 +189,6 @@ func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side fl
 		// If I can buy more, place order to fill diff of canBuy and current quantity
 		orderSize = calculateDifference(algo.canBuy(), math.Abs(algo.Market.QuoteAsset.Quantity))
 		side = float64(algo.Market.Weight)
-		log.Println("Triggered canBuy purchase")
 	}
 	return
 }
@@ -300,7 +299,6 @@ func CreateSpread(weight int32, confidence float64, price float64, spread float6
 	if weight == 1 {
 		orderArr = ReverseArr(orderArr)
 	}
-
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
 }
 

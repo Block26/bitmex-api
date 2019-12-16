@@ -153,7 +153,7 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 
 func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[]*models.Bar, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
-	algo.Market.Price = trade.Close
+	algo.Market.Price.Close = trade.Close
 	//TODO this is delayed by 1 min -> when we ask the database for 1m bars it returns the previous minute
 	data.UpdateLocalBars(localBars, data.GetData("XBTUSD", algo.DecisionInterval, 2))
 	setupData(*localBars, *algo)
@@ -178,7 +178,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 				}
 				if !containsSymbol {
 					expiry := market.Expiry * 1000
-					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
+					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price.Close, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
 					optionContract := models.OptionContract{
 						Symbol:           market.Symbol,
 						Strike:           market.Strike,
@@ -203,15 +203,15 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 
 func (algo *Algo) setupOrders() {
 	if algo.AutoOrderPlacement {
-		orderSize, side := algo.getOrderSize(algo.Market.Price)
+		orderSize, side := algo.getOrderSize(algo.Market.Price.Close)
 		if side == 0 {
 			return
 		}
 		var quantity float64
 		if algo.Market.Futures {
-			quantity = orderSize * (algo.Market.BaseAsset.Quantity * algo.Market.Price)
+			quantity = orderSize * (algo.Market.BaseAsset.Quantity * algo.Market.Price.Close)
 		} else {
-			quantity = orderSize * (algo.Market.BaseAsset.Quantity / algo.Market.Price)
+			quantity = orderSize * (algo.Market.BaseAsset.Quantity / algo.Market.Price.Close)
 		}
 
 		// Keep track of what we should have so the orders we place will grow and shrink
@@ -249,22 +249,22 @@ func (algo *Algo) setupOrders() {
 		if side == 1 {
 			algo.Market.BuyOrders = models.OrderArray{
 				Quantity: []float64{math.Abs(quantityToOrder)},
-				Price:    []float64{algo.Market.Price - algo.Market.TickSize},
+				Price:    []float64{algo.Market.Price.Close - algo.Market.TickSize},
 			}
 		} else if side == -1 {
 			algo.Market.SellOrders = models.OrderArray{
 				Quantity: []float64{math.Abs(quantityToOrder)},
-				Price:    []float64{algo.Market.Price + algo.Market.TickSize},
+				Price:    []float64{algo.Market.Price.Close + algo.Market.TickSize},
 			}
 		}
 
 	} else {
 		if algo.Market.Futures {
-			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price))
-			algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price))
+			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price.Close))
+			algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price.Close))
 		} else {
-			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price))
-			algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price))
+			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price.Close))
+			algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price.Close))
 		}
 	}
 }
