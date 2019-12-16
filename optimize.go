@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
+	// "math/rand"
 	"time"
 
 	"github.com/c-bata/goptuna"
@@ -12,7 +12,7 @@ import (
 	"github.com/c-bata/goptuna/tpe"
 	"golang.org/x/sync/errgroup"
 
-	eaopt "github.com/MaxHalford/eaopt"
+	eaopt "github.com/tantralabs/eaopt"
 )
 
 func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
@@ -50,19 +50,19 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 func EAOptimize(Evaluate func([]float64) float64, paramsDomain []float64) {
 	currentRunUUID = time.Now()
 	// var spso, err = eaopt.NewDefaultSPSO()
-	// var ga, err = eaopt.NewDiffEvo(40, 100, 0, 0.1, 0.5, 0.2, false, nil)
-	// var ga, err = eaopt.NewOES(1000, 30, 10, 0.05, true, nil)
-	var ga, err = eaopt.NewSPSO(1000, 10, 1, 10, 0.02, true, nil)
+	// var ga, err = eaopt.NewDiffEvo(400, 100, 0, 2, 0.5, 0.2, false, nil)
+	var ga, err = eaopt.NewOES(1000, 1000, []float64{1, 2, 3, 0.01, 0.01, 0.002}, 0.001, false, nil)
+	// var ga, err = eaopt.NewSPSO(10000, 1000, 0, 10, 0.02, false, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	// Fix random number generation
-	ga.GA.RNG = rand.New(rand.NewSource(42))
+	// ga.GA.RNG = rand.New(rand.NewSource(42))
 
 	// Run minimization
-	_, y, err := ga.Minimize(Evaluate, 6)
+	_, y, err := ga.Minimize(Evaluate, []float64{1, 30, 101, 0.01, 0.01, 0.002})
 	if err != nil {
 		fmt.Println(err)
 		return

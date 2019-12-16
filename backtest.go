@@ -33,11 +33,11 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	start := time.Now()
 	var history []models.History
 	// starting_algo.Market.BaseBalance := 0
-	volStart := ToIntTimestamp(data[0].Timestamp)
-	volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
-	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
+	// volStart := ToIntTimestamp(data[0].Timestamp)
+	// volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
+	// fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
 	// VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
-	algo.Market.Options = generateActiveOptions(&algo)
+	// algo.Market.Options = generateActiveOptions(&algo)
 	fmt.Printf("Len vol data: %v\n", len(VolData))
 	timestamp := ""
 	idx := 0
@@ -54,7 +54,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		if idx > algo.DataLength {
 			algo.Index = idx
 			algo.Market.Price = bar.Close
-			algo.updateActiveOptions()
+			// algo.updateActiveOptions()
 			algo = rebalance(bar.Open, algo)
 
 			if algo.FillType == "limit" {

@@ -63,11 +63,11 @@ func LoadBars(csvFile string) []*models.Bar {
 }
 
 //Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
-func (a *Algo) SetLiquidity(percentage float64, side string) float64 {
+func (a *Algo) SetLiquidity(percentage float64, side int) float64 {
 	if a.Market.Futures {
 		return percentage * a.Market.BaseAsset.Quantity
 	} else {
-		if side == "buy" {
+		if side == 1 {
 			return percentage * a.Market.QuoteAsset.Quantity
 		}
 		return percentage * (a.Market.BaseAsset.Quantity * a.Market.Price)
@@ -256,31 +256,33 @@ func (algo *Algo) LogLiveState() {
 }
 
 //Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
-func CreateSpread(weight int32, confidence float64, price float64, spread float64, TickSize float64, maxOrders int32) models.OrderArray {
+func (algo *Algo) CreateSpread(weight int32, confidence float64, price float64, spread float64) models.OrderArray {
+	tickSize := algo.Market.TickSize
+	maxOrders := algo.Market.MaxOrders
 	xStart := 0.0
 	if weight == 1 {
 		xStart = price - (price * spread)
 	} else {
 		xStart = price
 	}
-	xStart = Round(xStart, TickSize)
+	xStart = Round(xStart, tickSize)
 
 	xEnd := xStart + (xStart * spread)
-	xEnd = Round(xEnd, TickSize)
+	xEnd = Round(xEnd, tickSize)
 
 	diff := xEnd - xStart
 
-	if diff/TickSize >= float64(maxOrders) {
+	if diff/tickSize >= float64(maxOrders) {
 		newTickSize := diff / (float64(maxOrders) - 1)
-		TickSize = Round(newTickSize, TickSize)
+		tickSize = Round(newTickSize, tickSize)
 	}
 
 	var priceArr []float64
 
 	if weight == 1 {
-		priceArr = Arange(xStart, xEnd-float64(TickSize), float64(TickSize))
+		priceArr = Arange(xStart, xEnd-float64(tickSize), float64(tickSize))
 	} else {
-		priceArr = Arange(xStart, xEnd, float64(TickSize))
+		priceArr = Arange(xStart, xEnd, float64(tickSize))
 	}
 
 	temp := divArr(priceArr, xStart)
