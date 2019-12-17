@@ -168,16 +168,21 @@ func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side fl
 		currentWeight = float64(algo.Market.Weight)
 	}
 	adding := currentWeight == float64(algo.Market.Weight)
+	fmt.Printf("CURRENT WEIGHT %v, adding %v, leverage target %v, can buy %v, deleverage order size %v\n", currentWeight, adding, algo.LeverageTarget, algo.canBuy(), algo.DeleverageOrderSize)
 	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
+		fmt.Printf("1\n")
 		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
 		side = float64(algo.Market.Weight)
 	} else if !adding {
+		fmt.Printf("2\n")
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
 		side = float64(currentWeight * -1)
 	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
+		fmt.Printf("3\n")
 		orderSize = algo.DeleverageOrderSize
 		side = float64(currentWeight * -1)
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
+		fmt.Printf("4\n")
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
 		//side = Opposite of the quantity
 		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
@@ -314,7 +319,6 @@ func ToIntTimestamp(timeString string) int {
 	layout := "2006-01-02 15:04:05"
 	if strings.Contains(timeString, "+0000 UTC") {
 		timeString = strings.Replace(timeString, "+0000 UTC", "", 1)
-		fmt.Printf("Trimmed timestring: %v\n", timeString)
 	}
 	timeString = strings.TrimSpace(timeString)
 	currentTime, err := time.Parse(layout, timeString)
@@ -328,7 +332,6 @@ func ToTimeObject(timeString string) time.Time {
 	layout := "2006-01-02 15:04:05"
 	if strings.Contains(timeString, "+0000 UTC") {
 		timeString = strings.Replace(timeString, "+0000 UTC", "", 1)
-		fmt.Printf("Trimmed timestring: %v\n", timeString)
 	}
 	timeString = strings.TrimSpace(timeString)
 	currentTime, err := time.Parse(layout, timeString)

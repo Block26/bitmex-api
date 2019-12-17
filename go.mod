@@ -6,6 +6,8 @@ replace github.com/tantralabs/exchanges => ../../tantralabs/exchanges
 
 replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
 
+replace github.com/tantralabs/tantradb => ../../../github.com/tantralabs/tantradb
+
 require (
 	firebase.google.com/go v3.10.0+incompatible
 	github.com/MaxHalford/eaopt v0.1.1-0.20191017133541-37dd3a71cb48

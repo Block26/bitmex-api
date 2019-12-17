@@ -12,6 +12,7 @@ import (
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
+	// "github.com/tantralabs/tantradb"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
@@ -36,7 +37,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	volStart := ToIntTimestamp(data[0].Timestamp)
 	volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
 	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
-	VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
+	// VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
 	algo.Market.Options = generateActiveOptions(&algo)
 	fmt.Printf("Len vol data: %v\n", len(VolData))
 	timestamp := ""

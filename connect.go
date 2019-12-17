@@ -209,6 +209,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 						Status:           "open",
 						MidMarketPrice:   market.MidMarketPrice,
 					}
+					// fmt.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
 					algo.Market.Options = append(algo.Market.Options, optionContract)
 				}
 			}
@@ -219,9 +220,11 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 }
 
 func (algo *Algo) setupOrders() {
+	fmt.Printf("Setting up orders with auto order placement %v\n", algo.AutoOrderPlacement)
 	if algo.AutoOrderPlacement {
 		orderSize, side := algo.getOrderSize(algo.Market.Price)
 		if side == 0 {
+			fmt.Printf("No side")
 			return
 		}
 		var quantity float64
@@ -251,8 +254,10 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// When reducing to meet canBuy don't go lower than can buy
-		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) < algo.canBuy() {
+		fmt.Printf("Weight: %v, shouldhavequantity %v, canbuy %v\n", algo.Market.Weight, quantitySide, algo.canBuy())
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy()
+			fmt.Printf("WEIGHT: %v, should have qty: %v\n", algo.Market.Weight, shouldHaveQuantity)
 		}
 
 		// Don't over order to go neutral

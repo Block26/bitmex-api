@@ -123,24 +123,28 @@ func (o *OptionTheo) GetBlackScholesTheo(volatility float64) float64 {
 
 // Use newton raphson method to find volatility
 func (o *OptionTheo) CalcVol() {
-	norm := gaussian.NewGaussian(0, 1)
-	v := math.Sqrt(2*PI/o.TimeLeft) * o.Theo / o.UnderlyingPrice
-	for i := 0; i < 100; i++ {
-		d1 := o.calcD1(v)
-		d2 := o.calcD2(v)
-		vega := o.UnderlyingPrice * norm.Pdf(d1) * math.Sqrt(o.TimeLeft)
-		cp := 1.0
-		if o.OptionType == "put" {
-			cp = -1.0
+	if o.Theo > 0 {
+		norm := gaussian.NewGaussian(0, 1)
+		v := math.Sqrt(2*PI/o.TimeLeft) * o.Theo / o.UnderlyingPrice
+		for i := 0; i < 100; i++ {
+			d1 := o.calcD1(v)
+			d2 := o.calcD2(v)
+			vega := o.UnderlyingPrice * norm.Pdf(d1) * math.Sqrt(o.TimeLeft)
+			cp := 1.0
+			if o.OptionType == "put" {
+				cp = -1.0
+			}
+			theo0 := cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2)
+			v = v - (theo0-o.Theo)/vega
+			if math.Abs(theo0-o.Theo) < math.Pow(10, -25) {
+				break
+			}
 		}
-		theo0 := cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2)
-		v = v - (theo0-o.Theo)/vega
-		if math.Abs(theo0-o.Theo) < math.Pow(10, -25) {
-			break
-		}
+		// fmt.Printf("Calculated vol %v for %v\n", v, o.String())
+		o.Volatility = v
+	} else {
+		fmt.Printf("Can only calc vol with positive theo. Found %v\n", o.Theo)
 	}
-	// fmt.Printf("Calculated vol %v for %v\n", v, o.String())
-	o.Volatility = v
 }
 
 func (o *OptionTheo) CalcVega() {
