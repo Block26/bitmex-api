@@ -255,6 +255,10 @@ func (algo *Algo) LogLiveState() {
 	influx.Close()
 }
 
+func ConstrainFloat(x float64, min float64, max float64, decimals int) float64 {
+	return ToFixed(math.Max(min, math.Min(x, max)), decimals)
+}
+
 //Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
 func (algo *Algo) CreateSpread(weight int32, confidence float64, price float64, spread float64) models.OrderArray {
 	tickSize := algo.Market.TickSize

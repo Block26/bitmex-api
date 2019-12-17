@@ -3,12 +3,12 @@ module github.com/tantralabs/TheAlgoV2
 go 1.13
 
 // replace github.com/tantralabs/exchanges => ../../tantralabs/exchanges
+replace github.com/tantralabs/eaopt => ../../tantralabs/eaopt
 
 // replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
 
 require (
 	firebase.google.com/go v3.10.0+incompatible
-	github.com/MaxHalford/eaopt v0.1.1-0.20191017133541-37dd3a71cb48
 	github.com/aws/aws-sdk-go v1.25.28
 	github.com/c-bata/goptuna v0.1.1-0.20191111040524-81338bb530f0
 	github.com/chobie/go-gaussian v0.0.0-20150107165016-53c09d90eeaf
@@ -20,8 +20,9 @@ require (
 	github.com/influxdata/influxdb1-client v0.0.0-20190809212627-fc22c7df067e
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.2.0
+	github.com/tantralabs/eaopt v0.1.0 // indirect
 	github.com/tantralabs/exchanges v0.0.0-20191106215748-4d3dd77e096e
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	gonum.org/v1/gonum v0.0.0-20190724133715-a8659125a966
 	google.golang.org/api v0.13.0
 	gopkg.in/src-d/go-git.v4 v4.8.1

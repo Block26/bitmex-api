@@ -138,6 +138,8 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	log.Println("Execution Speed", elapsed)
 	// log.Println("History Length", len(history), "Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
 
+	algo.Params["EntryOrderSize"] = algo.EntryOrderSize
+	algo.Params["ExitOrderSize"] = algo.ExitOrderSize
 	algo.Result = map[string]interface{}{
 		"balance":             history[historyLength-1].UBalance,
 		"max_leverage":        maxLeverage,
