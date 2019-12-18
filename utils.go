@@ -286,6 +286,9 @@ func (algo *Algo) CreateSpread(weight int32, confidence float64, price float64, 
 	if weight == 1 {
 		priceArr = Arange(xStart, xEnd-float64(tickSize), float64(tickSize))
 	} else {
+		if xStart - xEnd < float64(tickSize) {
+			xEnd = xEnd + float64(tickSize)
+		}
 		priceArr = Arange(xStart, xEnd, float64(tickSize))
 	}
 
