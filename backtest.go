@@ -122,6 +122,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 
 	// fmt.Printf("Last option balance: %v\n", lastOptionBalance)
 
+	kvparams := createKeyValuePairs(algo.Params)
 	fmt.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s",
 		history[historyLength-1].Balance,
 		history[historyLength-1].AverageCost,
@@ -133,7 +134,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		algo.EntryOrderSize,
 		algo.ExitOrderSize,
 		score,
-		createKeyValuePairs(algo.Params),
+		kvparams,
 	)
 	log.Println("Execution Speed", elapsed)
 	// log.Println("History Length", len(history), "Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
@@ -146,7 +147,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		"max_position_profit": maxProfit,
 		"max_position_dd":     minProfit,
 		"max_dd":              drawdown,
-		"params":              algo.Params,
+		"params":              kvparams,
 		"score":               score,
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
