@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
+	// "math/rand"
 	"time"
 
 	"github.com/c-bata/goptuna"
@@ -12,7 +12,7 @@ import (
 	"github.com/c-bata/goptuna/tpe"
 	"golang.org/x/sync/errgroup"
 
-	eaopt "github.com/MaxHalford/eaopt"
+	eaopt "github.com/tantralabs/eaopt"
 )
 
 func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
@@ -47,27 +47,37 @@ func Optimize(objective func(goptuna.Trial) (float64, error), episodes int) {
 	log.Println(p)
 }
 
-func EAOptimize(Evaluate func([]float64) float64, paramsDomain []float64) {
+func OESOptimize(Evaluate func([]float64) float64, sigma []float64) {
 	currentRunUUID = time.Now()
-	// var spso, err = eaopt.NewDefaultSPSO()
-	// var ga, err = eaopt.NewDiffEvo(40, 100, 0, 0.1, 0.5, 0.2, false, nil)
-	// var ga, err = eaopt.NewOES(1000, 30, 10, 0.05, true, nil)
-	var ga, err = eaopt.NewSPSO(1000, 10, 1, 10, 0.02, true, nil)
+	var ga, err = eaopt.NewOES(1000, 10, sigma, 0.005, true, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
-	// Fix random number generation
-	ga.GA.RNG = rand.New(rand.NewSource(42))
-
 	// Run minimization
-	_, y, err := ga.Minimize(Evaluate, 6)
+	_, y, err := ga.Minimize(Evaluate, sigma)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	// log.Println(NormalizeParamVector(x))
+	var best = ga.GA.HallOfFame[0]
+	log.Println(best)
+	fmt.Printf("Found minimum of %.5f\n", y)
+}
+
+func DiffEvoOptimize(Evaluate func([]float64) float64, min, max []float64) {
+	currentRunUUID = time.Now()
+	var ga, err = eaopt.NewDiffEvo(400, 100, 0.5, 0.2, min, max, true, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// Run minimization
+	_, y, err := ga.Minimize(Evaluate, uint(len(min)))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	var best = ga.GA.HallOfFame[0]
 	log.Println(best)
 	fmt.Printf("Found minimum of %.5f\n", y)

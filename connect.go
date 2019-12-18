@@ -207,6 +207,12 @@ func (algo *Algo) setupOrders() {
 		if side == 0 {
 			return
 		}
+
+		// Adjust order size to order over the hour
+		if algo.DecisionInterval == "1h" {
+			orderSize = (orderSize * (1 + orderSize)) / 60
+		}
+
 		var quantity float64
 		if algo.Market.Futures {
 			quantity = orderSize * (algo.Market.BaseAsset.Quantity * algo.Market.Price.Close)
@@ -234,7 +240,7 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// When reducing to meet canBuy don't go lower than can buy
-		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) < algo.canBuy() {
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy()
 		}
 
