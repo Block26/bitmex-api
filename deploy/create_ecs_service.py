@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
 import json
 import os
 
 from utils import find_and_replace
 
-algo_name = "swings-testnet"
+algo_name = "dx-test"
 aws_account_id = "911053277385"
 
 with open('ecs_task_template.json', 'r') as f:

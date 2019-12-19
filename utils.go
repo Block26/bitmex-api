@@ -17,6 +17,7 @@ import (
 	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/TheAlgoV2/settings"
 	. "gopkg.in/src-d/go-git.v4/_examples"
+	"github.com/tantralabs/tradeapi/iex"
 )
 
 // Load a config file containing sensitive information from a local
@@ -38,6 +39,23 @@ func loadConfiguration(file string, secret bool) settings.Config {
 		jsonParser.Decode(&config)
 		return config
 	}
+}
+
+func convertTradeBinsToBars(bins []iex.TradeBin) (bars []*models.Bar) {
+	bars = make([]*models.Bar, len(bins))
+	for i, row := range bins {
+		bars[i] = &models.Bar{
+			Timestamp: row.Timestamp,
+			Open:      row.Open,
+			High:      row.High,
+			Low:       row.Low,
+			Close:     row.Close,
+			// VWAP:      row.
+			// Volume  :    row.
+			// QuoteVolume: row.
+		}
+	}
+	return
 }
 
 func LoadBars(csvFile string) []*models.Bar {
@@ -111,7 +129,7 @@ func (algo *Algo) canBuy() float64 {
 }
 
 //Log the state of the algo and update variables like leverage
-func (algo *Algo) logState(timestamp ...string) (state models.History) {
+func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
 	var balance float64
 	if algo.Market.Futures {
@@ -135,9 +153,9 @@ func (algo *Algo) logState(timestamp ...string) (state models.History) {
 	// fmt.Println(algo.Timestamp, algo.Market.Profit)
 
 	if timestamp != nil {
-		algo.Timestamp = timestamp[0]
+		algo.Timestamp = timestamp[0].String()
 		state = models.History{
-			Timestamp:   timestamp[0],
+			Timestamp:   algo.Timestamp,
 			Balance:     balance,
 			Quantity:    algo.Market.QuoteAsset.Quantity,
 			AverageCost: algo.Market.AverageCost,
@@ -210,6 +228,7 @@ func (algo *Algo) LogLiveState() {
 	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}
 
 	fields := structs.Map(algo.Market)
+	fields["Price"] = algo.Market.Price.Close
 
 	pt, err := client.NewPoint(
 		"market",
@@ -294,7 +313,7 @@ func (algo *Algo) CreateSpread(weight int32, confidence float64, price float64, 
 	if weight == 1 {
 		priceArr = Arange(xStart, xEnd-float64(tickSize), float64(tickSize))
 	} else {
-		if xStart - xEnd < float64(tickSize) {
+		if xStart-xEnd < float64(tickSize) {
 			xEnd = xEnd + float64(tickSize)
 		}
 		priceArr = Arange(xStart, xEnd, float64(tickSize))
@@ -366,6 +385,14 @@ func Round(x, unit float64) float64 {
 }
 
 func ReverseArr(a []float64) []float64 {
+	for i := len(a)/2 - 1; i >= 0; i-- {
+		opp := len(a) - 1 - i
+		a[i], a[opp] = a[opp], a[i]
+	}
+	return a
+}
+
+func ReverseBars(a []*models.Bar) []*models.Bar {
 	for i := len(a)/2 - 1; i >= 0; i-- {
 		opp := len(a) - 1 - i
 		a[i], a[opp] = a[opp], a[i]

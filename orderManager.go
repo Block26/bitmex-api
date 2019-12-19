@@ -62,7 +62,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 
-	if totalQty > 0.0 {
+	if totalQty > 0.0 && totalQty > a.Market.MinimumOrderSize  {
 		index := len(a.Market.BuyOrders.Quantity) - 1
 		createBid(index, totalQty)
 	}
@@ -76,7 +76,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 
-	if totalQty > 0.0 {
+	if totalQty > 0.0 && totalQty > a.Market.MinimumOrderSize {
 		index := len(a.Market.SellOrders.Quantity) - 1
 		createAsk(index, totalQty)
 	}
@@ -135,9 +135,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 
-	log.Println("New orders")
-	log.Println(newAsks)
-	log.Println(newBids)
+	log.Println("Orders: Asks", newAsks, "Bids", newBids)
 	// Get open buys, buys, open sells, sells, with matches filtered out
 	var openBids []iex.WSOrder
 	var openAsks []iex.WSOrder
@@ -267,8 +265,6 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 				cancelStr = strings.TrimSuffix(cancelStr, ",")
 				if len(cancelStr) > 0 {
-					log.Println("Trying to bulk cancel")
-					log.Println(cancelStr)
 					err := ex.CancelOrder(iex.CancelOrderF{
 						Market: a.Market.Symbol,
 						Uuid:   cancelStr,

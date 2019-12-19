@@ -15,6 +15,35 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 			return models.Market{
 				Symbol:      "XBTUSD",
 				Exchange:    "bitmex",
+				BaseAsset: models.Asset{
+					Symbol:   "XBT",
+					Quantity: 1,
+				},
+				QuoteAsset: models.Asset{
+					Symbol:   "USD",
+					Quantity: 0,
+				},
+				MaxLeverage:         1,
+				MinimumOrderSize:    25,
+				TickSize:            1,
+				QuantityTickSize:    1,
+				QuantityPrecision:   0,
+				PricePrecision:      2,
+				MaxOrders:           20,
+				MakerFee:            -0.00025,
+				TakerFee:            0.00075,
+				Futures:             true,
+				BulkCancelSupported: true,
+			}, nil
+		default:
+			log.Println(m, "is not supported for exchange", exchange)
+		}
+	} else if exchange == "bitmex-test" {
+		switch m := market; m {
+		case "XBTUSD":
+			return models.Market{
+				Symbol:      "XBTUSD",
+				Exchange:    "bitmex",
 				ExchangeURL: "https://testnet.bitmex.com",
 				WSStream:    "testnet.bitmex.com",
 				BaseAsset: models.Asset{

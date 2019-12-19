@@ -1,10 +1,8 @@
 package algo
 
-
 import (
 	ta "github.com/d4l3k/talib"
 )
-
 
 func GetNATR(high []float64, low []float64, close []float64, index int32, length int32) []float64 {
 	//TODO check live

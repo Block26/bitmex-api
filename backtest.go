@@ -34,6 +34,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	setupData(data, algo)
 	start := time.Now()
 	var history []models.History
+	var timestamp time.Time
 	// starting_algo.Market.BaseBalance := 0
 	// volStart := ToIntTimestamp(data[0].Timestamp)
 	// volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
@@ -41,11 +42,10 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	// VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
 	// algo.Market.Options = generateActiveOptions(&algo)
 	// fmt.Printf("Len vol data: %v\n", len(VolData))
-	timestamp := ""
 	idx := 0
 	log.Println("Running", len(data), "bars")
 	for _, bar := range data {
-		if timestamp == "" {
+		if idx == 0 {
 			log.Println("Start Timestamp", bar.Timestamp)
 			// 	//Set average cost if starting with a quote balance
 			if algo.Market.QuoteAsset.Quantity > 0 {
@@ -352,7 +352,7 @@ func getFilledAskOrders(prices []float64, orders []float64, price float64) ([]fl
 
 func LogBacktest(algo Algo) {
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     "http://a9266693f215611eaa2ab067000a9afa-324658220.us-east-2.elb.amazonaws.com:8086",//:8086
+		Addr:     "http://a9266693f215611eaa2ab067000a9afa-324658220.us-east-2.elb.amazonaws.com:8086", //:8086
 		Username: "tester",
 		Password: "123456",
 	})
