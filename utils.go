@@ -117,6 +117,7 @@ func (algo *Algo) logState(timestamp ...string) (state models.History) {
 	if algo.Market.Futures {
 		balance = algo.Market.BaseAsset.Quantity
 		algo.Market.Leverage = math.Abs(algo.Market.QuoteAsset.Quantity) / (algo.Market.Price * balance)
+		// fmt.Printf("Updating leverage with quote asset quantity %v and balance %v: %v\n", algo.Market.QuoteAsset.Quantity, balance, algo.Market.Leverage)
 	} else {
 		if algo.Market.AverageCost == 0 {
 			algo.Market.AverageCost = algo.Market.Price
@@ -168,21 +169,20 @@ func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side fl
 		currentWeight = float64(algo.Market.Weight)
 	}
 	adding := currentWeight == float64(algo.Market.Weight)
-	fmt.Printf("CURRENT WEIGHT %v, adding %v, leverage target %v, can buy %v, deleverage order size %v\n", currentWeight, adding, algo.LeverageTarget, algo.canBuy(), algo.DeleverageOrderSize)
+	// fmt.Printf("CURRENT WEIGHT %v, adding %v, leverage target %v, can buy %v, deleverage order size %v\n", currentWeight, adding, algo.LeverageTarget, algo.canBuy(), algo.DeleverageOrderSize)
+	fmt.Printf("Getting order size with quote asset quantity: %v\n", algo.Market.QuoteAsset.Quantity)
 	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
-		fmt.Printf("1\n")
+		fmt.Printf("Getting entry order with entry order size %v, leverage target %v, leverage %v\n", algo.EntryOrderSize, algo.LeverageTarget, algo.Market.Leverage)
 		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
 		side = float64(algo.Market.Weight)
 	} else if !adding {
-		fmt.Printf("2\n")
+		fmt.Printf("Getting exit order size with exit order size %v, leverage %v, weight %v\n", algo.ExitOrderSize, algo.Market.Leverage, algo.Market.Weight)
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
 		side = float64(currentWeight * -1)
 	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
-		fmt.Printf("3\n")
 		orderSize = algo.DeleverageOrderSize
 		side = float64(currentWeight * -1)
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
-		fmt.Printf("4\n")
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
 		//side = Opposite of the quantity
 		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
@@ -350,7 +350,7 @@ func TimestampToTime(timestamp int) time.Time {
 }
 
 func TimeToTimestamp(timeObject time.Time) int {
-	return timeObject.UTC().Nanosecond() / 1000000
+	return int(timeObject.UnixNano() / 1000000)
 }
 
 func Round(x, unit float64) float64 {
