@@ -5,7 +5,7 @@ import (
 	"log"
 	"math"
 	"strings"
-	"time"
+	// "time"
 
 	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
@@ -19,6 +19,9 @@ var firstPositionUpdate bool
 var shouldHaveQuantity float64
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) {
+	if algo.DecisionInterval == "" {
+		log.Fatal("DecisionInterval must be set")
+	}
 	firstTrade = true
 	firstPositionUpdate = true
 	config := loadConfiguration(settingsFile, secret)
@@ -50,8 +53,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	fmt.Printf("Got potential order status %v\n", orderStatus)
 
 	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
-	// localBars := make([]*models.Bar, 0)
-	localBars := data.GetData("XBTUSD", algo.DecisionInterval, algo.DataLength+1)
+	localBars := data.UpdateBars(ex, "XBTUSD", algo.DecisionInterval, algo.DataLength+1)
 	fmt.Printf("Got local bars: %v\n", len(localBars))
 	// log.Println(len(localBars), "downloaded")
 
@@ -100,7 +102,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		case positions := <-channels.PositionChan:
 			algo.updatePositions(positions)
 		case trade := <-channels.TradeBinChan:
-			algo.updateState(ex, trade[0], &localBars, setupData)
+			algo.updateState(ex, trade[0], localBars, setupData)
 			algo = rebalance(trade[0].Close, algo)
 			algo.setupOrders()
 			algo.PlaceOrdersOnBook(ex, localOrders)
@@ -151,15 +153,14 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 	}
 }
 
-func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[]*models.Bar, setupData func([]*models.Bar, Algo)) {
+func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []*models.Bar, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
-	algo.Market.Price.Close = trade.Close
-	//TODO this is delayed by 1 min -> when we ask the database for 1m bars it returns the previous minute
-	data.UpdateLocalBars(localBars, data.GetData("XBTUSD", algo.DecisionInterval, 2))
-	setupData(*localBars, *algo)
-	algo.Index = len(*localBars) - 1
-	algo.Timestamp = time.Now().Truncate(time.Second).UTC().String()
-	log.Println("algo.Index", algo.Index)
+	localBars = data.UpdateBars(ex, "XBTUSD", algo.DecisionInterval, 2)
+	algo.Index = len(localBars) - 1
+	algo.Market.Price = *localBars[algo.Index]
+	setupData(localBars, *algo)
+	algo.Timestamp = localBars[algo.Index].Timestamp.String()
+	log.Println("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
 		algo.logState()
 		firstTrade = false
