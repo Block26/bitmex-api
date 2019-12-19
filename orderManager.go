@@ -257,7 +257,6 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				askIndex++
 			}
 		} else {
-			fmt.Printf("Else\n")
 			// finish the rest of the orders
 
 			if a.Market.BulkCancelSupported {

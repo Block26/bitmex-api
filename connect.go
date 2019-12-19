@@ -40,16 +40,12 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 		OutputResponse: false,
 	}
 
-	fmt.Printf("Connecting to %v with key %v and secret %v, id %v\n", exchangeVars.Exchange, exchangeVars.ApiKey, exchangeVars.ApiSecret, exchangeVars.AccountID)
 	ex, err := tradeapi.New(exchangeVars)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Printf("Getting potential order status...\n")
 	orderStatus = ex.GetPotentialOrderStatus()
-	fmt.Printf("Got potential order status %v\n", orderStatus)
 
-	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
 	// localBars := make([]*models.Bar, 0)
 	localBars := data.GetData("XBTUSD", algo.DecisionInterval, algo.DataLength+1)
 	fmt.Printf("Got local bars: %v\n", len(localBars))
@@ -140,6 +136,7 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 			}
 		}
 		if firstPositionUpdate {
+			algo.logState()
 			shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
 			firstPositionUpdate = false
 		}
@@ -220,11 +217,10 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars *[
 }
 
 func (algo *Algo) setupOrders() {
-	fmt.Printf("Setting up orders with auto order placement %v\n", algo.AutoOrderPlacement)
 	if algo.AutoOrderPlacement {
 		orderSize, side := algo.getOrderSize(algo.Market.Price)
 		if side == 0 {
-			fmt.Printf("No side")
+			fmt.Printf("No side\n")
 			return
 		}
 		var quantity float64
@@ -254,7 +250,7 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// When reducing to meet canBuy don't go lower than can buy
-		fmt.Printf("Weight: %v, shouldhavequantity %v, canbuy %v\n", algo.Market.Weight, quantitySide, algo.canBuy())
+		fmt.Printf("Weight: %v, quantityside %v shouldhavequantity %v, canbuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
 		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy()
 			fmt.Printf("WEIGHT: %v, should have qty: %v\n", algo.Market.Weight, shouldHaveQuantity)
