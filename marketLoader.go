@@ -128,7 +128,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		switch m := market; m {
 		case "BTCPERPETUAL":
 			return models.Market{
-				Symbol:   "BTCPERPETUAL",
+				Symbol:   "BTC-PERPETUAL",
 				Exchange: "deribit",
 				BaseAsset: models.Asset{
 					Symbol:   "BTC",
@@ -156,7 +156,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		switch m := market; m {
 		case "BTCPERPETUAL":
 			return models.Market{
-				Symbol:      "BTCPERPETUAL",
+				Symbol:      "BTC-PERPETUAL",
 				Exchange:    "deribit",
 				ExchangeURL: "test.deribit.com",
 				WSStream:    "test.deribit.com",

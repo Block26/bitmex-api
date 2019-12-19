@@ -43,19 +43,21 @@ func loadConfiguration(file string, secret bool) settings.Config {
 
 func convertTradeBinsToBars(bins []iex.TradeBin) (bars []*models.Bar) {
 	bars = make([]*models.Bar, len(bins))
-	for i, row := range bins {
-		bars[i] = &models.Bar{
-			Timestamp: row.Timestamp,
-			Open:      row.Open,
-			High:      row.High,
-			Low:       row.Low,
-			Close:     row.Close,
-			// VWAP:      row.
-			// Volume  :    row.
-			// QuoteVolume: row.
-		}
+	for i, _ := range bins {
+		bar := convertTradeBinToBar(bins[i])
+		bars[i] = &bar
 	}
 	return
+}
+
+func convertTradeBinToBar(bin iex.TradeBin) models.Bar {
+	return models.Bar{
+		Timestamp: bin.Timestamp,
+		Open:      bin.Open,
+		High:      bin.High,
+		Low:       bin.Low,
+		Close:     bin.Close,
+	}
 }
 
 func LoadBars(csvFile string) []*models.Bar {

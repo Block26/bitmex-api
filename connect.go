@@ -53,7 +53,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 	fmt.Printf("Got potential order status %v\n", orderStatus)
 
 	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
-	localBars := data.UpdateBars(ex, "XBTUSD", algo.DecisionInterval, algo.DataLength+1)
+	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
 	fmt.Printf("Got local bars: %v\n", len(localBars))
 	// log.Println(len(localBars), "downloaded")
 
@@ -155,9 +155,9 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 
 func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []*models.Bar, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
-	localBars = data.UpdateBars(ex, "XBTUSD", algo.DecisionInterval, 2)
+	localBars = data.UpdateBars(ex, algo.Market.Symbol, algo.DecisionInterval, 2)
 	algo.Index = len(localBars) - 1
-	algo.Market.Price = *localBars[algo.Index]
+	algo.Market.Price = convertTradeBinToBar(trade)
 	setupData(localBars, *algo)
 	algo.Timestamp = localBars[algo.Index].Timestamp.String()
 	log.Println("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
