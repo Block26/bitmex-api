@@ -45,18 +45,6 @@ func (t *TheoEngine) getOptions(backtest bool) *[]models.OptionContract {
 	return &t.Options
 }
 
-func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
-	vol := -1.
-	for _, data := range volData {
-		timeDiff := time - data.Timestamp
-		if timeDiff < 0 {
-			vol = data.IV / 100 //Assume volData quotes IV in pct
-			break
-		}
-	}
-	return vol
-}
-
 func GetExpiredOptions(currentTime int, options []*models.OptionContract) []*models.OptionContract {
 	var expiredOptions []*models.OptionContract
 	for _, option := range options {
