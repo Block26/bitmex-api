@@ -1,6 +1,7 @@
 package algo
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"sort"
@@ -85,8 +86,9 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	totalQty = 0.0
 	for _, option := range a.Market.Options {
 		for i, qty := range option.BuyOrders.Quantity {
+			fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
-			if totalQty > option.MinimumOrderSize {
+			if totalQty >= option.MinimumOrderSize {
 				orderPrice := option.BuyOrders.Price[i]
 				// Assume a price of 0 indicates market order
 				var orderType string
@@ -98,7 +100,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				order := iex.Order{
 					Market:   option.Symbol,
 					Currency: a.Market.QuoteAsset.Symbol,
-					Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+					Amount:   ToFixed(totalQty, 1), //float64(int(totalQty)),
 					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
 					Type:     orderType,
 					Side:     "Buy",
@@ -111,8 +113,9 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	totalQty = 0.0
 	for _, option := range a.Market.Options {
 		for i, qty := range option.SellOrders.Quantity {
+			fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
-			if totalQty > option.MinimumOrderSize {
+			if totalQty >= option.MinimumOrderSize {
 				orderPrice := option.SellOrders.Price[i]
 				// Assume a price of 0 indicates market order
 				var orderType string
@@ -124,7 +127,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				order := iex.Order{
 					Market:   option.Symbol,
 					Currency: a.Market.QuoteAsset.Symbol,
-					Amount:   ToFixed(totalQty, a.Market.QuantityPrecision), //float64(int(totalQty)),
+					Amount:   ToFixed(totalQty, 1), //float64(int(totalQty)),
 					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
 					Type:     orderType,
 					Side:     "Sell",
@@ -152,7 +155,6 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	siftMatches := func(open []iex.WSOrder, new []iex.Order) ([]iex.WSOrder, []iex.Order) {
 		openfound := make([]bool, len(open))
 		newfound := make([]bool, len(new))
-
 		/*
 			Not 100% efficient, but it's simple and predictable (more hardware friendly,
 			which will likely make it more efficient). O(kn) time, but k and n should both
@@ -203,7 +205,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	})
 
 	cancel := func(order iex.WSOrder) {
-		log.Println("Trying to cancel", order.OrderID)
+		// log.Println("Trying to cancel", order.OrderID)
 		err := ex.CancelOrder(iex.CancelOrderF{
 			Market: order.Symbol,
 			Uuid:   order.OrderID,
@@ -226,6 +228,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	askIndex := 0
 	buyCont := len(newBids) != 0
 	sellCont := len(newAsks) != 0
+
+	// fmt.Printf("Num buys %v, num sells %v\n", len(newBids), len(newAsks))
 
 	for buyCont || sellCont {
 		if buyCont && sellCont {
@@ -283,12 +287,13 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 					cancel(openBids[i])
 				}
 			}
-
+			// fmt.Printf("Newasks: %v, newbids: %v\n", newAsks, newBids)
+			// fmt.Printf("Ask index: %v\n", askIndex)
 			for i := askIndex; i < len(newAsks); i++ {
 				place(newAsks[i])
 			}
-
-			for i := askIndex; i < len(newBids); i++ {
+			// fmt.Printf("Bid index: %v\n", bidIndex)
+			for i := bidIndex; i < len(newBids); i++ {
 				place(newBids[i])
 			}
 			break
@@ -300,11 +305,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.WSOrder {
 	var updatedOrders []iex.WSOrder
-	// log.Println(len(oldOrders), "old orders")
-	// log.Println(len(newOrders), "new orders")
 	for _, oldOrder := range oldOrders {
 		found := false
-		// log.Println("oldOrder.OrdStatus", oldOrder.OrdStatus)
 		for _, newOrder := range newOrders {
 			if newOrder.OrderID == oldOrder.OrderID {
 				found = true
@@ -312,7 +314,6 @@ func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.W
 					log.Println(newOrder.OrdStatus, oldOrder.OrderID)
 				} else {
 					updatedOrders = append(updatedOrders, newOrder)
-					// log.Println("Updated Order", newOrder.OrderID, newOrder.OrdStatus)
 				}
 			}
 		}
@@ -320,7 +321,6 @@ func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.W
 			if oldOrder.OrdStatus == orderStatus.Cancelled || oldOrder.OrdStatus == orderStatus.Filled || oldOrder.OrdStatus == orderStatus.Rejected {
 				log.Println(oldOrder.OrdStatus, oldOrder.OrderID)
 			} else {
-				// log.Println("Old Order", oldOrder.OrderID, oldOrder.OrdStatus)
 				updatedOrders = append(updatedOrders, oldOrder)
 			}
 		}
@@ -334,11 +334,14 @@ func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.W
 			}
 		}
 		if !found {
-			updatedOrders = append(updatedOrders, newOrder)
-			log.Println("Adding Order", newOrder.OrderID, newOrder.OrdStatus)
+			if newOrder.OrdStatus == orderStatus.Cancelled || newOrder.OrdStatus == orderStatus.Filled || newOrder.OrdStatus == orderStatus.Rejected {
+				log.Println(newOrder.OrdStatus, newOrder.OrderID)
+			} else {
+				updatedOrders = append(updatedOrders, newOrder)
+			}
 		}
 	}
 
-	// log.Println(len(updatedOrders), "orders")
+	log.Println(len(updatedOrders), "orders")
 	return updatedOrders
 }

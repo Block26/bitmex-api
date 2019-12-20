@@ -45,18 +45,6 @@ func (t *TheoEngine) getOptions(backtest bool) *[]models.OptionContract {
 	return &t.Options
 }
 
-func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
-	vol := -1.
-	for _, data := range volData {
-		timeDiff := time - data.Timestamp
-		if timeDiff < 0 {
-			vol = data.IV / 100 //Assume volData quotes IV in pct
-			break
-		}
-	}
-	return vol
-}
-
 func GetExpiredOptions(currentTime int, options []*models.OptionContract) []*models.OptionContract {
 	var expiredOptions []*models.OptionContract
 	for _, option := range options {
@@ -134,7 +122,7 @@ func BuildAvailableOptions(underlyingPrice float64, currentTime time.Time, volat
 				optionTheo := models.NewOptionTheo(optionType, underlyingPrice, strike, int(currentTime.UnixNano()/int64(time.Millisecond)), expiry, 0, volatility, -1)
 				symbol := base.GetDeribitOptionSymbol(expiry, strike, "BTC", optionType)
 				optionContract := models.OptionContract{symbol, strike, expiry, optionType, 0, 0, TickSize, MakerFee,
-					TakerFee, MinimumOrderSize, orderArray, orderArray, 0., *optionTheo, "open"}
+					TakerFee, MinimumOrderSize, orderArray, orderArray, 0., *optionTheo, "open", -1.}
 				optionContracts = append(optionContracts, optionContract)
 			}
 		}

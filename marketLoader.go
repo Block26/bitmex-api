@@ -126,7 +126,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		}
 	} else if exchange == "deribit" {
 		switch m := market; m {
-		case "BTCPERPETUAL":
+		case "BTC-PERPETUAL":
 			return models.Market{
 				Symbol:   "BTC-PERPETUAL",
 				Exchange: "deribit",
@@ -135,7 +135,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 					Quantity: 1,
 				},
 				QuoteAsset: models.Asset{
-					Symbol:   "USD",
+					Symbol:   "BTC-PERPETUAL",
 					Quantity: 0,
 				},
 				MinimumOrderSize:    10,
@@ -154,7 +154,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		}
 	} else if exchange == "deribit-test" {
 		switch m := market; m {
-		case "BTCPERPETUAL":
+		case "BTC-PERPETUAL":
 			return models.Market{
 				Symbol:      "BTC-PERPETUAL",
 				Exchange:    "deribit",
@@ -165,7 +165,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 					Quantity: 1,
 				},
 				QuoteAsset: models.Asset{
-					Symbol:   "PERPETUAL",
+					Symbol:   "BTC-PERPETUAL",
 					Quantity: 0,
 				},
 				MinimumOrderSize:    10,
