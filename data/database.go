@@ -3,7 +3,7 @@ package data
 import (
 	"fmt"
 	"log"
-	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -11,14 +11,14 @@ import (
 )
 
 const (
-	host     = "bitmexdata.cevu6a2ct9qj.us-west-1.rds.amazonaws.com"
-	port     = 45832
-	user     = "b26adminuser"
-	password = "R%ED6f^ZP&ddPwEg"
-	dbname   = "bmex_data"
+	host     = "localhost"
+	port     = 5432
+	user     = "yantrauser"
+	password = "password"
+	dbname   = "tantra"
 )
 
-func GetData(symbol string, bin string, count int) []*models.Bar {
+func GetData(symbol string, exchange string, interval string, startTimestamp time.Time, endTimestamp time.Time) []*models.Bar {
 
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
@@ -31,10 +31,8 @@ func GetData(symbol string, bin string, count int) []*models.Bar {
 	}
 
 	bars := []*models.Bar{}
-	tableName := strings.ToLower(symbol + "_" + bin)
-	cmd := fmt.Sprintf("SELECT timestamp, open, high, low, close, volume FROM public.%s ORDER BY \"timestamp\" DESC LIMIT %d", tableName, count)
+	cmd := fmt.Sprintf("select timestamp, open, high, low, close, volume from candles where symbol = '%s' and exchange = '%s' and interval = '%s' and timestamp >= '%d' and timestamp <= '%d'", symbol, exchange, interval, startTimestamp.Unix()*1000, endTimestamp.Unix()*1000)
 	err = db.Select(&bars, cmd)
-
 	if err != nil {
 		log.Fatal(err)
 	}

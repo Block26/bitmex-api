@@ -5,7 +5,7 @@ import (
 	"log"
 	"math"
 	"strings"
-	// "time"
+	"time"
 
 	"github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
@@ -159,7 +159,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 	algo.Index = len(localBars) - 1
 	algo.Market.Price = convertTradeBinToBar(trade)
 	setupData(localBars, *algo)
-	algo.Timestamp = localBars[algo.Index].Timestamp.String()
+	algo.Timestamp = time.Unix(localBars[algo.Index].Timestamp/1000, 0).UTC().String()
 	log.Println("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
 		algo.logState()

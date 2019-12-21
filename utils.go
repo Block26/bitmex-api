@@ -16,8 +16,8 @@ import (
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/TheAlgoV2/settings"
-	. "gopkg.in/src-d/go-git.v4/_examples"
 	"github.com/tantralabs/tradeapi/iex"
+	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
 // Load a config file containing sensitive information from a local
@@ -52,7 +52,7 @@ func convertTradeBinsToBars(bins []iex.TradeBin) (bars []*models.Bar) {
 
 func convertTradeBinToBar(bin iex.TradeBin) models.Bar {
 	return models.Bar{
-		Timestamp: bin.Timestamp,
+		Timestamp: bin.Timestamp.Unix()*1000,
 		Open:      bin.Open,
 		High:      bin.High,
 		Low:       bin.Low,

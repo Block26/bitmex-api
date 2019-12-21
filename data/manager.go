@@ -11,14 +11,14 @@ import (
 var barData []*models.Bar
 
 func UpdateLocalBars(localBars *[]*models.Bar, newBars []*models.Bar) {
-	timestamps := make([]string, len(*localBars))
-	for i := range *localBars {
-		timestamps[i] = (*localBars)[i].Timestamp.String()
+	timestamps := make([]int64, len(barData))
+	for i := range barData {
+		timestamps[i] = barData[i].Timestamp
 	}
 
 	if newBars != nil {
 		for y := range newBars {
-			if !containsString(timestamps, newBars[y].Timestamp.String()) {
+			if !containsInt(timestamps, newBars[y].Timestamp) {
 				newBars = append(newBars, &models.Bar{
 					Timestamp: newBars[y].Timestamp,
 					Open:      newBars[y].Open,
@@ -31,7 +31,7 @@ func UpdateLocalBars(localBars *[]*models.Bar, newBars []*models.Bar) {
 	}
 
 	var b []*models.Bar
-	sort.Slice(b, func(i, j int) bool { return (*localBars)[i].Timestamp.After((*localBars)[j].Timestamp) })
+	sort.Slice(b, func(i, j int) bool { return (*localBars)[i].Timestamp > (*localBars)[j].Timestamp })
 	localBars = &b
 }
 
@@ -41,15 +41,15 @@ func UpdateBars(ex iex.IExchange, symbol string, bin string, count int) []*model
 		log.Fatal("err getting data", err)
 	}
 
-	timestamps := make([]string, len(barData))
+	timestamps := make([]int64, len(barData))
 	for i := range barData {
-		timestamps[i] = barData[i].Timestamp.String()
+		timestamps[i] = barData[i].Timestamp
 	}
 
 	for y := range newData {
-		if !containsString(timestamps, newData[y].Timestamp.String()) {
+		if !containsInt(timestamps, newData[y].Timestamp.Unix()*1000) {
 			barData = append(barData, &models.Bar{
-				Timestamp: newData[y].Timestamp,
+				Timestamp: newData[y].Timestamp.Unix() * 1000,
 				Open:      newData[y].Open,
 				High:      newData[y].High,
 				Low:       newData[y].Low,
@@ -58,11 +58,11 @@ func UpdateBars(ex iex.IExchange, symbol string, bin string, count int) []*model
 		}
 	}
 
-	sort.Slice(barData, func(i, j int) bool { return barData[i].Timestamp.Before(barData[j].Timestamp) })
+	sort.Slice(barData, func(i, j int) bool { return barData[i].Timestamp < barData[j].Timestamp })
 	return barData
 }
 
-func containsString(s []string, e string) bool {
+func containsInt(s []int64, e int64) bool {
 	for _, a := range s {
 		if a == e {
 			return true
