@@ -48,7 +48,7 @@ func RunBacktest(startTime time.Time, endTime time.Time, algo Algo, rebalance fu
 	log.Println("Running", len(data), "bars")
 	for _, bar := range data {
 		if idx == 0 {
-			log.Println("Start Timestamp", bar.Timestamp)
+			log.Println("Start Timestamp", time.Unix(bar.Timestamp/1000, 0))
 			// 	//Set average cost if starting with a quote balance
 			if algo.Market.QuoteAsset.Quantity > 0 {
 				algo.Market.AverageCost = bar.Close
@@ -114,7 +114,11 @@ func RunBacktest(startTime time.Time, endTime time.Time, algo Algo, rebalance fu
 	// log.Println("mean", mean, "std", std)
 	score := mean / std
 	// TODO change the scoring based on 1h / 1m
-	score = score * math.Sqrt(365*24*60)
+	if algo.DecisionInterval == "1h" {
+		score = score * math.Sqrt(365*24)
+	} else if algo.DecisionInterval == "1m" {
+		score = score * math.Sqrt(365*24*60)
+	}
 
 	if math.IsNaN(score) {
 		score = -100

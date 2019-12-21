@@ -37,6 +37,10 @@ func GetData(symbol string, exchange string, interval string, startTimestamp tim
 		log.Fatal(err)
 	}
 
+	if len(bars) == 0 {
+		log.Fatal("There doesn't seem to be any data for", exchange, symbol, interval, "in the database. Maybe it was your start and end dates?")
+	}
+
 	db.Close()
 
 	return bars
