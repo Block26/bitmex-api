@@ -13,7 +13,6 @@ import (
 
 	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
-	database "github.com/tantralabs/TheAlgoV2/data"
 	"github.com/tantralabs/TheAlgoV2/models"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
@@ -31,8 +30,7 @@ const MinTradeAmount = .1
 const MakerFee = 0.
 const TakerFee = .001
 
-func RunBacktest(startTime time.Time, endTime time.Time, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
-	data := database.GetData(algo.Market.Symbol, algo.Market.Exchange, algo.DecisionInterval, startTime, endTime)
+func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
 	setupData(data, algo)
 	start := time.Now()
 	var history []models.History
