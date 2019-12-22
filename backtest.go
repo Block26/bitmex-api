@@ -13,7 +13,7 @@ import (
 
 	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
-	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/yantra/models"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
@@ -30,7 +30,7 @@ const MinTradeAmount = .1
 const MakerFee = 0.
 const TakerFee = .001
 
-func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
+func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
 	setupData(data, algo)
 	start := time.Now()
 	var history []models.History
@@ -57,7 +57,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 			algo.Index = idx
 			algo.Market.Price = *bar
 			// algo.updateActiveOptions()
-			algo = rebalance(bar.Open, algo)
+			algo = rebalance(algo)
 			// log.Println(data)
 			if algo.FillType == "limit" {
 				//Check which buys filled

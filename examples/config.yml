@@ -18,8 +18,8 @@ jobs:
       - run: ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts
       - run: go mod download
       - run: go mod vendor
-      - run: mv /tmp/project/vendor/github.com/tantralabs/TheAlgoV2/settings /tmp/project/settings
-      - run: mv /tmp/project/vendor/github.com/tantralabs/TheAlgoV2/ca-certificates.crt /tmp/project/ca-certificates.crt
+      - run: mv /tmp/project/vendor/github.com/tantralabs/yantra/settings /tmp/project/settings
+      - run: mv /tmp/project/vendor/github.com/tantralabs/yantra/ca-certificates.crt /tmp/project/ca-certificates.crt
       - run: CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
       - persist_to_workspace:
           root: /tmp/project

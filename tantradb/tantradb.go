@@ -6,7 +6,7 @@ import (
 	"log"
 
 	_ "github.com/lib/pq"
-	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/yantra/models"
 )
 
 const (

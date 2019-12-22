@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tantralabs/TheAlgoV2/data"
-	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/yantra/data"
+	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 )
@@ -18,7 +18,7 @@ var firstTrade bool
 var firstPositionUpdate bool
 var shouldHaveQuantity float64
 
-func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64, Algo) Algo, setupData func([]*models.Bar, Algo)) {
+func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) {
 	if algo.DecisionInterval == "" {
 		log.Fatal("DecisionInterval must be set")
 	}
@@ -103,7 +103,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(float64
 			algo.updatePositions(positions)
 		case trade := <-channels.TradeBinChan:
 			algo.updateState(ex, trade[0], localBars, setupData)
-			algo = rebalance(trade[0].Close, algo)
+			algo = rebalance(algo)
 			algo.setupOrders()
 			algo.PlaceOrdersOnBook(ex, localOrders)
 			algo.logState()

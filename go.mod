@@ -1,4 +1,4 @@
-module github.com/tantralabs/TheAlgoV2
+module github.com/tantralabs/yantra
 
 go 1.13
 
