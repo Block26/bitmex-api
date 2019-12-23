@@ -127,6 +127,9 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	}
 
 	// fmt.Printf("Last option balance: %v\n", lastOptionBalance)
+	algo.Params["EntryOrderSize"] = algo.EntryOrderSize
+	algo.Params["ExitOrderSize"] = algo.ExitOrderSize
+	algo.Params["DeleverageOrderSize"] = algo.DeleverageOrderSize
 
 	kvparams := createKeyValuePairs(algo.Params)
 	fmt.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s",
@@ -145,8 +148,6 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	log.Println("Execution Speed", elapsed)
 	// log.Println("History Length", len(history), "Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
 
-	algo.Params["EntryOrderSize"] = algo.EntryOrderSize
-	algo.Params["ExitOrderSize"] = algo.ExitOrderSize
 	algo.Result = map[string]interface{}{
 		"balance":             history[historyLength-1].UBalance,
 		"max_leverage":        maxLeverage,

@@ -35,6 +35,30 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				Futures:             true,
 				BulkCancelSupported: true,
 			}, nil
+		case "ETHUSD":
+			return models.Market{
+				Symbol:      "ETHUSD",
+				Exchange:    "bitmex",
+				BaseAsset: models.Asset{
+					Symbol:   "ETH",
+					Quantity: 1,
+				},
+				QuoteAsset: models.Asset{
+					Symbol:   "USD",
+					Quantity: 0,
+				},
+				MaxLeverage:         1,
+				MinimumOrderSize:    25,
+				TickSize:            1,
+				QuantityTickSize:    1,
+				QuantityPrecision:   0,
+				PricePrecision:      2,
+				MaxOrders:           20,
+				MakerFee:            -0.00025,
+				TakerFee:            0.00075,
+				Futures:             true,
+				BulkCancelSupported: true,
+			}, nil
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
 		}
