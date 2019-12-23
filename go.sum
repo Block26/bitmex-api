@@ -175,7 +175,6 @@ github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXf
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/tantralabs/eaopt v0.1.1-0.20191217192927-f9ded663d8fe h1:NXkxYi2FK1lsbApvKOokFbCR8HNPxPl0lGS3IIdxoDk=
 github.com/tantralabs/eaopt v0.1.1-0.20191217192927-f9ded663d8fe/go.mod h1:AJj0mJkQXEOhwdgxglbcSmqipxK7B4GadT5d2jL0AF8=
-github.com/tantralabs/exchanges v0.0.0-20191106215748-4d3dd77e096e/go.mod h1:NiPXmLirZ53Py4r6Q4FNU0+cReuVnJ12jj8y+K0KCVU=
 github.com/tidwall/gjson v1.3.2/go.mod h1:P256ACg0Mn+j1RXIDXoss50DeIABTYK1PULOJHhxOls=
 github.com/tidwall/match v1.0.1/go.mod h1:LujAq0jyVjBy028G1WhWfIzbpQfMO8bBZ6Tyb0+pL9E=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
