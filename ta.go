@@ -1,6 +1,7 @@
 package algo
 
 import (
+	"log"
 	ta "github.com/d4l3k/talib"
 )
 
@@ -22,6 +23,9 @@ func GetDX(high []float64, low []float64, close []float64, index int32, length i
 }
 
 func CreateEMA(data []float64, length int32) []float64 {
+	if length <= 1 {
+		log.Fatal("Length of the ema must be greater than 1")
+	}
 	newEma := make([]float64, len(data))
 	ema := ta.Ema(data, length)
 	for x := range newEma {
