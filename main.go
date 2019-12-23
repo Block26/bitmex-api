@@ -21,7 +21,6 @@ type Algo struct {
 	EntryOrderSize      float64
 	ExitOrderSize       float64
 	DeleverageOrderSize float64
-	AutoOrderSizing     bool
 	AutoOrderPlacement  bool
 	CanBuyBasedOnMax    bool
 
