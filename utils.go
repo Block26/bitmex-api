@@ -230,7 +230,10 @@ func (algo *Algo) LogLiveState() {
 	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}
 
 	fields := structs.Map(algo.Market)
+	
 	fields["Price"] = algo.Market.Price.Close
+	fields["Balance"] = algo.Market.BaseAsset.Quantity
+	fields["Quantity"] = algo.Market.QuoteAsset.Quantity
 
 	pt, err := client.NewPoint(
 		"market",
