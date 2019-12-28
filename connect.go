@@ -7,10 +7,10 @@ import (
 	"strings"
 	// "time"
 
-	"github.com/tantralabs/TheAlgoV2/data"
-	"github.com/tantralabs/TheAlgoV2/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
+	"github.com/tantralabs/yantra/data"
+	"github.com/tantralabs/yantra/models"
 )
 
 var orderStatus iex.OrderStatus
@@ -129,7 +129,7 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 				algo.Market.BaseAsset.Quantity = float64(position.CurrentQty)
 				log.Println("BaseAsset updated")
 			} else {
-				for _, option := range algo.Market.Options {
+				for _, option := range algo.Market.OptionContracts {
 					if option.Symbol == position.Symbol {
 						option.Position = position.CurrentQty
 						fmt.Printf("Updated position for %v: %v\n", option.Symbol, option.Position)
@@ -183,8 +183,8 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 		if err == nil {
 			// fmt.Printf("Got markets from API: %v\n", markets)
 			for _, market := range markets {
-				containsSymbols := false
-				for _, option := range algo.Market.Options {
+				containsSymbol := false
+				for _, option := range algo.Market.OptionContracts {
 					if option.Symbol == market.Symbol {
 						containsSymbol = true
 					}
@@ -208,11 +208,9 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 						Status:           "open",
 						MidMarketPrice:   market.MidMarketPrice,
 					}
-					// fmt.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
-					algo.Market.Options = append(algo.Market.Options, optionContract)
+					fmt.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
+					algo.Market.OptionContracts = append(algo.Market.OptionContracts, optionContract)
 				}
-				fmt.Printf("Parsed OptionContract: %v\n", optionContract.Symbol)
-				algo.Market.OptionContracts = append(algo.Market.OptionContracts, optionContract)
 			}
 		} else {
 			fmt.Printf("Error getting markets: %v\n", err)

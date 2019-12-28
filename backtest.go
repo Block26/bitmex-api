@@ -13,9 +13,9 @@ import (
 
 	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
-	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/yantra/models"
 
-	"github.com/tantralabs/TheAlgoV2/tantradb"
+	"github.com/tantralabs/yantra/tantradb"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
@@ -41,14 +41,13 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 	var history []models.History
 	var timestamp time.Time
 	// starting_algo.Market.BaseBalance := 0
-	volStart := ToIntTimestamp(data[0].Timestamp)
-	volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
+	volStart := TimeToTimestamp(data[0].Timestamp)
+	volEnd := TimeToTimestamp(data[len(data)-1].Timestamp)
 	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
-	algo.Timestamp = data[0].Timestamp
+	algo.Timestamp = data[0].Timestamp.String()
 	VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
-	algo.Market.Options = generateActiveOptions(&algo)
+	algo.Market.OptionContracts = generateActiveOptions(&algo)
 	fmt.Printf("Len vol data: %v\n", len(VolData))
-	timestamp := ""
 	idx := 0
 	log.Println("Running", len(data), "bars")
 	for _, bar := range data {
@@ -425,7 +424,7 @@ func (algo *Algo) updateOptionsPositions() {
 
 func generateActiveOptions(algo *Algo) []models.OptionContract {
 	if ToIntTimestamp(algo.Timestamp)-LastOptionLoad < OptionLoadFreq*1000 {
-		return algo.Market.Options
+		return algo.Market.OptionContracts
 	}
 	fmt.Printf("Generating active options with last option load %v, current timestamp %v\n", LastOptionLoad, ToIntTimestamp(algo.Timestamp))
 	const numWeeklys = 3
@@ -457,7 +456,7 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
 				vol := GetNearestVol(VolData, ToIntTimestamp(algo.Timestamp))
-				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price, strike, ToIntTimestamp(algo.Timestamp), expiry, 0, vol, -1)
+				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price.Close, strike, ToIntTimestamp(algo.Timestamp), expiry, 0, vol, -1)
 				optionContract := models.OptionContract{
 					Symbol:           GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
 					Strike:           strike,

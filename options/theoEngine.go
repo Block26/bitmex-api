@@ -5,8 +5,8 @@ import (
 	"math"
 	"time"
 
-	base "github.com/tantralabs/TheAlgoV2"
-	"github.com/tantralabs/TheAlgoV2/models"
+	base "github.com/tantralabs/yantra"
+	"github.com/tantralabs/yantra/models"
 )
 
 type TheoEngine struct {

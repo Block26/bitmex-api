@@ -1,7 +1,7 @@
 package algo
 
 import (
-	"github.com/tantralabs/TheAlgoV2/settings"
+	"github.com/tantralabs/yantra/settings"
 	// "github.com/tantralabs/exchanges/bitmex"
 	// "github.com/tantralabs/exchanges/bitmex/swagger"
 	// . "gopkg.in/src-d/go-git.v4/_examples"

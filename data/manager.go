@@ -4,7 +4,7 @@ import (
 	"log"
 	"sort"
 
-	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/tradeapi/iex"
 )
 

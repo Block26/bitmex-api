@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log"
 
-	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/yantra/models"
 )
 
 func LoadMarket(exchange string, market string) (newMarket models.Market, err error) {

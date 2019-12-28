@@ -1,11 +1,11 @@
 //export GOPATH=/Users/russell/git/go && export PATH=$PATH:$(go env GOPATH)/bin
-//go install github.com/tantralabs/TheAlgoV2 && TheAlgoV2
+//go install github.com/tantralabs/yantra && yantra
 // export GPG_TTY=$(tty)
 
 package algo
 
 import (
-	"github.com/tantralabs/TheAlgoV2/models"
+	"github.com/tantralabs/yantra/models"
 )
 
 var commitHash string

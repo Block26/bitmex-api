@@ -14,8 +14,8 @@ import (
 	"github.com/fatih/structs"
 	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
-	"github.com/tantralabs/TheAlgoV2/models"
-	"github.com/tantralabs/TheAlgoV2/settings"
+	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/settings"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 	"github.com/tantralabs/tradeapi/iex"
 )
