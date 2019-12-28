@@ -172,7 +172,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(float64, Algo) Al
 		panic(err)
 	}
 
-	LogBacktest(algo)
+	// LogBacktest(algo)
 	// score := ((math.Abs(minProfit) / history[historyLength-1].Balance) + maxLeverage) - history[historyLength-1].Balance // minimize
 	return algo //history.Balance[len(history.Balance)-1] / (maxLeverage + 1)
 }
@@ -253,7 +253,7 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 
 func (algo *Algo) updateOptionBalance() {
 	optionBalance := 0.
-	for _, option := range algo.Market.Options {
+	for _, option := range algo.Market.OptionContracts {
 		// Calculate unrealized pnl
 		option.OptionTheo.UnderlyingPrice = algo.Market.Price.Close
 		option.OptionTheo.CalcBlackScholesTheo(false)
@@ -396,7 +396,7 @@ func LogBacktest(algo Algo) {
 
 func (algo *Algo) updateOptionsPositions() {
 	//Aggregate positions
-	for _, option := range algo.Market.Options {
+	for _, option := range algo.Market.OptionContracts {
 		total := 0.
 		avgPrice := 0.
 		for i, qty := range option.BuyOrders.Quantity {
@@ -487,14 +487,14 @@ func (algo *Algo) updateActiveOptions() {
 	for _, activeOption := range activeOptions {
 		// Check to see if this option is already known
 		isNew := true
-		for _, option := range algo.Market.Options {
+		for _, option := range algo.Market.OptionContracts {
 			if option.Symbol == activeOption.Symbol {
 				isNew = false
 				break
 			}
 		}
 		if isNew {
-			algo.Market.Options = append(algo.Market.Options, activeOption)
+			algo.Market.OptionContracts = append(algo.Market.OptionContracts, activeOption)
 			fmt.Printf("Found new active option: %v\n", activeOption.OptionTheo.String())
 		}
 	}

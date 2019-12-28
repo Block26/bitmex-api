@@ -84,7 +84,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	//Parse option orders
 	totalQty = 0.0
-	for _, option := range a.Market.Options {
+	for _, option := range a.Market.OptionContracts {
 		for i, qty := range option.BuyOrders.Quantity {
 			fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
@@ -111,7 +111,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 	totalQty = 0.0
-	for _, option := range a.Market.Options {
+	for _, option := range a.Market.OptionContracts {
 		for i, qty := range option.SellOrders.Quantity {
 			fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
@@ -211,7 +211,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			Uuid:   order.OrderID,
 		})
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(err)		
 		}
 		time.Sleep(50 * time.Millisecond)
 	}

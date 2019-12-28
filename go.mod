@@ -4,6 +4,7 @@ go 1.13
 
 // replace github.com/tantralabs/exchanges => ../../tantralabs/exchanges
 // replace github.com/tantralabs/eaopt => ../../tantralabs/eaopt
+
 // replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
 
 require (
@@ -18,8 +19,9 @@ require (
 	github.com/influxdata/influxdb1-client v0.0.0-20190809212627-fc22c7df067e
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.2.0
-	github.com/tantralabs/eaopt v0.1.0 // indirect
+	github.com/tantralabs/eaopt v0.1.0
 	github.com/tantralabs/exchanges v0.0.0-20191106215748-4d3dd77e096e
+	github.com/tantralabs/tradeapi v0.0.0-00010101000000-000000000000
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	gonum.org/v1/gonum v0.0.0-20190724133715-a8659125a966
 	google.golang.org/api v0.13.0

@@ -148,6 +148,8 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				TakerFee:            0.00075,
 				Futures:             true,
 				BulkCancelSupported: false,
+				Options:			 true,
+				OptionContracts: []models.OptionContract{},
 			}, nil
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
@@ -178,6 +180,8 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				TakerFee:            0.00075,
 				Futures:             true,
 				BulkCancelSupported: false,
+				Options:			 true,
+				OptionContracts: []models.OptionContract{},
 			}, nil
 		default:
 			log.Println(m, "is not supported for exchange", exchange)

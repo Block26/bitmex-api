@@ -144,7 +144,7 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 			firstPositionUpdate = false
 		}
 	}
-	// algo.logState()
+	algo.logState()
 }
 
 func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
@@ -183,7 +183,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 		if err == nil {
 			// fmt.Printf("Got markets from API: %v\n", markets)
 			for _, market := range markets {
-				containsSymbol := false
+				containsSymbols := false
 				for _, option := range algo.Market.Options {
 					if option.Symbol == market.Symbol {
 						containsSymbol = true
@@ -211,6 +211,8 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 					// fmt.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
 					algo.Market.Options = append(algo.Market.Options, optionContract)
 				}
+				fmt.Printf("Parsed OptionContract: %v\n", optionContract.Symbol)
+				algo.Market.OptionContracts = append(algo.Market.OptionContracts, optionContract)
 			}
 		} else {
 			fmt.Printf("Error getting markets: %v\n", err)
