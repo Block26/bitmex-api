@@ -14,6 +14,7 @@ import (
 	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/tantradb"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
@@ -22,6 +23,8 @@ var currentRunUUID time.Time
 
 var VolData []models.ImpliedVol
 var lastOptionBalance = 0.
+var LastOptionLoad = 0
+var OptionLoadFreq = 15
 
 //TODO: these should be a config somewhere
 const StrikeInterval = 250.
@@ -36,12 +39,15 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	var history []models.History
 	var timestamp time.Time
 	// starting_algo.Market.BaseBalance := 0
-	// volStart := ToIntTimestamp(data[0].Timestamp)
-	// volEnd := ToIntTimestamp(data[len(data)-1].Timestamp)
-	// fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
-	// VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
-	// algo.Market.Options = generateActiveOptions(&algo)
-	// fmt.Printf("Len vol data: %v\n", len(VolData))
+	// volStart := TimeToTimestamp(data[0].Timestamp)
+	// volEnd := TimeToTimestamp(data[len(data)-1].Timestamp)
+	volStart := int(data[0].Timestamp)
+	volEnd := int(data[len(data)-1].Timestamp)
+	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
+	algo.Timestamp = TimestampToTime(volStart).String()
+	VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
+	algo.Market.OptionContracts = generateActiveOptions(&algo)
+	fmt.Printf("Len vol data: %v\n", len(VolData))
 	idx := 0
 	log.Println("Running", len(data), "bars")
 	for _, bar := range data {
@@ -170,7 +176,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		panic(err)
 	}
 
-	LogBacktest(algo)
+	// LogBacktest(algo)
 	// score := ((math.Abs(minProfit) / history[historyLength-1].Balance) + maxLeverage) - history[historyLength-1].Balance // minimize
 	return algo //history.Balance[len(history.Balance)-1] / (maxLeverage + 1)
 }
@@ -251,7 +257,7 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 
 func (algo *Algo) updateOptionBalance() {
 	optionBalance := 0.
-	for _, option := range algo.Market.Options {
+	for _, option := range algo.Market.OptionContracts {
 		// Calculate unrealized pnl
 		option.OptionTheo.UnderlyingPrice = algo.Market.Price.Close
 		option.OptionTheo.CalcBlackScholesTheo(false)
@@ -394,7 +400,7 @@ func LogBacktest(algo Algo) {
 
 func (algo *Algo) updateOptionsPositions() {
 	//Aggregate positions
-	for _, option := range algo.Market.Options {
+	for _, option := range algo.Market.OptionContracts {
 		total := 0.
 		avgPrice := 0.
 		for i, qty := range option.BuyOrders.Quantity {
@@ -422,6 +428,10 @@ func (algo *Algo) updateOptionsPositions() {
 }
 
 func generateActiveOptions(algo *Algo) []models.OptionContract {
+	if ToIntTimestamp(algo.Timestamp)-LastOptionLoad < OptionLoadFreq*1000 {
+		return algo.Market.OptionContracts
+	}
+	fmt.Printf("Generating active options with last option load %v, current timestamp %v\n", LastOptionLoad, ToIntTimestamp(algo.Timestamp))
 	const numWeeklys = 3
 	const numMonthlys = 5
 	//TODO: these should be based on underlying price
@@ -445,12 +455,13 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 	}
 	fmt.Printf("Generated expirys: %v\n", expirys)
 	strikes := Arange(minStrike, maxStrike, StrikeInterval)
-	fmt.Printf("Generated strikes: %v\n", expirys)
+	fmt.Printf("Generated strikes: %v\n", strikes)
 	var optionContracts []models.OptionContract
 	for _, expiry := range expirys {
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
-				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price.Close, strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
+				vol := GetNearestVol(VolData, ToIntTimestamp(algo.Timestamp))
+				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price.Close, strike, ToIntTimestamp(algo.Timestamp), expiry, 0, vol, -1)
 				optionContract := models.OptionContract{
 					Symbol:           GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
 					Strike:           strike,
@@ -465,11 +476,13 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 					Position:         0,
 					OptionTheo:       *optionTheo,
 					Status:           "open",
+					MidMarketPrice:   -1.,
 				}
 				optionContracts = append(optionContracts, optionContract)
 			}
 		}
 	}
+	LastOptionLoad = ToIntTimestamp(algo.Timestamp)
 	return optionContracts
 }
 
@@ -478,17 +491,29 @@ func (algo *Algo) updateActiveOptions() {
 	for _, activeOption := range activeOptions {
 		// Check to see if this option is already known
 		isNew := true
-		for _, option := range algo.Market.Options {
+		for _, option := range algo.Market.OptionContracts {
 			if option.Symbol == activeOption.Symbol {
 				isNew = false
 				break
 			}
 		}
 		if isNew {
-			algo.Market.Options = append(algo.Market.Options, activeOption)
+			algo.Market.OptionContracts = append(algo.Market.OptionContracts, activeOption)
 			fmt.Printf("Found new active option: %v\n", activeOption.OptionTheo.String())
 		}
 	}
+}
+
+func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
+	vol := -1.
+	for _, data := range volData {
+		timeDiff := time - data.Timestamp
+		if timeDiff < 0 {
+			vol = data.IV / 100 //Assume volData quotes IV in pct
+			break
+		}
+	}
+	return vol
 }
 
 func intInSlice(a int, list []int) bool {

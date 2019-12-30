@@ -16,4 +16,5 @@ type OptionContract struct {
 	Position         float64
 	OptionTheo       OptionTheo
 	Status           string // "open", "expired"
+	MidMarketPrice   float64
 }

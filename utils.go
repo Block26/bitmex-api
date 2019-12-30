@@ -177,7 +177,7 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 		}
 
 	} else {
-		algo.LogLiveState()
+		// algo.LogLiveState()
 	}
 	if algo.Debug {
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price.Close+(algo.Market.QuoteAsset.Quantity), 0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price.Close, algo.Market.AverageCost))
@@ -191,11 +191,14 @@ func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side fl
 		currentWeight = float64(algo.Market.Weight)
 	}
 	adding := currentWeight == float64(algo.Market.Weight)
-	// fmt.Println(algo.Timestamp, "Here", algo.canBuy(), (algo.Market.QuoteAsset.Quantity))
+	// fmt.Printf("CURRENT WEIGHT %v, adding %v, leverage target %v, can buy %v, deleverage order size %v\n", currentWeight, adding, algo.LeverageTarget, algo.canBuy(), algo.DeleverageOrderSize)
+	fmt.Printf("Getting order size with quote asset quantity: %v\n", algo.Market.QuoteAsset.Quantity)
 	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
+		fmt.Printf("Getting entry order with entry order size %v, leverage target %v, leverage %v\n", algo.EntryOrderSize, algo.LeverageTarget, algo.Market.Leverage)
 		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
 		side = float64(algo.Market.Weight)
 	} else if !adding {
+		fmt.Printf("Getting exit order size with exit order size %v, leverage %v, weight %v\n", algo.ExitOrderSize, algo.Market.Leverage, algo.Market.Weight)
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
 		side = float64(currentWeight * -1)
 	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
@@ -366,6 +369,10 @@ func GetOHLCBars(bars []*models.Bar) ([]float64, []float64, []float64, []float64
 
 func ToIntTimestamp(timeString string) int {
 	layout := "2006-01-02 15:04:05"
+	if strings.Contains(timeString, "+0000 UTC") {
+		timeString = strings.Replace(timeString, "+0000 UTC", "", 1)
+	}
+	timeString = strings.TrimSpace(timeString)
 	currentTime, err := time.Parse(layout, timeString)
 	if err != nil {
 		fmt.Printf("Error parsing timeString: %v\n", err)
@@ -377,7 +384,6 @@ func ToTimeObject(timeString string) time.Time {
 	layout := "2006-01-02 15:04:05"
 	if strings.Contains(timeString, "+0000 UTC") {
 		timeString = strings.Replace(timeString, "+0000 UTC", "", 1)
-		fmt.Printf("Trimmed timestring: %v\n", timeString)
 	}
 	timeString = strings.TrimSpace(timeString)
 	currentTime, err := time.Parse(layout, timeString)
@@ -396,7 +402,7 @@ func TimestampToTime(timestamp int) time.Time {
 }
 
 func TimeToTimestamp(timeObject time.Time) int {
-	return timeObject.UTC().Nanosecond() / 1000000
+	return int(timeObject.UnixNano() / 1000000)
 }
 
 func Round(x, unit float64) float64 {
