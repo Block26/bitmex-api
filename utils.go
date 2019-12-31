@@ -14,9 +14,9 @@ import (
 	"github.com/fatih/structs"
 	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/settings"
-	"github.com/tantralabs/tradeapi/iex"
 	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
@@ -52,7 +52,7 @@ func convertTradeBinsToBars(bins []iex.TradeBin) (bars []*models.Bar) {
 
 func convertTradeBinToBar(bin iex.TradeBin) models.Bar {
 	return models.Bar{
-		Timestamp: bin.Timestamp.Unix()*1000,
+		Timestamp: bin.Timestamp.Unix() * 1000,
 		Open:      bin.Open,
 		High:      bin.High,
 		Low:       bin.Low,
@@ -104,6 +104,26 @@ func (algo *Algo) CurrentProfit(price float64) float64 {
 	} else {
 		return calculateDifference(price, algo.Market.AverageCost)
 	}
+}
+
+func (algo *Algo) getPositionAbsLoss() float64 {
+	positionLoss := 0.0
+	if algo.Market.QuoteAsset.Quantity < 0 {
+		positionLoss = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.High) * algo.Market.Leverage)
+	} else {
+		positionLoss = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Low) * algo.Market.Leverage)
+	}
+	return positionLoss
+}
+
+func (algo *Algo) getPositionAbsProfit() float64 {
+	positionProfit := 0.0
+	if algo.Market.QuoteAsset.Quantity > 0 {
+		positionProfit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.High) * algo.Market.Leverage)
+	} else {
+		positionProfit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Low) * algo.Market.Leverage)
+	}
+	return positionProfit
 }
 
 func (algo *Algo) getExitOrderSize(orderSizeGreaterThanPositionSize bool) float64 {
@@ -163,6 +183,8 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 			AverageCost: algo.Market.AverageCost,
 			Leverage:    algo.Market.Leverage,
 			Profit:      algo.Market.Profit,
+			MaxLoss:     algo.getPositionAbsLoss(),
+			MaxProfit:   algo.getPositionAbsProfit(),
 			Price:       algo.Market.Price.Close,
 		}
 
@@ -244,7 +266,7 @@ func (algo *Algo) LogLiveState() {
 	bp.AddPoint(pt)
 
 	fields = algo.Params
-	
+
 	fields["EntryOrderSize"] = algo.EntryOrderSize
 	fields["ExitOrderSize"] = algo.ExitOrderSize
 	fields["DeleverageOrderSize"] = algo.DeleverageOrderSize

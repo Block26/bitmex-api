@@ -17,9 +17,9 @@ func CreateNATREMA(high []float64, low []float64, close []float64, index int, na
 	return ema
 }
 
-func GetDX(high []float64, low []float64, close []float64, index int, length int) []float64 {
+func GetDX(high []float64, low []float64, close []float64, index int, datalength int, length int) []float64 {
 	//TODO check live
-	return ta.Dx(high[index-length-1:index], low[index-length-1:index], close[index-length-1:index], length)
+	return ta.Dx(high[index-datalength-1:index], low[index-datalength-1:index], close[index-datalength-1:index], length)
 }
 
 func CreateEMA(data []float64, length int) []float64 {
@@ -28,6 +28,7 @@ func CreateEMA(data []float64, length int) []float64 {
 	}
 	// newEma := make([]float64, len(data))
 	ema := ta.Ema(data, length)
+	return ema
 	// for x := range newEma {
 	// 	if x < int(length) {
 	// 		newEma[x] = 0
@@ -35,5 +36,5 @@ func CreateEMA(data []float64, length int) []float64 {
 	// 		newEma[x] = ema[x-int(length)]
 	// 	}
 	// }
-	return ema
+	// return newEma
 }

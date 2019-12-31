@@ -301,15 +301,19 @@ func MinMaxStats(history []models.History) (float64, float64, float64, float64, 
 	var maxLeverage float64 = history[0].Leverage
 	var minLeverage float64 = history[0].Leverage
 
+	var maxPositionLoss float64 = 0.0
+	var maxPositionProfit float64 = 0.0
 	var drawdown float64 = 0.0
 	var highestBalance float64 = 0.0
 
 	for _, row := range history {
 		if maxProfit < row.Profit {
-			maxProfit = row.Profit
+			maxProfit = row.MaxProfit
+			maxPositionProfit = maxProfit / row.UBalance
 		}
 		if minProfit > row.Profit {
-			minProfit = row.Profit
+			minProfit = row.MaxLoss
+			maxPositionLoss = minProfit / row.UBalance
 		}
 
 		if row.UBalance > highestBalance {
@@ -328,7 +332,7 @@ func MinMaxStats(history []models.History) (float64, float64, float64, float64, 
 			minLeverage = row.Leverage
 		}
 	}
-	return minProfit, maxProfit, minLeverage, maxLeverage, drawdown
+	return maxPositionLoss, maxPositionProfit, minLeverage, maxLeverage, drawdown
 }
 
 func getFilledBidOrders(prices []float64, orders []float64, price float64) ([]float64, []float64) {
