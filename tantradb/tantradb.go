@@ -12,7 +12,7 @@ import (
 const (
 	host     = "localhost"
 	port     = 5432
-	user     = "user"
+	user     = "yantrauser"
 	password = "password"
 	dbname   = "tantra"
 )
