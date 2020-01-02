@@ -1,2 +1,2 @@
 # Yantra
-Follow a wiki to get started
+Follow the wiki to get started
