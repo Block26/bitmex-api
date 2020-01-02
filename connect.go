@@ -190,7 +190,8 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 					}
 				}
 				if !containsSymbol {
-					expiry := market.Expiry * 1000
+					// expiry := market.Expiry * 1000
+					expiry := market.Expiry
 					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price.Close, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
 					optionContract := models.OptionContract{
 						Symbol:           market.Symbol,
