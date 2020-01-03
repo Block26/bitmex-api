@@ -89,8 +89,12 @@ func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, c
 				option.OptionTheo.CalcBinomialTreeTheo(.5, 15)
 				theo = option.OptionTheo.BinomialTheo
 			}
-			option.Profit = option.Position * (theo - option.AverageCost)
-			fmt.Printf("[%v] calced profit: %v with avgcost %v, current theo %v, position %v\n", option.Symbol, option.Profit, option.AverageCost, option.OptionTheo.Theo, option.Position)
+			if theo >= 0 {
+				option.Profit = option.Position * (theo - option.AverageCost)
+				fmt.Printf("[%v] calced profit: %v with avgcost %v, current theo %v, position %v\n", option.Symbol, option.Profit, option.AverageCost, option.OptionTheo.Theo, option.Position)
+			} else {
+				fmt.Printf("[%v] Cannot calculate profit for option with negative theo %v\n", option.Symbol, theo)
+			}
 		}
 	}
 }

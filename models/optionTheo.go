@@ -49,15 +49,10 @@ func NewOptionTheo(optionType string, UnderlyingPrice float64, strike float64,
 }
 
 func (o *OptionTheo) String() string {
-	return fmt.Sprintf("OptionTheo %v with expiry %v, strike %v\n", o.OptionType, o.GetExpiryString(), o.Strike)
+	return fmt.Sprintf("%v %v with expiry %v\n", o.Strike, o.OptionType, o.GetExpiryString())
 }
 
 func (o *OptionTheo) GetExpiryString() string {
-	// fmt.Printf("Getting expiry string for %v\n", o.Expiry/1000)
-	// timeInt, err := strconv.ParseInt(string(o.Expiry/1000), 10, 64)
-	// if err != nil {
-	// 	panic(err)
-	// }
 	return time.Unix(int64(o.Expiry/1000), 0).UTC().String()
 }
 
@@ -67,7 +62,6 @@ func GetTimeLeft(currentTime int, expiry int) float64 {
 }
 
 func (o *OptionTheo) calcD1(volatility float64) float64 {
-	// fmt.Printf("Log el %v, interest el %v\n", math.Log(o.UnderlyingPrice/o.Strike), (o.InterestRate+(math.Pow(volatility, 2))/2)*o.TimeLeft)
 	return (math.Log(o.UnderlyingPrice/o.Strike) + (o.InterestRate+(math.Pow(volatility, 2))/2)*o.TimeLeft) / (volatility * math.Sqrt(o.TimeLeft))
 }
 
@@ -77,19 +71,22 @@ func (o *OptionTheo) calcD2(volatility float64) float64 {
 
 // Use Black-Scholes pricing model to calculate theoretical option value
 func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
+	if o.Volatility < 0 && o.Theo < 0 {
+		fmt.Printf("[%v] Cannot calc theo with negative theo %v and negative vol %v\n", o.String(), o.Theo, o.Volatility)
+		return
+	}
 	norm := gaussian.NewGaussian(0, 1)
 	td1 := o.calcD1(o.Volatility)
 	td2 := o.calcD2(o.Volatility)
-	if o.Volatility < 0 && calcGreeks {
+	if o.Volatility < 0 {
 		o.CalcVol()
 	} else {
 		if o.OptionType == "call" {
 			o.Theo = (o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)) / o.UnderlyingPrice
-			// fmt.Printf("d1: %v, d2: %v, cdf 1: %v, cdf 2: %v, exp interest time %v, theo %v, vol %v\n", td1, td2, norm.Cdf(td1), norm.Cdf(td2), math.Exp(-o.InterestRate*o.TimeLeft), o.Theo, o.Volatility)
 		} else if o.OptionType == "put" {
 			o.Theo = (o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)) / o.UnderlyingPrice
-			// fmt.Printf("Cdf 1: %v, cdf 2: %v, exp interest time %v, theo %v\n", norm.Cdf(td1), norm.Cdf(td2), math.Exp(-o.InterestRate*o.TimeLeft), o.Theo)
 		}
+		fmt.Printf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
 	}
 	if calcGreeks {
 		o.CalcGreeks()
@@ -183,9 +180,8 @@ func (o *OptionTheo) CalcWeightedVega() {
 	o.CalcBlackScholesTheo(false)
 	o.CalcVega()
 	o.WeightedVega = o.Vega / atmOption.Vega
-	// fmt.Printf("%v: vega %v, atm vega %v\n", o.String(), o.Vega, atmOption.Vega)
 	// if o.WeightedVega > .05 {
-	// 	fmt.Printf("Got significant weighted vega: %v\n", o.WeightedVega)
+	// 	fmt.Printf("[%v] Got significant weighted vega %v with vega %v and atm vega %v\n", o.String(), o.WeightedVega, o.Vega, atmOption.Vega)
 	// }
 }
 
