@@ -129,10 +129,12 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 				algo.Market.BaseAsset.Quantity = float64(position.CurrentQty)
 				log.Println("BaseAsset updated")
 			} else {
-				for _, option := range algo.Market.OptionContracts {
+				for i := range algo.Market.OptionContracts {
+					option := &algo.Market.OptionContracts[i]
 					if option.Symbol == position.Symbol {
 						option.Position = position.CurrentQty
-						fmt.Printf("Updated position for %v: %v\n", option.Symbol, option.Position)
+						option.AverageCost = position.AvgCostPrice
+						fmt.Printf("[%v] Updated position %v, average cost %v\n", option.Symbol, option.Position, option.AverageCost)
 						break
 					}
 				}
