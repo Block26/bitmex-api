@@ -76,7 +76,8 @@ func AggregateExpiredOptionPnl(options []*models.OptionContract, currentTime int
 }
 
 func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64, method string) {
-	for _, option := range options {
+	for i := range options {
+		option := options[i]
 		if option.Position != 0 {
 			option.OptionTheo.CurrentTime = currentTime
 			option.OptionTheo.UnderlyingPrice = currentPrice
@@ -89,7 +90,7 @@ func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, c
 				theo = option.OptionTheo.BinomialTheo
 			}
 			option.Profit = option.Position * (theo - option.AverageCost)
-			// fmt.Printf("Calculated profit for option %v: %v with position %v and theo %v, vol %v, timeToExpiry %v, underlying %v\n", option.OptionTheo.String(), option.Profit, option.Position, option.OptionTheo.Theo, option.OptionTheo.Volatility, option.OptionTheo.TimeLeft, option.OptionTheo.UnderlyingPrice)
+			fmt.Printf("[%v] calced profit: %v with avgcost %v, current theo %v, position %v\n", option.Symbol, option.Profit, option.AverageCost, option.OptionTheo.Theo, option.Position)
 		}
 	}
 }
