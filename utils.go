@@ -179,7 +179,7 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 		}
 
 	} else {
-		// algo.LogLiveState()
+		algo.LogLiveState()
 	}
 	if algo.Debug {
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price.Close+(algo.Market.QuoteAsset.Quantity), 0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price.Close, algo.Market.AverageCost))
