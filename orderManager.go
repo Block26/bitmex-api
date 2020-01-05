@@ -63,7 +63,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 
-	if totalQty > 0.0 && totalQty > a.Market.MinimumOrderSize  {
+	if totalQty > 0.0 && totalQty > a.Market.MinimumOrderSize {
 		index := len(a.Market.BuyOrders.Quantity) - 1
 		createBid(index, totalQty)
 	}
@@ -86,7 +86,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	totalQty = 0.0
 	for _, option := range a.Market.OptionContracts {
 		for i, qty := range option.BuyOrders.Quantity {
-			fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
+			// fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
 			if totalQty >= option.MinimumOrderSize {
 				orderPrice := option.BuyOrders.Price[i]
@@ -113,7 +113,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	totalQty = 0.0
 	for _, option := range a.Market.OptionContracts {
 		for i, qty := range option.SellOrders.Quantity {
-			fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
+			// fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
 			if totalQty >= option.MinimumOrderSize {
 				orderPrice := option.SellOrders.Price[i]
@@ -206,17 +206,19 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	cancel := func(order iex.WSOrder) {
 		// log.Println("Trying to cancel", order.OrderID)
+		fmt.Printf("Trying to cancel order %v\n", order.OrderID)
 		err := ex.CancelOrder(iex.CancelOrderF{
 			Market: order.Symbol,
 			Uuid:   order.OrderID,
 		})
 		if err != nil {
-			log.Fatal(err)		
+			log.Fatal(err)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 
 	place := func(order iex.Order) {
+		fmt.Printf("Trying to place order %v\n", order)
 		_, err := ex.PlaceOrder(order)
 		if err != nil {
 			log.Fatal(err)

@@ -236,6 +236,14 @@ func (algo *Algo) LogLiveState() {
 
 	fields := structs.Map(algo.Market)
 
+	fmt.Printf("Fields: %v\n", fields)
+
+	//TODO: shouldn't have to manually delete Options param here
+	_, ok := fields["Options"]
+	if ok {
+		delete(fields, "Options")
+	}
+
 	fields["Price"] = algo.Market.Price.Close
 	fields["Balance"] = algo.Market.BaseAsset.Quantity
 	fields["Quantity"] = algo.Market.QuoteAsset.Quantity
