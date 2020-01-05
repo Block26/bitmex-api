@@ -236,8 +236,6 @@ func (algo *Algo) LogLiveState() {
 
 	fields := structs.Map(algo.Market)
 
-	fmt.Printf("Fields: %v\n", fields)
-
 	//TODO: shouldn't have to manually delete Options param here
 	_, ok := fields["Options"]
 	if ok {
