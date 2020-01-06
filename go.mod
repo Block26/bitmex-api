@@ -3,7 +3,7 @@ module github.com/tantralabs/yantra
 go 1.13
 
 // replace github.com/tantralabs/eaopt => ../../tantralabs/eaopt
-replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
+// replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
 
 require (
 	firebase.google.com/go v3.10.0+incompatible
