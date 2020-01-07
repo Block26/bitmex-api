@@ -132,6 +132,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 					Type:     orderType,
 					Side:     "Sell",
 				}
+				fmt.Printf("New ask from OptionContracts: %v\n", order)
 				newAsks = append(newAsks, order)
 				totalQty = 0.0
 			}
@@ -148,6 +149,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 			openBids = append(openBids, order)
 		} else if strings.ToLower(order.Side) == "sell" {
 			openAsks = append(openAsks, order)
+			fmt.Printf("New ask from OpenOrders: %v\n", order)
 		}
 	}
 
@@ -184,6 +186,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 		return retOpen, retNew
 	}
+
+	fmt.Printf("OpenAsks %v, newAsks %v\n", openAsks, newAsks)
 
 	// Call local sifting function to get rid of matches
 	openBids, newBids = siftMatches(openBids, newBids)
@@ -303,12 +307,6 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		buyCont = (bidIndex < len(newBids))
 		sellCont = (askIndex < len(newAsks))
 	}
-
-	for _, option := range a.Market.OptionContracts {
-		if len(option.SellOrders.Quantity) > 0 {
-			fmt.Printf("Found remaining orders for option contract %v after placement: %v\n", option.Symbol, option.SellOrders)
-		}
-	}
 }
 
 func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.WSOrder {
@@ -351,5 +349,6 @@ func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.W
 	}
 
 	log.Println(len(updatedOrders), "orders")
+	fmt.Printf("%v orders\n", len(updatedOrders))
 	return updatedOrders
 }

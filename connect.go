@@ -106,6 +106,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			algo.logState()
 		case newOrders := <-channels.OrderChan:
 			// log.Println("update channels.OrderChan")
+			// fmt.Printf("Got new websocket orders: %v\n", newOrders)
 			localOrders = UpdateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
 			algo.updateAlgoBalances(update.Balance)
