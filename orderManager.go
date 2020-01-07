@@ -303,6 +303,12 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		buyCont = (bidIndex < len(newBids))
 		sellCont = (askIndex < len(newAsks))
 	}
+
+	for _, option := range a.Market.OptionContracts {
+		if len(option.SellOrders.Quantity) > 0 {
+			fmt.Printf("Found remaining orders for option contract %v after placement: %v\n", option.Symbol, option.SellOrders)
+		}
+	}
 }
 
 func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.WSOrder {
