@@ -361,9 +361,7 @@ func getFilledAskOrders(prices []float64, orders []float64, price float64) ([]fl
 
 func LogBacktest(algo Algo) {
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     "http://a9266693f215611eaa2ab067000a9afa-324658220.us-east-2.elb.amazonaws.com:8086", //:8086
-		Username: "tester",
-		Password: "123456",
+		Addr:     "http://ec2-34-222-170-225.us-west-2.compute.amazonaws.com:8086",
 	})
 	CheckIfError(err)
 

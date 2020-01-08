@@ -258,11 +258,13 @@ func (algo *Algo) setupOrders() {
 				Quantity: []float64{math.Abs(quantityToOrder)},
 				Price:    []float64{algo.Market.Price.Close - algo.Market.TickSize},
 			}
+			algo.Market.SellOrders = models.OrderArray{}
 		} else if side == -1 {
 			algo.Market.SellOrders = models.OrderArray{
 				Quantity: []float64{math.Abs(quantityToOrder)},
 				Price:    []float64{algo.Market.Price.Close + algo.Market.TickSize},
 			}
+			algo.Market.BuyOrders = models.OrderArray{}
 		}
 
 	} else {
