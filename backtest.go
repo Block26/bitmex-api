@@ -39,16 +39,17 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	start := time.Now()
 	var history []models.History
 	var timestamp time.Time
-	// starting_algo.Market.BaseBalance := 0
-	// volStart := TimeToTimestamp(data[0].Timestamp)
-	// volEnd := TimeToTimestamp(data[len(data)-1].Timestamp)
-	volStart := int(data[0].Timestamp)
-	volEnd := int(data[len(data)-1].Timestamp)
-	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
-	algo.Timestamp = TimestampToTime(volStart).String()
-	VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
-	algo.Market.OptionContracts = generateActiveOptions(&algo)
-	fmt.Printf("Len vol data: %v\n", len(VolData))
+
+	if algo.Market.Options {
+		volStart := int(data[0].Timestamp)
+		volEnd := int(data[len(data)-1].Timestamp)
+		fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
+		algo.Timestamp = TimestampToTime(volStart).String()
+		VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
+		algo.Market.OptionContracts = generateActiveOptions(&algo)
+		fmt.Printf("Len vol data: %v\n", len(VolData))
+	}
+
 	idx := 0
 	log.Println("Running", len(data), "bars")
 	for _, bar := range data {
@@ -368,7 +369,7 @@ func getFilledAskOrders(prices []float64, orders []float64, price float64) ([]fl
 
 func LogBacktest(algo Algo) {
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     "http://ec2-34-222-170-225.us-west-2.compute.amazonaws.com:8086",
+		Addr: "http://ec2-34-222-170-225.us-west-2.compute.amazonaws.com:8086",
 	})
 	CheckIfError(err)
 
@@ -403,7 +404,6 @@ func LogBacktest(algo Algo) {
 
 func (algo *Algo) updateOptionsPositions() {
 	//Aggregate positions
-	fmt.Printf("Updating options positions...\n")
 	for i := range algo.Market.OptionContracts {
 		option := &algo.Market.OptionContracts[i]
 		total := 0.

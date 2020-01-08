@@ -181,7 +181,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 		firstTrade = false
 	}
 	// Update active option contracts from API
-	if algo.Market.Exchange == "deribit" {
+	if algo.Market.Exchange == "deribit" && algo.Market.Options {
 		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, true, "option")
 		if err == nil {
 			// fmt.Printf("Got markets from API: %v\n", markets)
@@ -226,7 +226,6 @@ func (algo *Algo) setupOrders() {
 	if algo.AutoOrderPlacement {
 		orderSize, side := algo.getOrderSize(algo.Market.Price.Close)
 		if side == 0 {
-			fmt.Printf("No side\n")
 			return
 		}
 

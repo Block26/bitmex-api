@@ -13,8 +13,8 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		switch m := market; m {
 		case "XBTUSD":
 			return models.Market{
-				Symbol:      "XBTUSD",
-				Exchange:    "bitmex",
+				Symbol:   "XBTUSD",
+				Exchange: "bitmex",
 				BaseAsset: models.Asset{
 					Symbol:   "XBT",
 					Quantity: 1,
@@ -37,8 +37,8 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 			}, nil
 		case "ETHUSD":
 			return models.Market{
-				Symbol:      "ETHUSD",
-				Exchange:    "bitmex",
+				Symbol:   "ETHUSD",
+				Exchange: "bitmex",
 				BaseAsset: models.Asset{
 					Symbol:   "ETH",
 					Quantity: 1,
@@ -147,8 +147,8 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 			}, nil
 		case "ETHUSDT":
 			return models.Market{
-				Symbol:      "ETHUSDT",
-				Exchange:    "binance",
+				Symbol:   "ETHUSDT",
+				Exchange: "binance",
 				BaseAsset: models.Asset{
 					Symbol:   "ETH",
 					Quantity: 1,
@@ -196,8 +196,33 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				TakerFee:            0.00075,
 				Futures:             true,
 				BulkCancelSupported: false,
-				Options:			 true,
-				OptionContracts: []models.OptionContract{},
+				Options:             false,
+				OptionContracts:     []models.OptionContract{},
+			}, nil
+		case "ETH-PERPETUAL":
+			return models.Market{
+				Symbol:   "ETH-PERPETUAL",
+				Exchange: "deribit",
+				BaseAsset: models.Asset{
+					Symbol:   "ETH",
+					Quantity: 1,
+				},
+				QuoteAsset: models.Asset{
+					Symbol:   "ETH-PERPETUAL",
+					Quantity: 0,
+				},
+				MinimumOrderSize:    10,
+				TickSize:            .5,
+				QuantityTickSize:    10,
+				QuantityPrecision:   0,
+				PricePrecision:      2,
+				MaxOrders:           20,
+				MakerFee:            -0.00025,
+				TakerFee:            0.00075,
+				Futures:             true,
+				BulkCancelSupported: false,
+				Options:             false,
+				OptionContracts:     []models.OptionContract{},
 			}, nil
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
@@ -228,8 +253,8 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				TakerFee:            0.00075,
 				Futures:             true,
 				BulkCancelSupported: false,
-				Options:			 true,
-				OptionContracts: []models.OptionContract{},
+				Options:             false,
+				OptionContracts:     []models.OptionContract{},
 			}, nil
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
