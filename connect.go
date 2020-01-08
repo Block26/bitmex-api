@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tantralabs/yantra/data"
-	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
+	"github.com/tantralabs/yantra/data"
+	"github.com/tantralabs/yantra/models"
 )
 
 var orderStatus iex.OrderStatus
@@ -43,14 +43,11 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 		OutputResponse: false,
 	}
 
-	fmt.Printf("Connecting to %v with key %v and secret %v, id %v\n", exchangeVars.Exchange, exchangeVars.ApiKey, exchangeVars.ApiSecret, exchangeVars.AccountID)
 	ex, err := tradeapi.New(exchangeVars)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Printf("Getting potential order status...\n")
 	orderStatus = ex.GetPotentialOrderStatus()
-	fmt.Printf("Got potential order status %v\n", orderStatus)
 
 	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
 	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
@@ -109,6 +106,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			algo.logState()
 		case newOrders := <-channels.OrderChan:
 			// log.Println("update channels.OrderChan")
+			// fmt.Printf("Got new websocket orders: %v\n", newOrders)
 			localOrders = UpdateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
 			algo.updateAlgoBalances(update.Balance)
@@ -119,20 +117,37 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 	log.Println("Position Update:", positions)
 	if len(positions) > 0 {
-		position := positions[0]
-		algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
-		if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
-			algo.Market.AverageCost = position.AvgCostPrice
-		} else if position.CurrentQty == 0 {
-			algo.Market.AverageCost = 0
+		for _, position := range positions {
+			if position.Symbol == algo.Market.QuoteAsset.Symbol {
+				algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
+				if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
+					algo.Market.AverageCost = position.AvgCostPrice
+				} else if position.CurrentQty == 0 {
+					algo.Market.AverageCost = 0
+				}
+				log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
+			} else if position.Symbol == algo.Market.BaseAsset.Symbol {
+				algo.Market.BaseAsset.Quantity = float64(position.CurrentQty)
+				log.Println("BaseAsset updated")
+			} else {
+				for i := range algo.Market.OptionContracts {
+					option := &algo.Market.OptionContracts[i]
+					if option.Symbol == position.Symbol {
+						option.Position = position.CurrentQty
+						option.AverageCost = position.AvgCostPrice
+						fmt.Printf("[%v] Updated position %v, average cost %v\n", option.Symbol, option.Position, option.AverageCost)
+						break
+					}
+				}
+			}
 		}
-		log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
 		if firstPositionUpdate {
+			algo.logState()
 			shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
 			firstPositionUpdate = false
 		}
 	}
-	// algo.logState()
+	algo.logState()
 }
 
 func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
@@ -166,19 +181,20 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 		firstTrade = false
 	}
 	// Update active option contracts from API
-	if algo.Market.Options != nil {
-		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, "option")
-		if err != nil {
-			fmt.Printf("Got markets from API: %v\n", markets)
+	if algo.Market.Exchange == "deribit" {
+		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, true, "option")
+		if err == nil {
+			// fmt.Printf("Got markets from API: %v\n", markets)
 			for _, market := range markets {
 				containsSymbol := false
-				for _, option := range algo.Market.Options {
+				for _, option := range algo.Market.OptionContracts {
 					if option.Symbol == market.Symbol {
 						containsSymbol = true
 					}
 				}
 				if !containsSymbol {
-					expiry := market.Expiry * 1000
+					// expiry := market.Expiry * 1000
+					expiry := market.Expiry
 					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price.Close, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
 					optionContract := models.OptionContract{
 						Symbol:           market.Symbol,
@@ -194,10 +210,14 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 						Position:         0,
 						OptionTheo:       *optionTheo,
 						Status:           "open",
+						MidMarketPrice:   market.MidMarketPrice,
 					}
-					algo.Market.Options = append(algo.Market.Options, optionContract)
+					fmt.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
+					algo.Market.OptionContracts = append(algo.Market.OptionContracts, optionContract)
 				}
 			}
+		} else {
+			fmt.Printf("Error getting markets: %v\n", err)
 		}
 	}
 }
@@ -206,6 +226,7 @@ func (algo *Algo) setupOrders() {
 	if algo.AutoOrderPlacement {
 		orderSize, side := algo.getOrderSize(algo.Market.Price.Close)
 		if side == 0 {
+			fmt.Printf("No side\n")
 			return
 		}
 
@@ -241,8 +262,10 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// When reducing to meet canBuy don't go lower than can buy
+		fmt.Printf("Weight: %v, quantityside %v shouldhavequantity %v, canbuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
 		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy()
+			fmt.Printf("WEIGHT: %v, should have qty: %v\n", algo.Market.Weight, shouldHaveQuantity)
 		}
 
 		// Don't over order to go neutral

@@ -30,6 +30,7 @@ func loadConfiguration(file string, secret bool) settings.Config {
 		json.Unmarshal([]byte(secret), &config)
 		return config
 	} else {
+		fmt.Printf("Loading config from file: %v\n", file)
 		configFile, err := os.Open(file)
 		defer configFile.Close()
 		if err != nil {
@@ -37,6 +38,7 @@ func loadConfiguration(file string, secret bool) settings.Config {
 		}
 		jsonParser := json.NewDecoder(configFile)
 		jsonParser.Decode(&config)
+		fmt.Printf("Parsed json: %v\n", jsonParser)
 		return config
 	}
 }
@@ -213,11 +215,14 @@ func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side fl
 		currentWeight = float64(algo.Market.Weight)
 	}
 	adding := currentWeight == float64(algo.Market.Weight)
-	// fmt.Println(algo.Timestamp, "Here", algo.canBuy(), (algo.Market.QuoteAsset.Quantity))
+	// fmt.Printf("CURRENT WEIGHT %v, adding %v, leverage target %v, can buy %v, deleverage order size %v\n", currentWeight, adding, algo.LeverageTarget, algo.canBuy(), algo.DeleverageOrderSize)
+	// fmt.Printf("Getting order size with quote asset quantity: %v\n", algo.Market.QuoteAsset.Quantity)
 	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
+		// fmt.Printf("Getting entry order with entry order size %v, leverage target %v, leverage %v\n", algo.EntryOrderSize, algo.LeverageTarget, algo.Market.Leverage)
 		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
 		side = float64(algo.Market.Weight)
 	} else if !adding {
+		// fmt.Printf("Getting exit order size with exit order size %v, leverage %v, weight %v\n", algo.ExitOrderSize, algo.Market.Leverage, algo.Market.Weight)
 		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
 		side = float64(currentWeight * -1)
 	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
@@ -252,6 +257,12 @@ func (algo *Algo) LogLiveState() {
 	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}
 
 	fields := structs.Map(algo.Market)
+
+	//TODO: shouldn't have to manually delete Options param here
+	_, ok := fields["Options"]
+	if ok {
+		delete(fields, "Options")
+	}
 
 	fields["Price"] = algo.Market.Price.Close
 	fields["Balance"] = algo.Market.BaseAsset.Quantity
@@ -388,6 +399,11 @@ func GetOHLCBars(bars []*models.Bar) ([]float64, []float64, []float64, []float64
 
 func ToIntTimestamp(timeString string) int {
 	layout := "2006-01-02 15:04:05"
+	// if strings.Contains(timeString, "+0000 UTC") {
+	// 	timeString = strings.Replace(timeString, "+0000 UTC", "", 1)
+	// }
+	// timeString = strings.TrimSpace(timeString)
+	timeString = timeString[:19]
 	currentTime, err := time.Parse(layout, timeString)
 	if err != nil {
 		fmt.Printf("Error parsing timeString: %v\n", err)
@@ -397,11 +413,11 @@ func ToIntTimestamp(timeString string) int {
 
 func ToTimeObject(timeString string) time.Time {
 	layout := "2006-01-02 15:04:05"
-	if strings.Contains(timeString, "+0000 UTC") {
-		timeString = strings.Replace(timeString, "+0000 UTC", "", 1)
-		fmt.Printf("Trimmed timestring: %v\n", timeString)
-	}
-	timeString = strings.TrimSpace(timeString)
+	// if strings.Contains(timeString, "+0000 UTC") {
+	// 	timeString = strings.Replace(timeString, "+0000 UTC", "", 1)
+	// }
+	// timeString = strings.TrimSpace(timeString)
+	timeString = timeString[:19]
 	currentTime, err := time.Parse(layout, timeString)
 	if err != nil {
 		fmt.Printf("Error parsing timeString: %v", err)
@@ -418,7 +434,7 @@ func TimestampToTime(timestamp int) time.Time {
 }
 
 func TimeToTimestamp(timeObject time.Time) int {
-	return timeObject.UTC().Nanosecond() / 1000000
+	return int(timeObject.UnixNano() / 1000000)
 }
 
 func Round(x, unit float64) float64 {
@@ -527,18 +543,21 @@ func RoundToNearest(num float64, interval float64) float64 {
 
 func AdjustForSlippage(premium float64, side string, slippage float64) float64 {
 	adjPremium := premium
+	fmt.Printf("Premium %v, with slippage %v\n", premium, premium*(1.-slippage))
 	if side == "buy" {
-		adjPremium = premium * (1 + (slippage / 100.))
+		adjPremium = premium * (1. + slippage)
 	} else if side == "sell" {
-		adjPremium = premium * (1 - (slippage / 100.))
+		adjPremium = premium * (1. - slippage)
 	}
 	return adjPremium
 }
 
 func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionType string) string {
 	expiryTime := time.Unix(int64(expiry/1000), 0)
-	year, month, day := expiryTime.Date()
-	return "BTC-" + string(day) + string(month) + string(year) + "-" + optionType
+	year := strconv.Itoa(expiryTime.Year())[2:3]
+	month := strings.ToUpper(expiryTime.Month().String())[:3]
+	day := strconv.Itoa(expiryTime.Day())
+	return "BTC-" + strconv.Itoa(int(strike)) + "-" + day + month + year + "-" + strings.ToUpper(optionType)
 }
 
 func GetNextFriday(currentTime time.Time) time.Time {

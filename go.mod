@@ -13,11 +13,13 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/gocarina/gocsv v0.0.0-20190927101021-3ecffd272576
 	github.com/google/uuid v1.1.1
-	github.com/influxdata/influxdb-client-go v0.1.4
 	github.com/influxdata/influxdb1-client v0.0.0-20190809212627-fc22c7df067e
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.2.0
-	github.com/tantralabs/eaopt v0.1.1-0.20191217192927-f9ded663d8fe // indirect
+	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70
+	github.com/tantralabs/eaopt v0.1.1-0.20191217192927-f9ded663d8fe
+	github.com/tantralabs/tradeapi v0.0.0-20200106220846-b239ce995caf
+	//github.com/tantralabs/tradeapi v0.0.0-20191219235251-a9ae690eb1bc
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	gonum.org/v1/gonum v0.0.0-20190724133715-a8659125a966
 	google.golang.org/api v0.13.0

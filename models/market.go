@@ -27,6 +27,7 @@ type Market struct {
 	QuantityTickSize    int
 	PricePrecision      int
 	Futures             bool
+	Options				bool
 	BulkCancelSupported bool
-	Options             []OptionContract
+	OptionContracts             []OptionContract
 }
