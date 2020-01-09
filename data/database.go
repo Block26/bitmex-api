@@ -1,3 +1,4 @@
+// Package data handles database connections and data gathering.
 package data
 
 import (
@@ -18,6 +19,7 @@ const (
 	dbname   = "tantra"
 )
 
+// GetData is called to fetch data from your local psql database setup by https://github.com/tantralabs/tantradb
 func GetData(symbol string, exchange string, interval string, startTimestamp time.Time, endTimestamp time.Time) []*models.Bar {
 
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+

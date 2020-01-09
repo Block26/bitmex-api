@@ -9,7 +9,7 @@ import (
 	models "github.com/tantralabs/yantra/models"
 )
 
-func Arange(start, stop, step float64) []float64 {
+func utils.Arange(start, stop, step float64) []float64 {
 	N := int(math.Ceil((stop - start) / step))
 	arr := make([]float64, N, N)
 	i := 0
@@ -27,9 +27,9 @@ func Arange(start, stop, step float64) []float64 {
 // 	impliedVolData := tantradb.LoadImpliedVols("XBTUSD", start, end)
 // 	calcGreeks := true
 // 	numOptions := 0
-// 	times := Arange(float64(start), float64(end), 3600.*1000)
-// 	strikes := Arange(5000., 20000., 500.)
-// 	timesToExpiry := Arange(7., 63., 7.)
+// 	times := utils.Arange(float64(start), float64(end), 3600.*1000)
+// 	strikes := utils.Arange(5000., 20000., 500.)
+// 	timesToExpiry := utils.Arange(7., 63., 7.)
 // 	for _, time := range times {
 // 		for _, strike := range strikes {
 // 			for _, timeToExpiry := range timesToExpiry {
@@ -70,9 +70,9 @@ func TestLiveData(t *testing.T) {
 // 	end := 1571990400000
 // 	impliedVolData := tantradb.LoadImpliedVols("XBTUSD", start, end)
 // 	numOptions := 0
-// 	times := Arange(float64(start), float64(end), 10*86400.*1000)
-// 	strikes := Arange(5000., 20000., 1000.)
-// 	timesToExpiry := Arange(7., 63., 7.)
+// 	times := utils.Arange(float64(start), float64(end), 10*86400.*1000)
+// 	strikes := utils.Arange(5000., 20000., 1000.)
+// 	timesToExpiry := utils.Arange(7., 63., 7.)
 // 	for _, time := range times {
 // 		for _, strike := range strikes {
 // 			for _, timeToExpiry := range timesToExpiry {

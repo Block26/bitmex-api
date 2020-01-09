@@ -1,8 +1,0 @@
-{
-   "symbol": "XBTUSD",
-   "max_orders" : 12,
-   "max_retries": 5,
-   "api_key": "xPUtF8r0GEVeIF2v5fTZz3pj",
-   "api_secret" : "wyac7JCoRjyizVZlj_nJHFy_JzTRQeX-2fEj8J5aEbxCG38V",
-   "test_net": true
-}

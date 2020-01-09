@@ -1,16 +1,8 @@
-package algo
+package yantra
 
 import (
-	"context"
 	"fmt"
 	"log"
-	// "math/rand"
-	"time"
-
-	"github.com/c-bata/goptuna"
-	// "github.com/c-bata/goptuna/successivehalving"
-	"github.com/c-bata/goptuna/tpe"
-	"golang.org/x/sync/errgroup"
 
 	eaopt "github.com/tantralabs/eaopt"
 )

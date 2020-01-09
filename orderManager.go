@@ -1,4 +1,4 @@
-package algo
+package yantra
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tantralabs/tradeapi/iex"
+	"github.com/tantralabs/yantra/utils"
 )
 
 func deltaFloat(a, b, delta float64) bool {
@@ -26,13 +27,13 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	createBid := func(i int, qty float64) {
 		orderPrice := a.Market.BuyOrders.Price[i]
-		quantity := ToFixed(qty, a.Market.QuantityPrecision)
-		quantity = RoundToNearest(qty, float64(a.Market.QuantityTickSize))
+		quantity := utils.ToFixed(qty, a.Market.QuantityPrecision)
+		quantity = utils.RoundToNearest(qty, float64(a.Market.QuantityTickSize))
 		order := iex.Order{
 			Market:   a.Market.BaseAsset.Symbol,
 			Currency: a.Market.QuoteAsset.Symbol,
 			Amount:   quantity,
-			Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+			Rate:     utils.ToFixed(orderPrice, a.Market.PricePrecision),
 			Type:     "Limit",
 			Side:     "Buy",
 		}
@@ -41,13 +42,13 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	createAsk := func(i int, qty float64) {
 		orderPrice := a.Market.SellOrders.Price[i]
-		quantity := ToFixed(qty, a.Market.QuantityPrecision)
-		quantity = RoundToNearest(qty, float64(a.Market.QuantityTickSize))
+		quantity := utils.ToFixed(qty, a.Market.QuantityPrecision)
+		quantity = utils.RoundToNearest(qty, float64(a.Market.QuantityTickSize))
 		order := iex.Order{
 			Market:   a.Market.BaseAsset.Symbol,
 			Currency: a.Market.QuoteAsset.Symbol,
 			Amount:   quantity,
-			Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+			Rate:     utils.ToFixed(orderPrice, a.Market.PricePrecision),
 			Type:     "Limit",
 			Side:     "Sell",
 		}
@@ -100,8 +101,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				order := iex.Order{
 					Market:   option.Symbol,
 					Currency: a.Market.QuoteAsset.Symbol,
-					Amount:   ToFixed(totalQty, 1), //float64(int(totalQty)),
-					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+					Amount:   utils.ToFixed(totalQty, 1), //float64(int(totalQty)),
+					Rate:     utils.ToFixed(orderPrice, a.Market.PricePrecision),
 					Type:     orderType,
 					Side:     "Buy",
 				}
@@ -127,8 +128,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				order := iex.Order{
 					Market:   option.Symbol,
 					Currency: a.Market.QuoteAsset.Symbol,
-					Amount:   ToFixed(totalQty, 1), //float64(int(totalQty)),
-					Rate:     ToFixed(orderPrice, a.Market.PricePrecision),
+					Amount:   utils.ToFixed(totalQty, 1), //float64(int(totalQty)),
+					Rate:     utils.ToFixed(orderPrice, a.Market.PricePrecision),
 					Type:     orderType,
 					Side:     "Sell",
 				}

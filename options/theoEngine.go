@@ -117,7 +117,7 @@ func BuildAvailableOptions(underlyingPrice float64, currentTime time.Time, volat
 	midStrike := base.RoundToNearest(underlyingPrice, StrikeInterval)
 	minStrike := midStrike - (StrikeInterval * math.Floor(NumStrikes/2))
 	maxStrike := midStrike + (StrikeInterval * math.Ceil(NumStrikes/2))
-	strikes := base.Arange(minStrike, maxStrike, StrikeInterval)
+	strikes := base.utils.Arange(minStrike, maxStrike, StrikeInterval)
 	// Generate options contracts
 	var optionContracts []models.OptionContract
 	var orderArray models.OrderArray

@@ -1,4 +1,4 @@
-package algo
+package yantra
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/data"
 	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/utils"
 )
 
 var orderStatus iex.OrderStatus
@@ -19,12 +20,12 @@ var firstPositionUpdate bool
 var shouldHaveQuantity float64
 
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) {
-	if algo.DecisionInterval == "" {
-		log.Fatal("DecisionInterval must be set")
+	if algo.RebalanceInterval == "" {
+		log.Fatal("RebalanceInterval must be set")
 	}
 	firstTrade = true
 	firstPositionUpdate = true
-	config := loadConfiguration(settingsFile, secret)
+	config := utils.LoadConfiguration(settingsFile, secret)
 	fmt.Printf("Loaded config for %v \n", algo.Market.Exchange)
 	// We instantiate a new repository targeting the given path (the .git folder)
 	// r, err := git.PlainOpen(".")
@@ -49,8 +50,8 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	}
 	orderStatus = ex.GetPotentialOrderStatus()
 
-	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
-	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.DecisionInterval, algo.DataLength+1)
+	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
+	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
 	fmt.Printf("Got local bars: %v\n", len(localBars))
 	// log.Println(len(localBars), "downloaded")
 
@@ -170,9 +171,9 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 
 func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []*models.Bar, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
-	localBars = data.UpdateBars(ex, algo.Market.Symbol, algo.DecisionInterval, 2)
+	localBars = data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
 	algo.Index = len(localBars) - 1
-	algo.Market.Price = convertTradeBinToBar(trade)
+	algo.Market.Price = utils.ConvertTradeBinToBar(trade)
 	setupData(localBars, *algo)
 	algo.Timestamp = time.Unix(localBars[algo.Index].Timestamp/1000, 0).UTC().String()
 	log.Println("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
@@ -195,7 +196,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 				if !containsSymbol {
 					// expiry := market.Expiry * 1000
 					expiry := market.Expiry
-					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price.Close, market.Strike, ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
+					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price.Close, market.Strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
 					optionContract := models.OptionContract{
 						Symbol:           market.Symbol,
 						Strike:           market.Strike,
@@ -230,7 +231,7 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// Adjust order size to order over the hour
-		if algo.DecisionInterval == "1h" {
+		if algo.RebalanceInterval == "1h" {
 			orderSize = (orderSize * (1 + orderSize)) / 60
 		}
 
@@ -291,11 +292,11 @@ func (algo *Algo) setupOrders() {
 
 	} else {
 		if algo.Market.Futures {
-			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price.Close))
-			algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price.Close))
+			algo.Market.BuyOrders.Quantity = utils.MulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price.Close))
+			algo.Market.SellOrders.Quantity = utils.MulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price.Close))
 		} else {
-			algo.Market.BuyOrders.Quantity = mulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price.Close))
-			algo.Market.SellOrders.Quantity = mulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price.Close))
+			algo.Market.BuyOrders.Quantity = utils.MulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price.Close))
+			algo.Market.SellOrders.Quantity = utils.MulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price.Close))
 		}
 	}
 }

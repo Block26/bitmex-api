@@ -1,4 +1,4 @@
-package algo
+package exchanges
 
 import (
 	"errors"
