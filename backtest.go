@@ -13,6 +13,7 @@ import (
 	"gonum.org/v1/gonum/stat"
 
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 
@@ -72,7 +73,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 			// algo.updateActiveOptions()
 			algo = rebalance(algo)
 			// log.Println(data)
-			if algo.FillType == "limit" {
+			if algo.FillType == exchanges.FillType().Limit {
 				//Check which buys filled
 				pricesFilled, ordersFilled := getFilledBidOrders(algo.Market.BuyOrders.Price, algo.Market.BuyOrders.Quantity, bar.Low)
 				fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
@@ -81,9 +82,9 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 				pricesFilled, ordersFilled = getFilledAskOrders(algo.Market.SellOrders.Price, algo.Market.SellOrders.Quantity, bar.High)
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
 				algo.UpdateBalance(fillCost, algo.Market.Selling*-fillPercentage)
-			} else if algo.FillType == "close" {
+			} else if algo.FillType == exchanges.FillType().Close {
 				algo.updateBalanceFromFill(bar.Close)
-			} else if algo.FillType == "open" {
+			} else if algo.FillType == exchanges.FillType().Open {
 				algo.updateBalanceFromFill(bar.Open)
 			}
 			state := algo.logState(timestamp)
@@ -114,9 +115,9 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	mean, std := stat.MeanStdDev(percentReturn, nil)
 	score := mean / std
 	// TODO change the scoring based on 1h / 1m
-	if algo.RebalanceInterval == "1h" {
+	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
 		score = score * math.Sqrt(365*24)
-	} else if algo.RebalanceInterval == "1m" {
+	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
 		score = score * math.Sqrt(365*24*60)
 	}
 
