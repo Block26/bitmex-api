@@ -23,6 +23,7 @@ type Algo struct {
 	DeleverageOrderSize float64
 	AutoOrderPlacement  bool
 	CanBuyBasedOnMax    bool
+	LogBacktestToCSV    bool
 
 	State map[string]interface{}
 

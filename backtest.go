@@ -7,13 +7,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
 
 	"gonum.org/v1/gonum/stat"
 
-	"github.com/gocarina/gocsv"
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/yantra/models"
+
 	// "github.com/tantralabs/yantra/options"
 	"github.com/tantralabs/yantra/tantradb"
 	. "gopkg.in/src-d/go-git.v4/_examples"
@@ -35,8 +36,10 @@ const MakerFee = 0.
 const TakerFee = .001
 
 func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
-	setupData(data, algo)
+	currentRunUUID = time.Now()
 	start := time.Now()
+
+	setupData(data, algo)
 	var history []models.History
 	var timestamp time.Time
 
@@ -56,7 +59,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		if idx == 0 {
 			log.Println("Start Timestamp", time.Unix(bar.Timestamp/1000, 0))
 			fmt.Printf("Running backtest with quote asset quantity %v and base asset quantity %v, fill type %v\n", algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity, algo.FillType)
-			// 	//Set average cost if starting with a quote balance
+			// Set average cost if starting with a quote balance
 			if algo.Market.QuoteAsset.Quantity > 0 {
 				algo.Market.AverageCost = bar.Close
 			}
@@ -82,16 +85,8 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 			} else if algo.FillType == "open" {
 				algo.updateBalanceFromFill(bar.Open)
 			}
-			// fmt.Printf("Updated balances: quote asset %v, base asset %v\n", algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity)
-			// updateBalanceXBTStrat(bar)
-			algo.updateOptionsPositions()
 			state := algo.logState(timestamp)
 			history = append(history, state)
-			// if algo.Market.Qua+(algo.Market.BaseBalance*algo.Market.Profit) < 0 {
-			// 	break
-			// }
-			// history.Balance[len(history.Balance)-1], == portfolio value
-			// portfolioValue := history.Balance[len(history.Balance)-1]
 		}
 		idx++
 	}
@@ -100,8 +95,6 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	log.Println("End Timestamp", timestamp)
 	//TODO do this during test instead of after the test
 	minProfit, maxProfit, _, maxLeverage, drawdown := MinMaxStats(history)
-	// score := (history[historyLength-1].Balance) + drawdown*3 //+ (minProfit * maxLeverage) - drawdown // maximize
-	// score := (history[historyLength-1].Balance) * math.Abs(1/drawdown) //+ (minProfit * maxLeverage) - drawdown // maximize
 
 	historyLength := len(history)
 	log.Println("historyLength", historyLength)
@@ -118,7 +111,6 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	}
 
 	mean, std := stat.MeanStdDev(percentReturn, nil)
-	// log.Println("mean", mean, "std", std)
 	score := mean / std
 	// TODO change the scoring based on 1h / 1m
 	if algo.DecisionInterval == "1h" {
@@ -155,7 +147,6 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		kvparams,
 	)
 	log.Println("Execution Speed", elapsed)
-	// log.Println("History Length", len(history), "Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
 
 	algo.Result = map[string]interface{}{
 		"balance":             history[historyLength-1].UBalance,
@@ -167,21 +158,23 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		"score":               score,
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
-	os.Remove("balance.csv")
-	historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
-	if err != nil {
-		panic(err)
-	}
-	defer historyFile.Close()
+	if algo.LogBacktestToCSV {
+		os.Remove("balance.csv")
+		historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+		if err != nil {
+			panic(err)
+		}
+		defer historyFile.Close()
 
-	err = gocsv.MarshalFile(&history, historyFile) // Use this to save the CSV back to the file
-	if err != nil {
-		panic(err)
+		err = gocsv.MarshalFile(&history, historyFile) // Use this to save the CSV back to the file
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	// LogBacktest(algo)
-	// score := ((math.Abs(minProfit) / history[historyLength-1].Balance) + maxLeverage) - history[historyLength-1].Balance // minimize
-	return algo //history.Balance[len(history.Balance)-1] / (maxLeverage + 1)
+	LogBacktest(algo)
+
+	return algo
 }
 
 func (algo *Algo) updateBalanceFromFill(fillPrice float64) {
