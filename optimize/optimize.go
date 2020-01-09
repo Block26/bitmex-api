@@ -1,4 +1,4 @@
-package yantra
+package optimize
 
 import (
 	"fmt"
