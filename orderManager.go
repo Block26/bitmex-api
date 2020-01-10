@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tantralabs/tradeapi/iex"
+	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 )
@@ -25,7 +26,7 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// Adjust order size to order over the hour
-		if algo.RebalanceInterval == "1h" {
+		if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
 			orderSize = (orderSize * (1 + orderSize)) / 60
 		}
 
@@ -56,7 +57,7 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// When reducing to meet canBuy don't go lower than can buy
-		log.Printf("Weight: %v, quantityside %v shouldhavequantity %v, canbuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
+		log.Printf("Weight: %v, quantitySide %v shouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
 		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy()
 			log.Printf("WEIGHT: %v, should have qty: %v\n", algo.Market.Weight, shouldHaveQuantity)
