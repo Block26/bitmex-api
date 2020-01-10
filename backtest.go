@@ -34,9 +34,9 @@ var OptionLoadFreq = 15
 const StrikeInterval = 250.
 const TickSize = .1
 const MinTradeAmount = .1
-const MakerFee = 0.
-const TakerFee = .001
 
+// RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
+// setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
 func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
 	currentRunUUID = time.Now()
 	start := time.Now()
@@ -77,11 +77,11 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 				//Check which buys filled
 				pricesFilled, ordersFilled := getFilledBidOrders(algo.Market.BuyOrders.Price, algo.Market.BuyOrders.Quantity, bar.Low)
 				fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
-				algo.UpdateBalance(fillCost, algo.Market.Buying*fillPercentage)
+				algo.updateBalance(fillCost, algo.Market.Buying*fillPercentage)
 				//Check which sells filled
 				pricesFilled, ordersFilled = getFilledAskOrders(algo.Market.SellOrders.Price, algo.Market.SellOrders.Quantity, bar.High)
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
-				algo.UpdateBalance(fillCost, algo.Market.Selling*-fillPercentage)
+				algo.updateBalance(fillCost, algo.Market.Selling*-fillPercentage)
 			} else if algo.FillType == exchanges.FillType().Close {
 				algo.updateBalanceFromFill(bar.Close)
 			} else if algo.FillType == exchanges.FillType().Open {
@@ -179,13 +179,15 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	return algo
 }
 
+// Core Backtest functionality
+
 func (algo *Algo) updateBalanceFromFill(fillPrice float64) {
 	orderSize, side := algo.getOrderSize(fillPrice)
 	fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{orderSize})
-	algo.UpdateBalance(fillCost, ordersFilled*side)
+	algo.updateBalance(fillCost, ordersFilled*side)
 }
 
-func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
+func (algo *Algo) updateBalance(fillCost float64, fillAmount float64) {
 	// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
 	// fmt.Printf("Updating balance with fill cost %v, fill amount %v, qaq %v, baq %v\n", fillCost, fillAmount, algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity)
 	if math.Abs(fillAmount) > 0 {
@@ -484,7 +486,7 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 	currentTime = utils.ToTimeObject(algo.Timestamp)
 	for i := 0; i < numMonthlys; i++ {
 		expiry := utils.TimeToTimestamp(utils.GetLastFridayOfMonth(currentTime))
-		if !intInSlice(expiry, expirys) {
+		if !utils.IntInSlice(expiry, expirys) {
 			expirys = append(expirys, expiry)
 		}
 		currentTime = currentTime.Add(time.Hour * 24 * 28)
@@ -496,7 +498,7 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 	for _, expiry := range expirys {
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
-				vol := GetNearestVol(VolData, utils.ToIntTimestamp(algo.Timestamp))
+				vol := getNearestVol(VolData, utils.ToIntTimestamp(algo.Timestamp))
 				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price.Close, strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, vol, -1)
 				optionContract := models.OptionContract{
 					Symbol:           utils.GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
@@ -506,8 +508,8 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 					AverageCost:      0,
 					Profit:           0,
 					TickSize:         TickSize,
-					MakerFee:         MakerFee,
-					TakerFee:         TakerFee,
+					MakerFee:         algo.Market.MakerFee,
+					TakerFee:         algo.Market.TakerFee,
 					MinimumOrderSize: MinTradeAmount,
 					Position:         0,
 					OptionTheo:       *optionTheo,
@@ -540,7 +542,7 @@ func (algo *Algo) updateActiveOptions() {
 	}
 }
 
-func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
+func getNearestVol(volData []models.ImpliedVol, time int) float64 {
 	vol := -1.
 	for _, data := range volData {
 		timeDiff := time - data.Timestamp
@@ -550,13 +552,4 @@ func GetNearestVol(volData []models.ImpliedVol, time int) float64 {
 		}
 	}
 	return vol
-}
-
-func intInSlice(a int, list []int) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
 }

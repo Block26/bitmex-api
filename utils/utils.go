@@ -355,3 +355,12 @@ func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
 	// fmt.Printf("Got quarterly expiry %v\n", lastFriday)
 	return lastFriday
 }
+
+func IntInSlice(a int, list []int) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}

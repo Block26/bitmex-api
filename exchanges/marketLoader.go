@@ -8,8 +8,7 @@ import (
 )
 
 func LoadMarket(exchange string, market string) (newMarket models.Market, err error) {
-
-	if exchange == "bitmex" {
+	if exchange == Bitmex {
 		switch m := market; m {
 		case "XBTUSD":
 			return models.Market{
@@ -62,7 +61,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
 		}
-	} else if exchange == "bitmex-test" {
+	} else if exchange == BitmexTestNet {
 		switch m := market; m {
 		case "XBTUSD":
 			return models.Market{
@@ -93,7 +92,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
 		}
-	} else if exchange == "binance" {
+	} else if exchange == Binance {
 		switch m := market; m {
 		case "BTCUSDT":
 			return models.Market{
@@ -172,7 +171,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
 		}
-	} else if exchange == "deribit" {
+	} else if exchange == Deribit {
 		switch m := market; m {
 		case "BTC-PERPETUAL":
 			return models.Market{
@@ -227,7 +226,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
 		}
-	} else if exchange == "deribit-test" {
+	} else if exchange == DeribitTestNet {
 		switch m := market; m {
 		case "BTC-PERPETUAL":
 			return models.Market{

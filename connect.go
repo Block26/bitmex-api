@@ -18,7 +18,12 @@ var orderStatus iex.OrderStatus
 var firstTrade bool
 var firstPositionUpdate bool
 var shouldHaveQuantity float64
+var commitHash string
 
+// Connect is called to connect to an exchanges WS api and begin trading.
+// The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
+//
+// This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) {
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
@@ -27,13 +32,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	firstPositionUpdate = true
 	config := utils.LoadConfiguration(settingsFile, secret)
 	fmt.Printf("Loaded config for %v \n", algo.Market.Exchange)
-	// We instantiate a new repository targeting the given path (the .git folder)
-	// r, err := git.PlainOpen(".")
-	// CheckIfError(err)
-	// ... retrieving the HEAD reference
-	// ref, err := r.Head()
-	commitHash = "test" //ref.Hash().String()
-	// CheckIfError(err)
+	commitHash = time.Now().String()
 
 	exchangeVars := iex.ExchangeConf{
 		Exchange:       algo.Market.Exchange,
@@ -103,12 +102,12 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			algo.updateState(ex, trade[0], localBars, setupData)
 			algo = rebalance(algo)
 			algo.setupOrders()
-			algo.PlaceOrdersOnBook(ex, localOrders)
+			algo.placeOrdersOnBook(ex, localOrders)
 			algo.logState()
 		case newOrders := <-channels.OrderChan:
 			// log.Println("update channels.OrderChan")
 			// fmt.Printf("Got new websocket orders: %v\n", newOrders)
-			localOrders = UpdateLocalOrders(localOrders, newOrders)
+			localOrders = updateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
 			algo.updateAlgoBalances(update.Balance)
 		}
@@ -219,84 +218,6 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 			}
 		} else {
 			fmt.Printf("Error getting markets: %v\n", err)
-		}
-	}
-}
-
-func (algo *Algo) setupOrders() {
-	if algo.AutoOrderPlacement {
-		orderSize, side := algo.getOrderSize(algo.Market.Price.Close)
-		if side == 0 {
-			return
-		}
-
-		// Adjust order size to order over the hour
-		if algo.RebalanceInterval == "1h" {
-			orderSize = (orderSize * (1 + orderSize)) / 60
-		}
-
-		var quantity float64
-		if algo.Market.Futures {
-			quantity = orderSize * (algo.Market.BaseAsset.Quantity * algo.Market.Price.Close)
-		} else {
-			quantity = orderSize * (algo.Market.BaseAsset.Quantity / algo.Market.Price.Close)
-		}
-
-		// Keep track of what we should have so the orders we place will grow and shrink
-		if shouldHaveQuantity == 0 {
-			shouldHaveQuantity = quantity * side
-		} else {
-			shouldHaveQuantity += quantity * side
-		}
-
-		// Get the difference of what we have and what we should have, thats what we should order
-		quantityToOrder := shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
-
-		// Don't over order while adding to the position
-		orderSide := math.Copysign(1, quantityToOrder)
-		quantitySide := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-
-		if orderSide == quantitySide && math.Abs(shouldHaveQuantity) > algo.canBuy() {
-			shouldHaveQuantity = algo.canBuy() * quantitySide
-			quantityToOrder = shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
-		}
-
-		// When reducing to meet canBuy don't go lower than can buy
-		fmt.Printf("Weight: %v, quantityside %v shouldhavequantity %v, canbuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
-		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() {
-			shouldHaveQuantity = algo.canBuy()
-			fmt.Printf("WEIGHT: %v, should have qty: %v\n", algo.Market.Weight, shouldHaveQuantity)
-		}
-
-		// Don't over order to go neutral
-		if algo.Market.Weight == 0 && math.Abs(quantityToOrder) > math.Abs(algo.Market.QuoteAsset.Quantity) {
-			shouldHaveQuantity = 0
-			quantityToOrder = -algo.Market.QuoteAsset.Quantity
-		}
-
-		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder)
-
-		if side == 1 {
-			algo.Market.BuyOrders = models.OrderArray{
-				Quantity: []float64{math.Abs(quantityToOrder)},
-				Price:    []float64{algo.Market.Price.Close - algo.Market.TickSize},
-			}
-			algo.Market.SellOrders = models.OrderArray{}
-		} else if side == -1 {
-			algo.Market.SellOrders = models.OrderArray{
-				Quantity: []float64{math.Abs(quantityToOrder)},
-				Price:    []float64{algo.Market.Price.Close + algo.Market.TickSize},
-			}
-			algo.Market.BuyOrders = models.OrderArray{}
-		}
-
-	} else {
-		if algo.Market.Futures {
-			algo.Market.BuyOrders.Quantity = utils.MulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price.Close))
-			algo.Market.SellOrders.Quantity = utils.MulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price.Close))
-		} else {
-			algo.Market.BuyOrders.Quantity = utils.MulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price.Close))
-			algo.Market.SellOrders.Quantity = utils.MulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price.Close))
 		}
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tantralabs/tradeapi/iex"
+	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 )
 
@@ -16,7 +17,85 @@ func deltaFloat(a, b, delta float64) bool {
 	return math.Abs(a-b) <= delta
 }
 
-func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
+func (algo *Algo) setupOrders() {
+	if algo.AutoOrderPlacement {
+		orderSize, side := algo.getOrderSize(algo.Market.Price.Close)
+		if side == 0 {
+			return
+		}
+
+		// Adjust order size to order over the hour
+		if algo.RebalanceInterval == "1h" {
+			orderSize = (orderSize * (1 + orderSize)) / 60
+		}
+
+		var quantity float64
+		if algo.Market.Futures {
+			quantity = orderSize * (algo.Market.BaseAsset.Quantity * algo.Market.Price.Close)
+		} else {
+			quantity = orderSize * (algo.Market.BaseAsset.Quantity / algo.Market.Price.Close)
+		}
+
+		// Keep track of what we should have so the orders we place will grow and shrink
+		if shouldHaveQuantity == 0 {
+			shouldHaveQuantity = quantity * side
+		} else {
+			shouldHaveQuantity += quantity * side
+		}
+
+		// Get the difference of what we have and what we should have, thats what we should order
+		quantityToOrder := shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+
+		// Don't over order while adding to the position
+		orderSide := math.Copysign(1, quantityToOrder)
+		quantitySide := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+
+		if orderSide == quantitySide && math.Abs(shouldHaveQuantity) > algo.canBuy() {
+			shouldHaveQuantity = algo.canBuy() * quantitySide
+			quantityToOrder = shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+		}
+
+		// When reducing to meet canBuy don't go lower than can buy
+		fmt.Printf("Weight: %v, quantityside %v shouldhavequantity %v, canbuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() {
+			shouldHaveQuantity = algo.canBuy()
+			fmt.Printf("WEIGHT: %v, should have qty: %v\n", algo.Market.Weight, shouldHaveQuantity)
+		}
+
+		// Don't over order to go neutral
+		if algo.Market.Weight == 0 && math.Abs(quantityToOrder) > math.Abs(algo.Market.QuoteAsset.Quantity) {
+			shouldHaveQuantity = 0
+			quantityToOrder = -algo.Market.QuoteAsset.Quantity
+		}
+
+		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder)
+
+		if side == 1 {
+			algo.Market.BuyOrders = models.OrderArray{
+				Quantity: []float64{math.Abs(quantityToOrder)},
+				Price:    []float64{algo.Market.Price.Close - algo.Market.TickSize},
+			}
+			algo.Market.SellOrders = models.OrderArray{}
+		} else if side == -1 {
+			algo.Market.SellOrders = models.OrderArray{
+				Quantity: []float64{math.Abs(quantityToOrder)},
+				Price:    []float64{algo.Market.Price.Close + algo.Market.TickSize},
+			}
+			algo.Market.BuyOrders = models.OrderArray{}
+		}
+
+	} else {
+		if algo.Market.Futures {
+			algo.Market.BuyOrders.Quantity = utils.MulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying * algo.Market.Price.Close))
+			algo.Market.SellOrders.Quantity = utils.MulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling * algo.Market.Price.Close))
+		} else {
+			algo.Market.BuyOrders.Quantity = utils.MulArr(algo.Market.BuyOrders.Quantity, (algo.Market.Buying / algo.Market.Price.Close))
+			algo.Market.SellOrders.Quantity = utils.MulArr(algo.Market.SellOrders.Quantity, (algo.Market.Selling / algo.Market.Price.Close))
+		}
+	}
+}
+
+func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	// For now. Should be parameterized
 	qtyTolerance := 1.0
@@ -26,14 +105,14 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	var newAsks []iex.Order
 
 	createBid := func(i int, qty float64) {
-		orderPrice := a.Market.BuyOrders.Price[i]
-		quantity := utils.ToFixed(qty, a.Market.QuantityPrecision)
-		quantity = utils.RoundToNearest(qty, float64(a.Market.QuantityTickSize))
+		orderPrice := algo.Market.BuyOrders.Price[i]
+		quantity := utils.ToFixed(qty, algo.Market.QuantityPrecision)
+		quantity = utils.RoundToNearest(qty, float64(algo.Market.QuantityTickSize))
 		order := iex.Order{
-			Market:   a.Market.BaseAsset.Symbol,
-			Currency: a.Market.QuoteAsset.Symbol,
+			Market:   algo.Market.BaseAsset.Symbol,
+			Currency: algo.Market.QuoteAsset.Symbol,
 			Amount:   quantity,
-			Rate:     utils.ToFixed(orderPrice, a.Market.PricePrecision),
+			Rate:     utils.ToFixed(orderPrice, algo.Market.PricePrecision),
 			Type:     "Limit",
 			Side:     "Buy",
 		}
@@ -41,14 +120,14 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	}
 
 	createAsk := func(i int, qty float64) {
-		orderPrice := a.Market.SellOrders.Price[i]
-		quantity := utils.ToFixed(qty, a.Market.QuantityPrecision)
-		quantity = utils.RoundToNearest(qty, float64(a.Market.QuantityTickSize))
+		orderPrice := algo.Market.SellOrders.Price[i]
+		quantity := utils.ToFixed(qty, algo.Market.QuantityPrecision)
+		quantity = utils.RoundToNearest(qty, float64(algo.Market.QuantityTickSize))
 		order := iex.Order{
-			Market:   a.Market.BaseAsset.Symbol,
-			Currency: a.Market.QuoteAsset.Symbol,
+			Market:   algo.Market.BaseAsset.Symbol,
+			Currency: algo.Market.QuoteAsset.Symbol,
 			Amount:   quantity,
-			Rate:     utils.ToFixed(orderPrice, a.Market.PricePrecision),
+			Rate:     utils.ToFixed(orderPrice, algo.Market.PricePrecision),
 			Type:     "Limit",
 			Side:     "Sell",
 		}
@@ -56,36 +135,36 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	}
 
 	totalQty := 0.0
-	for i, qty := range a.Market.BuyOrders.Quantity {
+	for i, qty := range algo.Market.BuyOrders.Quantity {
 		totalQty = totalQty + qty
-		if totalQty > a.Market.MinimumOrderSize {
+		if totalQty > algo.Market.MinimumOrderSize {
 			createBid(i, totalQty)
 			totalQty = 0.0
 		}
 	}
 
-	if totalQty > 0.0 && totalQty > a.Market.MinimumOrderSize {
-		index := len(a.Market.BuyOrders.Quantity) - 1
+	if totalQty > 0.0 && totalQty > algo.Market.MinimumOrderSize {
+		index := len(algo.Market.BuyOrders.Quantity) - 1
 		createBid(index, totalQty)
 	}
 
 	totalQty = 0.0
-	for i, qty := range a.Market.SellOrders.Quantity {
+	for i, qty := range algo.Market.SellOrders.Quantity {
 		totalQty = totalQty + qty
-		if totalQty > a.Market.MinimumOrderSize {
+		if totalQty > algo.Market.MinimumOrderSize {
 			createAsk(i, totalQty)
 			totalQty = 0.0
 		}
 	}
 
-	if totalQty > 0.0 && totalQty > a.Market.MinimumOrderSize {
-		index := len(a.Market.SellOrders.Quantity) - 1
+	if totalQty > 0.0 && totalQty > algo.Market.MinimumOrderSize {
+		index := len(algo.Market.SellOrders.Quantity) - 1
 		createAsk(index, totalQty)
 	}
 
 	//Parse option orders
 	totalQty = 0.0
-	for _, option := range a.Market.OptionContracts {
+	for _, option := range algo.Market.OptionContracts {
 		for i, qty := range option.BuyOrders.Quantity {
 			// fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
@@ -100,9 +179,9 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				}
 				order := iex.Order{
 					Market:   option.Symbol,
-					Currency: a.Market.QuoteAsset.Symbol,
+					Currency: algo.Market.QuoteAsset.Symbol,
 					Amount:   utils.ToFixed(totalQty, 1), //float64(int(totalQty)),
-					Rate:     utils.ToFixed(orderPrice, a.Market.PricePrecision),
+					Rate:     utils.ToFixed(orderPrice, algo.Market.PricePrecision),
 					Type:     orderType,
 					Side:     "Buy",
 				}
@@ -112,7 +191,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		}
 	}
 	totalQty = 0.0
-	for _, option := range a.Market.OptionContracts {
+	for _, option := range algo.Market.OptionContracts {
 		for i, qty := range option.SellOrders.Quantity {
 			// fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
@@ -127,9 +206,9 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				}
 				order := iex.Order{
 					Market:   option.Symbol,
-					Currency: a.Market.QuoteAsset.Symbol,
+					Currency: algo.Market.QuoteAsset.Symbol,
 					Amount:   utils.ToFixed(totalQty, 1), //float64(int(totalQty)),
-					Rate:     utils.ToFixed(orderPrice, a.Market.PricePrecision),
+					Rate:     utils.ToFixed(orderPrice, algo.Market.PricePrecision),
 					Type:     orderType,
 					Side:     "Sell",
 				}
@@ -240,8 +319,8 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 
 	for buyCont || sellCont {
 		if buyCont && sellCont {
-			buyDiff := math.Abs(newBids[bidIndex].Rate - a.Market.Price.Close)
-			sellDiff := math.Abs(newAsks[askIndex].Rate - a.Market.Price.Close)
+			buyDiff := math.Abs(newBids[bidIndex].Rate - algo.Market.Price.Close)
+			sellDiff := math.Abs(newAsks[askIndex].Rate - algo.Market.Price.Close)
 			if buyDiff < sellDiff {
 				// cancel buy
 				if len(openBids) > bidIndex {
@@ -264,7 +343,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 		} else {
 			// finish the rest of the orders
 
-			if a.Market.BulkCancelSupported {
+			if algo.Market.BulkCancelSupported {
 				cancelStr := ""
 				for i := askIndex; i < len(openAsks); i++ {
 					cancelStr += openAsks[i].OrderID + ","
@@ -277,7 +356,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 				cancelStr = strings.TrimSuffix(cancelStr, ",")
 				if len(cancelStr) > 0 {
 					err := ex.CancelOrder(iex.CancelOrderF{
-						Market: a.Market.Symbol,
+						Market: algo.Market.Symbol,
 						Uuid:   cancelStr,
 					})
 
@@ -310,7 +389,7 @@ func (a *Algo) PlaceOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
 	}
 }
 
-func UpdateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.WSOrder {
+func updateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.WSOrder {
 	var updatedOrders []iex.WSOrder
 	for _, oldOrder := range oldOrders {
 		found := false

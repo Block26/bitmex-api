@@ -3,7 +3,7 @@ package interfaces
 type Algo interface {
 	Rebalance(float64)
 	Connect(settingsFile string, secret bool)
-	UpdateBalance(fillCost float64, fillAmount float64)
+	updateBalance(fillCost float64, fillAmount float64)
 	CurrentProfit(price float64) float64
 	RunBacktest()
 }

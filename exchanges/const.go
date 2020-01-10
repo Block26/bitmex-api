@@ -2,7 +2,9 @@
 package exchanges
 
 const (
-	Bitmex  = "bitmex"
-	Deribit = "deribit"
-	Binance = "binance"
+	Bitmex         = "bitmex"
+	BitmexTestNet  = "bitmex-test"
+	Deribit        = "deribit"
+	DeribitTestNet = "deribit-test"
+	Binance        = "binance"
 )

@@ -20,32 +20,37 @@ import (
 	"github.com/tantralabs/yantra/utils"
 )
 
-var commitHash string
-
+// Algo is where you will define your initial state and it will keep track of your state throughout a test and during live execution.
 type Algo struct {
-	//Required
-	Name   string
-	Market models.Market
+	Name              string                 // A UUID that tells the live system what algorithm is executing trades
+	Market            models.Market          // The market this Algo is trading. Refer to exchanges.LoadMarket(exchange, symbol)
+	FillType          string                 // The simulation fill type for this Algo. Refer to exchanges.FillType() for options
+	RebalanceInterval string                 // The interval at which rebalance should be called. Refer to exchanges.RebalanceInterval() for options
+	Debug             bool                   // Turn logs on or off
+	Index             int                    // Current index of the Algo in it's data
+	Timestamp         string                 // Current timestamp of the Algo in it's data
+	DataLength        int                    // Datalength tells the Algo when it is safe to start rebalancing, your Datalength should be longer than any TA length
+	History           []models.History       // Used to Store historical states
+	Params            map[string]interface{} // Save the initial Params of the Algo, for logging purposes. This is used to check the params after running a genetic search.
+	Result            map[string]interface{} // The result of your backtest
+	LogBacktestToCSV  bool                   // Exports the backtest history to a balance.csv in your local directory
+	State             map[string]interface{} // State of the algo, useful for logging live ta indicators.
 
-	FillType            string
-	RebalanceInterval   string
-	LeverageTarget      float64
-	EntryOrderSize      float64
-	ExitOrderSize       float64
-	DeleverageOrderSize float64
-	AutoOrderPlacement  bool
-	CanBuyBasedOnMax    bool
-	LogBacktestToCSV    bool
-
-	State map[string]interface{}
-
-	Debug      bool
-	Index      int
-	Timestamp  string
-	DataLength int
-	History    []models.History
-	Params     map[string]interface{}
-	Result     map[string]interface{}
+	// AutoOrderPlacement
+	// AutoOrderPlacement is not neccesary and can be false, it is the easiest way to create an algorithm with yantra
+	// using AutoOrderPlacement will allow yantra to automatically leverage and deleverage your account based on Algo.Market.Weight
+	//
+	// Examples
+	// EX) If RebalanceInterval().Hour and EntryOrderSize = 0.1 then when you are entering a position you will order 10% of your LeverageTarget per hour.
+	// EX) If RebalanceInterval().Hour and ExitOrderSize = 0.1 then when you are exiting a position you will order 10% of your LeverageTarget per hour.
+	// EX) If RebalanceInterval().Hour and DeleverageOrderSize = 0.01 then when you are over leveraged you will order 1% of your LeverageTarget per hour until you are no longer over leveraged.
+	// EX) If Market.MaxLeverage is 1 and Algo.LeverageTarget is 1 then your algorithm will be fully leveraged when it enters it's position.
+	AutoOrderPlacement  bool    // AutoOrderPlacement whether yantra should manage your orders / leverage for you.
+	CanBuyBasedOnMax    bool    // If true then yantra will calculate leverage based on Market.MaxLeverage, if false then yantra will calculate leverage based on Algo.LeverageTarget
+	LeverageTarget      float64 // The target leverage for the Algo, 1 would be 100%, 0.5 would be 50% of the MaxLeverage defined by Market.
+	EntryOrderSize      float64 // The speed at which the algo enters positions during the RebalanceInterval
+	ExitOrderSize       float64 // The speed at which the algo exits positions during the RebalanceInterval
+	DeleverageOrderSize float64 // The speed at which the algo exits positions during the RebalanceInterval if it is over leveraged, current leverage is determined by Algo.LeverageTarget or Market.MaxLeverage.
 }
 
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
@@ -168,7 +173,7 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 		algo.logLiveState()
 	}
 	if algo.Debug {
-		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price.Close+(algo.Market.QuoteAsset.Quantity), 0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price.Close, algo.Market.AverageCost))
+		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price.Close+(algo.Market.QuoteAsset.Quantity), 0.0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price.Close, algo.Market.AverageCost))
 	}
 	return
 }
