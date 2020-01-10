@@ -1,7 +1,6 @@
 package yantra
 
 import (
-	"fmt"
 	"log"
 	"math"
 	"strings"
@@ -31,7 +30,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	firstTrade = true
 	firstPositionUpdate = true
 	config := utils.LoadConfiguration(settingsFile, secret)
-	fmt.Printf("Loaded config for %v \n", algo.Market.Exchange)
+	log.Printf("Loaded config for %v \n", algo.Market.Exchange)
 	commitHash = time.Now().String()
 
 	exchangeVars := iex.ExchangeConf{
@@ -45,13 +44,13 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 
 	ex, err := tradeapi.New(exchangeVars)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	orderStatus = ex.GetPotentialOrderStatus()
 
-	fmt.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
+	log.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
 	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
-	fmt.Printf("Got local bars: %v\n", len(localBars))
+	log.Printf("Got local bars: %v\n", len(localBars))
 	// log.Println(len(localBars), "downloaded")
 
 	// SETUP ALGO WITH RESTFUL CALLS
@@ -89,7 +88,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	})
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 
 	var localOrders []iex.WSOrder
@@ -106,7 +105,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			algo.logState()
 		case newOrders := <-channels.OrderChan:
 			// log.Println("update channels.OrderChan")
-			// fmt.Printf("Got new websocket orders: %v\n", newOrders)
+			// log.Printf("Got new websocket orders: %v\n", newOrders)
 			localOrders = updateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
 			algo.updateAlgoBalances(update.Balance)
@@ -135,7 +134,7 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 					if option.Symbol == position.Symbol {
 						option.Position = position.CurrentQty
 						option.AverageCost = position.AvgCostPrice
-						fmt.Printf("[%v] Updated position %v, average cost %v\n", option.Symbol, option.Position, option.AverageCost)
+						log.Printf("[%v] Updated position %v, average cost %v\n", option.Symbol, option.Position, option.AverageCost)
 						break
 					}
 				}
@@ -156,13 +155,13 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 			walletAmount := float64(balances[i].Balance)
 			if walletAmount > 0 && walletAmount != algo.Market.BaseAsset.Quantity {
 				algo.Market.BaseAsset.Quantity = walletAmount
-				fmt.Printf("BaseAsset: %+v \n", walletAmount)
+				log.Printf("BaseAsset: %+v \n", walletAmount)
 			}
 		} else if balances[i].Asset == algo.Market.QuoteAsset.Symbol {
 			walletAmount := float64(balances[i].Balance)
 			if walletAmount > 0 && walletAmount != algo.Market.QuoteAsset.Quantity {
 				algo.Market.QuoteAsset.Quantity = walletAmount
-				fmt.Printf("QuoteAsset: %+v \n", walletAmount)
+				log.Printf("QuoteAsset: %+v \n", walletAmount)
 			}
 		}
 	}
@@ -184,7 +183,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 	if algo.Market.Exchange == "deribit" && algo.Market.Options {
 		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, true, "option")
 		if err == nil {
-			// fmt.Printf("Got markets from API: %v\n", markets)
+			// log.Printf("Got markets from API: %v\n", markets)
 			for _, market := range markets {
 				containsSymbol := false
 				for _, option := range algo.Market.OptionContracts {
@@ -212,12 +211,12 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 						Status:           "open",
 						MidMarketPrice:   market.MidMarketPrice,
 					}
-					fmt.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
+					log.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
 					algo.Market.OptionContracts = append(algo.Market.OptionContracts, optionContract)
 				}
 			}
 		} else {
-			fmt.Printf("Error getting markets: %v\n", err)
+			log.Printf("Error getting markets: %v\n", err)
 		}
 	}
 }

@@ -143,7 +143,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 		}
 	}
 
-	if totalQty > 0.0 && totalQty > algo.Market.MinimumOrderSize {
+	if totalQty > 0.0 && totalQty >= algo.Market.MinimumOrderSize {
 		index := len(algo.Market.BuyOrders.Quantity) - 1
 		createBid(index, totalQty)
 	}
@@ -157,7 +157,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 		}
 	}
 
-	if totalQty > 0.0 && totalQty > algo.Market.MinimumOrderSize {
+	if totalQty > 0.0 && totalQty >= algo.Market.MinimumOrderSize {
 		index := len(algo.Market.SellOrders.Quantity) - 1
 		createAsk(index, totalQty)
 	}
