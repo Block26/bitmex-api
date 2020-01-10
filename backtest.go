@@ -25,15 +25,7 @@ import (
 // var MinimumOrderSize = 25
 var currentRunUUID time.Time
 
-var VolData []models.ImpliedVol
 var lastOptionBalance = 0.
-var LastOptionLoad = 0
-var OptionLoadFreq = 15
-
-//TODO: these should be a config somewhere
-const StrikeInterval = 250.
-const TickSize = .1
-const MinTradeAmount = .1
 
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
@@ -44,15 +36,18 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	setupData(data, algo)
 	var history []models.History
 	var timestamp time.Time
-
+	var volData []models.ImpliedVol
+	const optionLoadFreq = 15
+	var lastOptionLoad int
 	if algo.Market.Options {
+		lastOptionLoad = 0
 		volStart := int(data[0].Timestamp)
 		volEnd := int(data[len(data)-1].Timestamp)
 		fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
 		algo.Timestamp = utils.TimestampToTime(volStart).String()
-		VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
-		algo.Market.OptionContracts = generateActiveOptions(&algo)
-		fmt.Printf("Len vol data: %v\n", len(VolData))
+		volData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
+		algo.Market.OptionContracts, lastOptionLoad = generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, &algo)
+		fmt.Printf("Len vol data: %v\n", len(volData))
 	}
 
 	idx := 0
@@ -70,7 +65,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		if idx > algo.DataLength+1 {
 			algo.Index = idx
 			algo.Market.Price = *bar
-			// algo.updateActiveOptions()
+			//lastOptionLoad = algo.updateActiveOptions(volData)
 			algo = rebalance(algo)
 			// log.Println(data)
 			if algo.FillType == exchanges.FillType().Limit {
@@ -467,16 +462,19 @@ func (algo *Algo) updateOptionsPositions() {
 	}
 }
 
-func generateActiveOptions(algo *Algo) []models.OptionContract {
-	if utils.ToIntTimestamp(algo.Timestamp)-LastOptionLoad < OptionLoadFreq*1000 {
-		return algo.Market.OptionContracts
+func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []models.ImpliedVol, algo *Algo) ([]models.OptionContract, int) {
+	if utils.ToIntTimestamp(algo.Timestamp)-lastOptionLoad < optionLoadFreq*1000 {
+		return algo.Market.OptionContracts, lastOptionLoad
 	}
-	fmt.Printf("Generating active options with last option load %v, current timestamp %v\n", LastOptionLoad, utils.ToIntTimestamp(algo.Timestamp))
+	fmt.Printf("Generating active options with last option load %v, current timestamp %v\n", lastOptionLoad, utils.ToIntTimestamp(algo.Timestamp))
 	const numWeeklys = 3
 	const numMonthlys = 5
 	//TODO: these should be based on underlying price
 	const minStrike = 5000.
 	const maxStrike = 20000.
+	const strikeInterval = 250.
+	const tickSize = .1
+	const minOrderSize = .1
 	//Build expirys
 	var expirys []int
 	currentTime := utils.ToTimeObject(algo.Timestamp)
@@ -494,13 +492,13 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 		currentTime = currentTime.Add(time.Hour * 24 * 28)
 	}
 	fmt.Printf("Generated expirys: %v\n", expirys)
-	strikes := utils.Arange(minStrike, maxStrike, StrikeInterval)
+	strikes := utils.Arange(minStrike, maxStrike, strikeInterval)
 	fmt.Printf("Generated strikes: %v\n", strikes)
 	var optionContracts []models.OptionContract
 	for _, expiry := range expirys {
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
-				vol := getNearestVol(VolData, utils.ToIntTimestamp(algo.Timestamp))
+				vol := getNearestVol(volData, utils.ToIntTimestamp(algo.Timestamp))
 				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price.Close, strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, vol, -1)
 				optionContract := models.OptionContract{
 					Symbol:           utils.GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
@@ -509,10 +507,10 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 					OptionType:       optionType,
 					AverageCost:      0,
 					Profit:           0,
-					TickSize:         TickSize,
+					TickSize:         tickSize,
 					MakerFee:         algo.Market.MakerFee,
 					TakerFee:         algo.Market.TakerFee,
-					MinimumOrderSize: MinTradeAmount,
+					MinimumOrderSize: minOrderSize,
 					Position:         0,
 					OptionTheo:       *optionTheo,
 					Status:           "open",
@@ -522,12 +520,12 @@ func generateActiveOptions(algo *Algo) []models.OptionContract {
 			}
 		}
 	}
-	LastOptionLoad = utils.ToIntTimestamp(algo.Timestamp)
-	return optionContracts
+	lastOptionLoad = utils.ToIntTimestamp(algo.Timestamp)
+	return optionContracts, lastOptionLoad
 }
 
-func (algo *Algo) updateActiveOptions() {
-	activeOptions := generateActiveOptions(algo)
+func (algo *Algo) updateActiveOptions(lastOptionLoad, optionLoadFreq int, volData []models.ImpliedVol) int {
+	activeOptions, lastOptionLoad := generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, algo)
 	for _, activeOption := range activeOptions {
 		// Check to see if this option is already known
 		isNew := true
@@ -542,6 +540,7 @@ func (algo *Algo) updateActiveOptions() {
 			fmt.Printf("Found new active option: %v\n", activeOption.OptionTheo.String())
 		}
 	}
+	return lastOptionLoad
 }
 
 func getNearestVol(volData []models.ImpliedVol, time int) float64 {
