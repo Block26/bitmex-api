@@ -86,7 +86,7 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 		} else if o.OptionType == "put" {
 			o.Theo = (o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)) / o.UnderlyingPrice
 		}
-		fmt.Printf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
+		// fmt.Printf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
 	}
 	if calcGreeks {
 		o.CalcGreeks()

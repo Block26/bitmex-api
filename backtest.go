@@ -40,15 +40,15 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	var history []models.History
 	var timestamp time.Time
 	// starting_algo.Market.BaseBalance := 0
-	// volStart := TimeToTimestamp(data[0].Timestamp)
-	// volEnd := TimeToTimestamp(data[len(data)-1].Timestamp)
-	volStart := int(data[0].Timestamp)
-	volEnd := int(data[len(data)-1].Timestamp)
-	fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
-	algo.Timestamp = TimestampToTime(volStart).String()
-	VolData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
-	algo.Market.OptionContracts = generateActiveOptions(&algo)
-	fmt.Printf("Len vol data: %v\n", len(VolData))
+	dataStart := int(data[0].Timestamp)
+	if algo.Market.Options {
+		volEnd := int(data[len(data)-1].Timestamp)
+		fmt.Printf("Vol data start: %v, end %v\n", dataStart, volEnd)
+		VolData = tantradb.LoadImpliedVols("XBTUSD", dataStart, volEnd)
+		algo.Market.OptionContracts = generateActiveOptions(&algo)
+		fmt.Printf("Len vol data: %v\n", len(VolData))
+	}
+	algo.Timestamp = TimestampToTime(dataStart).String()
 	idx := 0
 	log.Println("Running", len(data), "bars")
 	for _, bar := range data {
@@ -83,7 +83,9 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 			}
 			// fmt.Printf("Updated balances: quote asset %v, base asset %v\n", algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity)
 			// updateBalanceXBTStrat(bar)
-			algo.updateOptionsPositions()
+			if algo.Market.Options {
+				algo.updateOptionsPositions()
+			}
 			state := algo.logState(timestamp)
 			history = append(history, state)
 			// if algo.Market.Qua+(algo.Market.BaseBalance*algo.Market.Profit) < 0 {
@@ -258,7 +260,9 @@ func (algo *Algo) UpdateBalance(fillCost float64, fillAmount float64) {
 		// log.Printf("fillCost %.8f -> fillAmount %.8f -> newQuantity %0.8f\n", fillCost, fillAmount, newQuantity)
 		// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity - fee
 	}
-	algo.updateOptionBalance()
+	if algo.Market.Options {
+		algo.updateOptionBalance()
+	}
 }
 
 func (algo *Algo) updateOptionBalance() {
