@@ -40,7 +40,7 @@ func NewOptionTheo(optionType string, UnderlyingPrice float64, strike float64,
 		InterestRate:    r,
 		CurrentTime:     currentTime,
 		Expiry:          expiry,
-		TimeLeft:        GetTimeLeft(currentTime, expiry),
+		TimeLeft:        getTimeLeft(currentTime, expiry),
 		OptionType:      optionType,
 		Volatility:      volatility,
 		Theo:            theo,
@@ -49,15 +49,15 @@ func NewOptionTheo(optionType string, UnderlyingPrice float64, strike float64,
 }
 
 func (o *OptionTheo) String() string {
-	return fmt.Sprintf("%v %v with expiry %v\n", o.Strike, o.OptionType, o.GetExpiryString())
+	return fmt.Sprintf("%v %v with expiry %v\n", o.Strike, o.OptionType, o.getExpiryString())
 }
 
-func (o *OptionTheo) GetExpiryString() string {
+func (o *OptionTheo) getExpiryString() string {
 	return time.Unix(int64(o.Expiry/1000), 0).UTC().String()
 }
 
 // Times in ms; return time in days
-func GetTimeLeft(currentTime int, expiry int) float64 {
+func getTimeLeft(currentTime int, expiry int) float64 {
 	return float64(expiry-currentTime) / float64(1000*day*365)
 }
 
