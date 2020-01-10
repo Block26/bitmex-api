@@ -256,7 +256,9 @@ func (algo *Algo) updateBalance(fillCost float64, fillAmount float64) {
 		// log.Printf("fillCost %.8f -> fillAmount %.8f -> newQuantity %0.8f\n", fillCost, fillAmount, newQuantity)
 		// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity - fee
 	}
-	algo.updateOptionBalance()
+	if algo.Market.Options {
+		algo.updateOptionBalance()
+	}
 }
 
 func (algo *Algo) updateOptionBalance() {

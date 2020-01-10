@@ -211,7 +211,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []
 						Status:           "open",
 						MidMarketPrice:   market.MidMarketPrice,
 					}
-					log.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
+					// fmt.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
 					algo.Market.OptionContracts = append(algo.Market.OptionContracts, optionContract)
 				}
 			}
