@@ -335,18 +335,18 @@ func (algo *Algo) getFilledBidOrders(price float64) ([]float64, []float64) {
 
 	var oldPrices []float64
 	var oldQuantities []float64
-	for i := range algo.Market.SellOrders.Price {
-		if algo.Market.SellOrders.Price[i] > price {
-			hitPrices = append(hitPrices, algo.Market.SellOrders.Price[i])
-			hitQuantities = append(hitQuantities, algo.Market.SellOrders.Quantity[i])
+	for i := range algo.Market.BuyOrders.Price {
+		if algo.Market.BuyOrders.Price[i] > price {
+			hitPrices = append(hitPrices, algo.Market.BuyOrders.Price[i])
+			hitQuantities = append(hitQuantities, algo.Market.BuyOrders.Quantity[i])
 		} else {
-			oldPrices = append(oldPrices, algo.Market.SellOrders.Price[i])
-			oldQuantities = append(oldQuantities, algo.Market.SellOrders.Quantity[i])
+			oldPrices = append(oldPrices, algo.Market.BuyOrders.Price[i])
+			oldQuantities = append(oldQuantities, algo.Market.BuyOrders.Quantity[i])
 		}
 	}
 
-	algo.Market.SellOrders.Price = oldPrices
-	algo.Market.SellOrders.Quantity = oldQuantities
+	algo.Market.BuyOrders.Price = oldPrices
+	algo.Market.BuyOrders.Quantity = oldQuantities
 	return hitPrices, hitQuantities
 }
 

@@ -4,6 +4,7 @@ package data
 import (
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -44,6 +45,6 @@ func GetData(symbol string, exchange string, interval string, startTimestamp tim
 	}
 
 	db.Close()
-
+	sort.Slice(bars, func(i, j int) bool { return bars[i].Timestamp < bars[j].Timestamp })
 	return bars
 }
