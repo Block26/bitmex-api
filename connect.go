@@ -117,7 +117,7 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 	log.Println("Position Update:", positions)
 	if len(positions) > 0 {
 		for _, position := range positions {
-			if position.Symbol == algo.Market.QuoteAsset.Symbol {
+			if position.Symbol == algo.Market.QuoteAsset.Symbol || position.Symbol == algo.Market.Symbol {
 				algo.Market.QuoteAsset.Quantity = float64(position.CurrentQty)
 				if math.Abs(algo.Market.QuoteAsset.Quantity) > 0 && position.AvgCostPrice > 0 {
 					algo.Market.AverageCost = position.AvgCostPrice
