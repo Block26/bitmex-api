@@ -329,28 +329,46 @@ func minMaxStats(history []models.History) (float64, float64, float64, float64, 
 	return maxPositionLoss, maxPositionProfit, minLeverage, maxLeverage, drawdown
 }
 
-func getFilledBidOrders(prices []float64, orders []float64, price float64) ([]float64, []float64) {
-	var p []float64
-	var o []float64
-	for i := range prices {
-		if prices[i] > price {
-			p = append(p, prices[i])
-			o = append(o, orders[i])
+func (algo *Algo) getFilledBidOrders(price float64) ([]float64, []float64) {
+	var hitPrices []float64
+	var hitQuantities []float64
+
+	var oldPrices []float64
+	var oldQuantities []float64
+	for i := range algo.Market.SellOrders.Price {
+		if algo.Market.SellOrders.Price[i] > price {
+			hitPrices = append(hitPrices, algo.Market.SellOrders.Price[i])
+			hitQuantities = append(hitQuantities, algo.Market.SellOrders.Quantity[i])
+		} else {
+			oldPrices = append(oldPrices, algo.Market.SellOrders.Price[i])
+			oldQuantities = append(oldQuantities, algo.Market.SellOrders.Quantity[i])
 		}
 	}
-	return p, o
+
+	algo.Market.SellOrders.Price = oldPrices
+	algo.Market.SellOrders.Quantity = oldQuantities
+	return hitPrices, hitQuantities
 }
 
-func getFilledAskOrders(prices []float64, orders []float64, price float64) ([]float64, []float64) {
-	var p []float64
-	var o []float64
-	for i := range prices {
-		if prices[i] < price {
-			p = append(p, prices[i])
-			o = append(o, orders[i])
+func (algo *Algo) getFilledAskOrders(price float64) ([]float64, []float64) {
+	var hitPrices []float64
+	var hitQuantities []float64
+
+	var oldPrices []float64
+	var oldQuantities []float64
+	for i := range algo.Market.SellOrders.Price {
+		if algo.Market.SellOrders.Price[i] < price {
+			hitPrices = append(hitPrices, algo.Market.SellOrders.Price[i])
+			hitQuantities = append(hitQuantities, algo.Market.SellOrders.Quantity[i])
+		} else {
+			oldPrices = append(oldPrices, algo.Market.SellOrders.Price[i])
+			oldQuantities = append(oldQuantities, algo.Market.SellOrders.Quantity[i])
 		}
 	}
-	return p, o
+
+	algo.Market.SellOrders.Price = oldPrices
+	algo.Market.SellOrders.Quantity = oldQuantities
+	return hitPrices, hitQuantities
 }
 
 func logBacktest(algo Algo) {
