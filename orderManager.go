@@ -56,10 +56,10 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// When reducing to meet canBuy don't go lower than can buy
-		fmt.Printf("Weight: %v, quantityside %v shouldhavequantity %v, canbuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
+		log.Printf("Weight: %v, quantityside %v shouldhavequantity %v, canbuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
 		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy()
-			fmt.Printf("WEIGHT: %v, should have qty: %v\n", algo.Market.Weight, shouldHaveQuantity)
+			log.Printf("WEIGHT: %v, should have qty: %v\n", algo.Market.Weight, shouldHaveQuantity)
 		}
 
 		// Don't over order to go neutral
@@ -267,8 +267,6 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 		return retOpen, retNew
 	}
 
-	fmt.Printf("OpenAsks %v, newAsks %v\n", openAsks, newAsks)
-
 	// Call local sifting function to get rid of matches
 	openBids, newBids = siftMatches(openBids, newBids)
 	openAsks, newAsks = siftMatches(openAsks, newAsks)
@@ -290,7 +288,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 
 	cancel := func(order iex.WSOrder) {
 		// log.Println("Trying to cancel", order.OrderID)
-		fmt.Printf("Trying to cancel order %v\n", order.OrderID)
+		log.Printf("Trying to cancel order %v\n", order.OrderID)
 		err := ex.CancelOrder(iex.CancelOrderF{
 			Market: order.Symbol,
 			Uuid:   order.OrderID,
@@ -302,7 +300,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 	}
 
 	place := func(order iex.Order) {
-		fmt.Printf("Trying to place order %v\n", order)
+		log.Printf("Trying to place order %v\n", order)
 		_, err := ex.PlaceOrder(order)
 		if err != nil {
 			log.Fatal(err)
@@ -428,7 +426,5 @@ func updateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.W
 		}
 	}
 
-	log.Println(len(updatedOrders), "orders")
-	fmt.Printf("%v orders\n", len(updatedOrders))
 	return updatedOrders
 }
