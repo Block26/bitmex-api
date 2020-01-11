@@ -5,8 +5,8 @@ import (
 	"math"
 	"time"
 
-	base "github.com/tantralabs/yantra"
 	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/utils"
 )
 
 type TheoEngine struct {
@@ -38,7 +38,7 @@ const MaxLossPct = 50.
 
 func (t *TheoEngine) getOptions(backtest bool) *[]models.OptionContract {
 	if backtest {
-		t.Options = BuildAvailableOptions(t.UnderlyingPrice, base.TimestampToTime(t.CurrentTime), t.BaseVolatility)
+		t.Options = BuildAvailableOptions(t.UnderlyingPrice, utils.TimestampToTime(t.CurrentTime), t.BaseVolatility)
 	} else {
 		fmt.Printf("Getting options from exchange not yet implemented")
 	}
@@ -102,7 +102,7 @@ func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, c
 func BuildAvailableOptions(underlyingPrice float64, currentTime time.Time, volatility float64) []models.OptionContract {
 	// Get expiries
 	var expirys []int
-	nextFriday := base.GetNextFriday(currentTime)
+	nextFriday := utils.GetNextFriday(currentTime)
 	for i := 0; i < NumWeekly; i++ {
 		expirys = append(expirys, int(nextFriday.UnixNano()/int64(time.Millisecond)))
 		nextFriday = nextFriday.Add(time.Hour * time.Duration(24*7))
@@ -114,10 +114,10 @@ func BuildAvailableOptions(underlyingPrice float64, currentTime time.Time, volat
 		month = month % 12
 	}
 	// Get strikes
-	midStrike := base.RoundToNearest(underlyingPrice, StrikeInterval)
+	midStrike := utils.RoundToNearest(underlyingPrice, StrikeInterval)
 	minStrike := midStrike - (StrikeInterval * math.Floor(NumStrikes/2))
 	maxStrike := midStrike + (StrikeInterval * math.Ceil(NumStrikes/2))
-	strikes := base.utils.Arange(minStrike, maxStrike, StrikeInterval)
+	strikes := utils.Arange(minStrike, maxStrike, StrikeInterval)
 	// Generate options contracts
 	var optionContracts []models.OptionContract
 	var orderArray models.OrderArray
@@ -125,7 +125,7 @@ func BuildAvailableOptions(underlyingPrice float64, currentTime time.Time, volat
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
 				optionTheo := models.NewOptionTheo(optionType, underlyingPrice, strike, int(currentTime.UnixNano()/int64(time.Millisecond)), expiry, 0, volatility, -1)
-				symbol := base.GetDeribitOptionSymbol(expiry, strike, "BTC", optionType)
+				symbol := utils.GetDeribitOptionSymbol(expiry, strike, "BTC", optionType)
 				optionContract := models.OptionContract{symbol, strike, expiry, optionType, 0, 0, TickSize, MakerFee,
 					TakerFee, MinimumOrderSize, orderArray, orderArray, 0., *optionTheo, "open", -1.}
 				optionContracts = append(optionContracts, optionContract)
