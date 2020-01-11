@@ -56,11 +56,12 @@ func (algo *Algo) setupOrders() {
 			quantityToOrder = shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
 		}
 
-		// When reducing to meet canBuy don't go lower than can buy
-		log.Printf("Weight: %v, quantitySide %v shouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
-		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() {
+		// When deleveraging to meet canBuy don't go lower than can buy
+		// log.Printf("Weight: %v, quantitySide %v shouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() && math.Abs(quantity+quantityToOrder) < algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy()
-			log.Printf("WEIGHT: %v, should have qty: %v\n", algo.Market.Weight, shouldHaveQuantity)
+			quantityToOrder = (math.Abs(quantity) - algo.canBuy()) * -quantitySide
+			log.Printf("Don't over order when reducing leverage should have qty: %v\n", shouldHaveQuantity)
 		}
 
 		// Don't over order to go neutral
