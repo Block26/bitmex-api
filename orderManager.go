@@ -96,7 +96,7 @@ func (algo *Algo) setupOrders() {
 	}
 }
 
-func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) {
+func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 
 	// For now. Should be parameterized
 	qtyTolerance := 1.0
@@ -222,8 +222,8 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 
 	log.Println("Orders: Asks", newAsks, "Bids", newBids)
 	// Get open buys, buys, open sells, sells, with matches filtered out
-	var openBids []iex.WSOrder
-	var openAsks []iex.WSOrder
+	var openBids []iex.Order
+	var openAsks []iex.Order
 
 	for _, order := range openOrders {
 		if strings.ToLower(order.Side) == "buy" {
@@ -235,7 +235,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 	}
 
 	// Make a local sifting function
-	siftMatches := func(open []iex.WSOrder, new []iex.Order) ([]iex.WSOrder, []iex.Order) {
+	siftMatches := func(open []iex.Order, new []iex.Order) ([]iex.Order, []iex.Order) {
 		openfound := make([]bool, len(open))
 		newfound := make([]bool, len(new))
 		/*
@@ -245,14 +245,14 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 		*/
 		for i, op := range open {
 			for j, nw := range new {
-				if (deltaFloat(op.Price, nw.Rate, priceTolerance)) && (deltaFloat(op.OrderQty, nw.Amount, qtyTolerance)) {
+				if (deltaFloat(op.Rate, nw.Rate, priceTolerance)) && (deltaFloat(op.Amount, nw.Amount, qtyTolerance)) {
 					openfound[i] = true
 					newfound[j] = true
 				}
 			}
 		}
 
-		var retOpen []iex.WSOrder
+		var retOpen []iex.Order
 		var retNew []iex.Order
 		// Filter out matches
 		for i, op := range open {
@@ -281,13 +281,13 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 	})
 
 	sort.Slice(openBids, func(a, b int) bool {
-		return openBids[a].Price > openBids[b].Price
+		return openBids[a].Rate > openBids[b].Rate
 	})
 	sort.Slice(openAsks, func(a, b int) bool {
-		return openAsks[a].Price < openAsks[b].Price
+		return openAsks[a].Rate < openAsks[b].Rate
 	})
 
-	cancel := func(order iex.WSOrder) {
+	cancel := func(order iex.Order) {
 		// log.Println("Trying to cancel", order.OrderID)
 		log.Printf("Trying to cancel order %v\n", order.OrderID)
 		err := ex.CancelOrder(iex.CancelOrderF{
@@ -388,8 +388,8 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.WSOrder) 
 	}
 }
 
-func updateLocalOrders(oldOrders []iex.WSOrder, newOrders []iex.WSOrder) []iex.WSOrder {
-	var updatedOrders []iex.WSOrder
+func updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order) []iex.Order {
+	var updatedOrders []iex.Order
 	for _, oldOrder := range oldOrders {
 		found := false
 		for _, newOrder := range newOrders {

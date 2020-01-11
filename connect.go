@@ -76,7 +76,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 		PositionChan: make(chan []iex.WsPosition, 2),
 		TradeBinChan: make(chan []iex.TradeBin, 2),
 		WalletChan:   make(chan *iex.WSWallet, 2),
-		OrderChan:    make(chan []iex.WSOrder, 2),
+		OrderChan:    make(chan []iex.Order, 2),
 	}
 
 	// Start the websocket.
@@ -91,7 +91,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 		log.Println(err)
 	}
 
-	var localOrders []iex.WSOrder
+	var localOrders []iex.Order
 
 	for {
 		select {
