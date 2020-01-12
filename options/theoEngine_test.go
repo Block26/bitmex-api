@@ -9,7 +9,7 @@ import (
 	models "github.com/tantralabs/yantra/models"
 )
 
-func utils.Arange(start, stop, step float64) []float64 {
+func Arange(start, stop, step float64) []float64 {
 	N := int(math.Ceil((stop - start) / step))
 	arr := make([]float64, N, N)
 	i := 0

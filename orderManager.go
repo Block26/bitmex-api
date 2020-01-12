@@ -57,10 +57,12 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// When deleveraging to meet canBuy don't go lower than can buy
+		// log.Println("quantityToOrder", quantityToOrder, "math.Abs(quantity+(quantityToOrder*side))", math.Abs(quantity+(quantityToOrder*side)), "side", side, (quantityToOrder * side))
 		// log.Printf("Weight: %v, quantitySide %v shouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
-		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(shouldHaveQuantity) > algo.canBuy() && math.Abs(quantity+quantityToOrder) < algo.canBuy() {
-			shouldHaveQuantity = algo.canBuy()
-			quantityToOrder = (math.Abs(quantity) - algo.canBuy()) * -quantitySide
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && math.Abs(algo.Market.QuoteAsset.Quantity+quantityToOrder) < algo.canBuy() {
+			shouldHaveQuantity = algo.canBuy() * quantitySide
+			quantityToOrder = math.Abs(algo.Market.QuoteAsset.Quantity) - algo.canBuy()
+			// quantityToOrder = (math.Abs(quantity) - algo.canBuy()) * -quantitySide
 			log.Printf("Don't over order when reducing leverage should have qty: %v\n", shouldHaveQuantity)
 		}
 
@@ -70,20 +72,25 @@ func (algo *Algo) setupOrders() {
 			quantityToOrder = -algo.Market.QuoteAsset.Quantity
 		}
 
-		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder)
+		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder, "leverage", algo.Market.Leverage, "leverage target", algo.LeverageTarget)
 
-		if side == 1 {
-			algo.Market.BuyOrders = models.OrderArray{
-				Quantity: []float64{math.Abs(quantityToOrder)},
-				Price:    []float64{algo.Market.Price.Close - algo.Market.TickSize},
+		if math.Abs(quantityToOrder) > 0 {
+			if side == 1 {
+				algo.Market.BuyOrders = models.OrderArray{
+					Quantity: []float64{math.Abs(quantityToOrder)},
+					Price:    []float64{algo.Market.Price.Close - algo.Market.TickSize},
+				}
+				algo.Market.SellOrders = models.OrderArray{}
+			} else if side == -1 {
+				algo.Market.SellOrders = models.OrderArray{
+					Quantity: []float64{math.Abs(quantityToOrder)},
+					Price:    []float64{algo.Market.Price.Close + algo.Market.TickSize},
+				}
+				algo.Market.BuyOrders = models.OrderArray{}
 			}
-			algo.Market.SellOrders = models.OrderArray{}
-		} else if side == -1 {
-			algo.Market.SellOrders = models.OrderArray{
-				Quantity: []float64{math.Abs(quantityToOrder)},
-				Price:    []float64{algo.Market.Price.Close + algo.Market.TickSize},
-			}
+		} else {
 			algo.Market.BuyOrders = models.OrderArray{}
+			algo.Market.SellOrders = models.OrderArray{}
 		}
 
 	} else {
