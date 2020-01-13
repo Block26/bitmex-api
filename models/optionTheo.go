@@ -9,6 +9,10 @@ import (
 	"github.com/chobie/go-gaussian"
 )
 
+const PI float64 = 3.14159265359
+const day = 86400
+const DefaultVolatility = .6
+
 type OptionTheo struct {
 	Strike          float64 // Strike price
 	UnderlyingPrice float64 // Underlying price
@@ -26,9 +30,6 @@ type OptionTheo struct {
 	Vega            float64 // Change in theo wrt. 1% increase in volatility
 	WeightedVega    float64 // Vega / Vega of ATM option
 }
-
-const PI float64 = 3.14159265359
-const day = 86400
 
 // Either theo or volatility is unknown (pass in -1.0 for unknown values)
 func NewOptionTheo(optionType string, UnderlyingPrice float64, strike float64,
@@ -72,8 +73,8 @@ func (o *OptionTheo) calcD2(volatility float64) float64 {
 // Use Black-Scholes pricing model to calculate theoretical option value
 func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 	if o.Volatility < 0 && o.Theo < 0 {
-		fmt.Printf("[%v] Cannot calc theo with negative theo %v and negative vol %v\n", o.String(), o.Theo, o.Volatility)
-		return
+		o.Volatility = DefaultVolatility
+		fmt.Printf("Set volatility for %v to default volatility %v\n", o.String(), o.Volatility)
 	}
 	norm := gaussian.NewGaussian(0, 1)
 	td1 := o.calcD1(o.Volatility)

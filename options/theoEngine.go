@@ -25,6 +25,7 @@ const NumMonthly = 3
 const NumStrikes = 10
 const StrikeInterval = 250.
 const TickSize = .1
+const DefaultVolatility = .6
 
 //TODO: Inspect deribit options trading fees
 const MakerFee = .0004
@@ -67,7 +68,33 @@ func GetOpenOptions(options []*models.OptionContract) []*models.OptionContract {
 	return openOptions
 }
 
+func PropagateVolatility(options []*models.OptionContract, defaultVolatility float64) []*models.OptionContract {
+	fmt.Printf("Propagating volatility for %v options with default volatility %v\n", len(options), defaultVolatility)
+	expiryToVol := map[int]float64{}
+	for _, option := range options {
+		if option.OptionTheo.Volatility > 0 {
+			if _, ok := expiryToVol[option.Expiry]; !ok {
+				expiryToVol[option.Expiry] = option.OptionTheo.Volatility
+			}
+		}
+	}
+	for _, option := range options {
+		if vol, ok := expiryToVol[option.Expiry]; ok {
+			option.OptionTheo.Volatility = vol
+		} else {
+			option.OptionTheo.Volatility = defaultVolatility
+		}
+	}
+	return options
+}
+
 func AggregateExpiredOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64) {
+	options = PropagateVolatility(options, DefaultVolatility)
+	for _, option := range options {
+		if option.OptionTheo.Volatility < 0 {
+			fmt.Printf("Found option with negative volatitlity after propagation: %v\n", option.Symbol)
+		}
+	}
 	for _, option := range GetExpiredOptions(currentTime, options) {
 		option.Profit = option.Position * (option.OptionTheo.GetExpiryValue(currentPrice) - option.AverageCost)
 		// fmt.Printf("Aggregated profit at price %v for %v with position %v: %v\n", currentPrice, option.OptionTheo.String(), option.Position, option.Profit)
