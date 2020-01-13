@@ -16,9 +16,9 @@ import (
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
-	"github.com/tantralabs/yantra/exchanges"
 )
 
 // Algo is where you will define your initial state and it will keep track of your state throughout a test and during live execution.
@@ -191,7 +191,7 @@ func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize fl
 	// Change order sizes for live to ensure similar boolen checks
 	exitOrderSize := algo.ExitOrderSize
 	entryOrderSize := algo.EntryOrderSize
-	
+
 	if live != nil && live[0] {
 		if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
 			exitOrderSize = algo.ExitOrderSize / 60
@@ -223,7 +223,12 @@ func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize fl
 }
 
 //Log the state of the algo to influx db
-func (algo *Algo) logLiveState() {
+func (algo *Algo) logLiveState(test ...bool) {
+	prefix := ""
+	if test != nil {
+		prefix = "test_"
+	}
+
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:     "http://ec2-54-219-145-3.us-west-1.compute.amazonaws.com:8086",
 		Username: "russell",
@@ -254,7 +259,7 @@ func (algo *Algo) logLiveState() {
 	fields["Quantity"] = algo.Market.QuoteAsset.Quantity
 
 	pt, err := client.NewPoint(
-		"market",
+		prefix+"market",
 		tags,
 		fields,
 		time.Now(),
@@ -268,7 +273,7 @@ func (algo *Algo) logLiveState() {
 	fields["DeleverageOrderSize"] = algo.DeleverageOrderSize
 
 	pt, err = client.NewPoint(
-		"params",
+		prefix+"params",
 		tags,
 		fields,
 		time.Now(),
@@ -282,7 +287,7 @@ func (algo *Algo) logLiveState() {
 		}
 
 		pt, err = client.NewPoint(
-			"buy_orders",
+			prefix+"buy_orders",
 			tags,
 			fields,
 			time.Now(),
@@ -295,7 +300,7 @@ func (algo *Algo) logLiveState() {
 			fmt.Sprintf("%0.2f", algo.Market.SellOrders.Price[index]): algo.Market.SellOrders.Quantity[index],
 		}
 		pt, err = client.NewPoint(
-			"sell_orders",
+			prefix+"sell_orders",
 			tags,
 			fields,
 			time.Now(),
@@ -305,7 +310,7 @@ func (algo *Algo) logLiveState() {
 
 	if algo.State != nil {
 		pt, err := client.NewPoint(
-			"state",
+			prefix+"state",
 			tags,
 			algo.State,
 			time.Now(),
