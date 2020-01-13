@@ -9,6 +9,7 @@ import (
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/data"
+	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 
@@ -101,12 +102,13 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 		case positions := <-channels.PositionChan:
 			algo.updatePositions(positions)
 		case trade := <-channels.TradeBinChan:
-			algo.updateState(ex, trade[0], localBars, setupData)
+			algo.updateBars(ex, trade[0])
+			algo.updateState(ex, trade[0], setupData)
 			algo = rebalance(algo)
 			algo.setupOrders()
 			algo.placeOrdersOnBook(ex, localOrders)
 			algo.logState()
-			algo.runTest(localBars, setupData, rebalance)
+			algo.runTest(setupData, rebalance)
 		case newOrders := <-channels.OrderChan:
 			localOrders = updateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
@@ -115,9 +117,9 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	}
 }
 
-func (algo *Algo) runTest(localBars []*models.Bar, setupData func([]*models.Bar, Algo), rebalance func(Algo) Algo) {
-	if lastTest != localBars[algo.Index].Timestamp {
-		lastTest = localBars[algo.Index].Timestamp
+func (algo *Algo) runTest(setupData func([]*models.Bar, Algo), rebalance func(Algo) Algo) {
+	if lastTest != data.GetBars()[algo.Index].Timestamp {
+		lastTest = data.GetBars()[algo.Index].Timestamp
 		testAlgo := Algo{}
 		copier.Copy(&testAlgo, &algo)
 		log.Println(testAlgo.Market.BaseAsset.Quantity)
@@ -125,7 +127,7 @@ func (algo *Algo) runTest(localBars []*models.Bar, setupData func([]*models.Bar,
 		testAlgo.Market.QuoteAsset.Quantity = 0
 		testAlgo.Market.Leverage = 0
 		testAlgo.Market.Weight = 0
-		testAlgo = RunBacktest(localBars, testAlgo, rebalance, setupData)
+		testAlgo = RunBacktest(data.GetBars(), testAlgo, rebalance, setupData)
 		log.Println("test end test leverage", testAlgo.Market.Leverage, "actual leverage", algo.Market.Leverage)
 
 		// log.Println("test start", algo.Market.BaseAsset.Quantity)
@@ -189,13 +191,25 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 	}
 }
 
-func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, localBars []*models.Bar, setupData func([]*models.Bar, Algo)) {
+func (algo *Algo) updateBars(ex iex.IExchange, trade iex.TradeBin) {
+	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
+		diff := trade.Timestamp.Sub(time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0))
+		if diff.Minutes() >= 60 {
+			data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
+		}
+	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
+		data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
+	} else {
+		log.Fatal("This rebalance interval is not supported")
+	}
+	algo.Index = len(data.GetBars()) - 1
+}
+
+func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
-	localBars = data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
-	algo.Index = len(localBars) - 1
 	algo.Market.Price = utils.ConvertTradeBinToBar(trade)
-	setupData(localBars, *algo)
-	algo.Timestamp = time.Unix(localBars[algo.Index].Timestamp/1000, 0).UTC().String()
+	setupData(data.GetBars(), *algo)
+	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
 	log.Println("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
 		algo.logState()

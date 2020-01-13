@@ -4,11 +4,15 @@ import (
 	"log"
 	"sort"
 
-	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/tradeapi/iex"
+	"github.com/tantralabs/yantra/models"
 )
 
 var barData []*models.Bar
+
+func GetBars() []*models.Bar {
+	return barData
+}
 
 func UpdateLocalBars(localBars *[]*models.Bar, newBars []*models.Bar) {
 	timestamps := make([]int64, len(barData))
