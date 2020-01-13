@@ -11,6 +11,8 @@ import (
 	"github.com/tantralabs/yantra/data"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
+
+	"github.com/jinzhu/copier"
 )
 
 var orderStatus iex.OrderStatus
@@ -18,6 +20,7 @@ var firstTrade bool
 var firstPositionUpdate bool
 var shouldHaveQuantity float64
 var commitHash string
+var lastTest int64
 
 // Connect is called to connect to an exchanges WS api and begin trading.
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
@@ -49,7 +52,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	orderStatus = ex.GetPotentialOrderStatus()
 
 	log.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
-	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
+	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
 	log.Printf("Got local bars: %v\n", len(localBars))
 	// log.Println(len(localBars), "downloaded")
 
@@ -103,12 +106,33 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			algo.setupOrders()
 			algo.placeOrdersOnBook(ex, localOrders)
 			algo.logState()
+			algo.runTest(localBars, setupData, rebalance)
 		case newOrders := <-channels.OrderChan:
 			localOrders = updateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
 			algo.updateAlgoBalances(update.Balance)
 		}
 	}
+}
+
+func (algo *Algo) runTest(localBars []*models.Bar, setupData func([]*models.Bar, Algo), rebalance func(Algo) Algo) {
+	if lastTest != localBars[algo.Index].Timestamp {
+		lastTest = localBars[algo.Index].Timestamp
+		testAlgo := Algo{}
+		copier.Copy(&testAlgo, &algo)
+		log.Println(testAlgo.Market.BaseAsset.Quantity)
+		// RESET Algo but leave base balance
+		testAlgo.Market.QuoteAsset.Quantity = 0
+		testAlgo.Market.Leverage = 0
+		testAlgo.Market.Weight = 0
+		testAlgo = RunBacktest(localBars, testAlgo, rebalance, setupData)
+		log.Println("test end test leverage", testAlgo.Market.Leverage, "actual leverage", algo.Market.Leverage)
+
+		// log.Println("test start", algo.Market.BaseAsset.Quantity)
+		// log.Println("test end for a", a.Market.BaseAsset.Quantity)
+		//TODO compare the states
+	}
+
 }
 
 func (algo *Algo) updatePositions(positions []iex.WsPosition) {

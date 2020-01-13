@@ -3,7 +3,7 @@ module github.com/tantralabs/yantra
 go 1.13
 
 // replace github.com/tantralabs/eaopt => ../../tantralabs/eaopt
-// replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
+replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
 
 require (
 	firebase.google.com/go v3.10.0+incompatible
@@ -14,6 +14,7 @@ require (
 	github.com/gocarina/gocsv v0.0.0-20190927101021-3ecffd272576
 	github.com/google/uuid v1.1.1
 	github.com/influxdata/influxdb1-client v0.0.0-20190809212627-fc22c7df067e
+	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.2.0
 	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70

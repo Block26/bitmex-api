@@ -18,6 +18,7 @@ import (
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
+	"github.com/tantralabs/yantra/exchanges"
 )
 
 // Algo is where you will define your initial state and it will keep track of your state throughout a test and during live execution.
@@ -178,7 +179,7 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 	return
 }
 
-func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side float64) {
+func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize float64, side float64) {
 	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 	if algo.Market.QuoteAsset.Quantity == 0 {
 		currentWeight = float64(algo.Market.Weight)
@@ -186,19 +187,31 @@ func (algo *Algo) getOrderSize(currentPrice float64) (orderSize float64, side fl
 	adding := currentWeight == float64(algo.Market.Weight)
 	// fmt.Printf("CURRENT WEIGHT %v, adding %v, leverage target %v, can buy %v, deleverage order size %v\n", currentWeight, adding, algo.LeverageTarget, algo.canBuy(), algo.DeleverageOrderSize)
 	// fmt.Printf("Getting order size with quote asset quantity: %v\n", algo.Market.QuoteAsset.Quantity)
+
+	// Change order sizes for live to ensure similar boolen checks
+	exitOrderSize := algo.ExitOrderSize
+	entryOrderSize := algo.EntryOrderSize
+	
+	if live != nil && live[0] {
+		if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
+			exitOrderSize = algo.ExitOrderSize / 60
+			entryOrderSize = algo.EntryOrderSize / 60
+		}
+	}
+
 	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
-		// fmt.Printf("Getting entry order with entry order size %v, leverage target %v, leverage %v\n", algo.EntryOrderSize, algo.LeverageTarget, algo.Market.Leverage)
-		orderSize = algo.getEntryOrderSize(algo.EntryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
+		// fmt.Printf("Getting entry order with entry order size %v, leverage target %v, leverage %v\n", entryOrderSize, algo.LeverageTarget, algo.Market.Leverage)
+		orderSize = algo.getEntryOrderSize(entryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
 		side = float64(algo.Market.Weight)
 	} else if !adding {
-		// fmt.Printf("Getting exit order size with exit order size %v, leverage %v, weight %v\n", algo.ExitOrderSize, algo.Market.Leverage, algo.Market.Weight)
-		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
+		// fmt.Printf("Getting exit order size with exit order size %v, leverage %v, weight %v\n", exitOrderSize, algo.Market.Leverage, algo.Market.Weight)
+		orderSize = algo.getExitOrderSize(exitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
 		side = float64(currentWeight * -1)
 	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
 		orderSize = algo.DeleverageOrderSize
 		side = float64(currentWeight * -1)
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
-		orderSize = algo.getExitOrderSize(algo.ExitOrderSize > algo.Market.Leverage)
+		orderSize = algo.getExitOrderSize(exitOrderSize > algo.Market.Leverage)
 		//side = Opposite of the quantity
 		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 	} else if algo.canBuy() > math.Abs(algo.Market.QuoteAsset.Quantity) {

@@ -20,7 +20,7 @@ func deltaFloat(a, b, delta float64) bool {
 
 func (algo *Algo) setupOrders() {
 	if algo.AutoOrderPlacement {
-		orderSize, side := algo.getOrderSize(algo.Market.Price.Close)
+		orderSize, side := algo.getOrderSize(algo.Market.Price.Close, true)
 		if side == 0 {
 			return
 		}
