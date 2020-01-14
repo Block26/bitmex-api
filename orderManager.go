@@ -38,11 +38,7 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// Keep track of what we should have so the orders we place will grow and shrink
-		if shouldHaveQuantity == 0 {
-			shouldHaveQuantity = quantity * side
-		} else {
-			shouldHaveQuantity += quantity * side
-		}
+		shouldHaveQuantity += quantity * side
 
 		// Get the difference of what we have and what we should have, thats what we should order
 		quantityToOrder := shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
