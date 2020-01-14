@@ -1,5 +1,6 @@
 package models
 
+// Option contract representation. Option theoretical values and greeks are stored in OptionTheo struct.
 type OptionContract struct {
 	Symbol           string
 	Strike           float64

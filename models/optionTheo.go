@@ -31,7 +31,8 @@ type OptionTheo struct {
 	WeightedVega    float64 // Vega / Vega of ATM option
 }
 
-// Either theo or volatility is unknown (pass in -1.0 for unknown values)
+// An unknown value (theo or volatility) is represented by -1.
+// Volatility is represented by a decimal. Theoretical values are in terms of underlying currency.
 func NewOptionTheo(optionType string, UnderlyingPrice float64, strike float64,
 	currentTime int, expiry int, r float64,
 	volatility float64, theo float64) *OptionTheo {
@@ -57,20 +58,23 @@ func (o *OptionTheo) getExpiryString() string {
 	return time.Unix(int64(o.Expiry/1000), 0).UTC().String()
 }
 
-// Times in ms; return time in days
+// Times in ms; return time to expiry in years (because volatility values are annualized)
 func getTimeLeft(currentTime int, expiry int) float64 {
 	return float64(expiry-currentTime) / float64(1000*day*365)
 }
 
+// Black-scholes parameter
 func (o *OptionTheo) calcD1(volatility float64) float64 {
 	return (math.Log(o.UnderlyingPrice/o.Strike) + (o.InterestRate+(math.Pow(volatility, 2))/2)*o.TimeLeft) / (volatility * math.Sqrt(o.TimeLeft))
 }
 
+// Black-scholes parameter
 func (o *OptionTheo) calcD2(volatility float64) float64 {
 	return o.calcD1(volatility) - (volatility * math.Sqrt(o.TimeLeft))
 }
 
-// Use Black-Scholes pricing model to calculate theoretical option value
+// Use Black-Scholes pricing model to calculate theoretical option value, or back out volatility from given theoretical option value.
+// Calculate greeks if specified.
 func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 	if o.Volatility < 0 && o.Theo < 0 {
 		o.Volatility = DefaultVolatility
@@ -94,7 +98,12 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 	}
 }
 
+// Calculate greeks (delta, gamma, theta) for a given option (option volatility must be known)
 func (o *OptionTheo) CalcGreeks() {
+	if o.Volatility < 0 {
+		fmt.Printf("Volatility must be known for %v to calculate greeks.\n", o.String())
+		return
+	}
 	norm := gaussian.NewGaussian(0, 1)
 	td1 := o.calcD1(o.Volatility)
 	td2 := o.calcD2(o.Volatility)
@@ -110,6 +119,7 @@ func (o *OptionTheo) CalcGreeks() {
 	}
 }
 
+// Return the black-scholes theoretical value for an option for a given volatility value, but do not store it.
 func (o *OptionTheo) GetBlackScholesTheo(volatility float64) float64 {
 	norm := gaussian.NewGaussian(0, 1)
 	td1 := o.calcD1(volatility)
@@ -155,6 +165,7 @@ func (o *OptionTheo) CalcVol() {
 	}
 }
 
+// Calculate vega for an option by increasing implied volatility by 1% and calculating the change in theo
 func (o *OptionTheo) CalcVega() {
 	// fmt.Printf("O theo for %v: %v at underlying price %v\n", o.String(), o.Theo, o.UnderlyingPrice)
 	volChange := .01
@@ -165,6 +176,7 @@ func (o *OptionTheo) CalcVega() {
 	o.Vega = (newTheo - o.Theo) * o.UnderlyingPrice
 }
 
+// Calculate weighted vega for an option by calculating vega as a fraction of at-the-money vega
 func (o *OptionTheo) CalcWeightedVega() {
 	atmOption := NewOptionTheo(
 		o.OptionType,
@@ -200,6 +212,7 @@ func (o *OptionTheo) GetExpiryValue(currentPrice float64) float64 {
 	return expiryValue
 }
 
+// Recursively calculate the expected values of underlying price.
 // TODO: can be made more efficient by assuming paths can intersect (i.e. up -> down yields same node as down -> up)
 // Can be done with binomial tree indexing instead of indexing by path string:
 //			4
@@ -216,7 +229,6 @@ const maxPrice = 20000
 const minPrice = 2000
 const minProb = .00001
 
-// Recursively calculate the expected values of underlying price
 func (o *OptionTheo) binomialWalk(move float64, prob float64, currentPrice float64, currentProb float64, path string,
 	evSum *float64, timestepsLeft int, walkCache map[string]*float64) {
 	value, ok := walkCache[path]
