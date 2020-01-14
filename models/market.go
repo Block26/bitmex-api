@@ -7,8 +7,8 @@ type Market struct {
 	WSStream         string
 	BaseAsset        Asset
 	QuoteAsset       Asset
-	MaxOrders        int32
-	Weight           int32
+	MaxOrders        int
+	Weight           int
 	Price            Bar
 	Profit           float64
 	AverageCost      float64
@@ -27,7 +27,7 @@ type Market struct {
 	QuantityTickSize    int
 	PricePrecision      int
 	Futures             bool
-	Options				bool
+	Options             bool
 	BulkCancelSupported bool
-	OptionContracts             []OptionContract
+	OptionContracts     []OptionContract
 }
