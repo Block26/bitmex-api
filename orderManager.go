@@ -59,7 +59,7 @@ func (algo *Algo) setupOrders() {
 		// When deleveraging to meet canBuy don't go lower than can buy
 		// log.Println("quantityToOrder", quantityToOrder, "math.Abs(quantity+(quantityToOrder*side))", math.Abs(quantity+(quantityToOrder*side)), "side", side, (quantityToOrder * side))
 		// log.Printf("Weight: %v, quantitySide %v shouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
-		if (algo.Market.Weight != 0 && algo.Market.Weight == int32(quantitySide)) && math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && math.Abs(algo.Market.QuoteAsset.Quantity+quantityToOrder) < algo.canBuy() {
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int(quantitySide)) && math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && math.Abs(algo.Market.QuoteAsset.Quantity+quantityToOrder) < algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy() * quantitySide
 			quantityToOrder = math.Abs(algo.Market.QuoteAsset.Quantity) - algo.canBuy()
 			// quantityToOrder = (math.Abs(quantity) - algo.canBuy()) * -quantitySide
