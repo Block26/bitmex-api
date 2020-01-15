@@ -485,24 +485,16 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 		return algo.Market.OptionContracts, lastOptionLoad
 	}
 	fmt.Printf("Generating active options with last option load %v, current timestamp %v\n", lastOptionLoad, utils.ToIntTimestamp(algo.Timestamp))
-	const numWeeklys = 3
-	const numMonthlys = 5
-	//TODO: these should be based on underlying price
-	const minStrike = 50.
-	const maxStrike = 1000.
-	const strikeInterval = 10.
-	const tickSize = .1
-	const minOrderSize = .1
 	//Build expirys
 	var expirys []int
 	currentTime := utils.ToTimeObject(algo.Timestamp)
-	for i := 0; i < numWeeklys; i++ {
+	for i := 0; i < algo.Market.NumWeeklyOptions; i++ {
 		expiry := utils.TimeToTimestamp(utils.GetNextFriday(currentTime))
 		expirys = append(expirys, expiry)
 		currentTime = currentTime.Add(time.Hour * 24 * 7)
 	}
 	currentTime = utils.ToTimeObject(algo.Timestamp)
-	for i := 0; i < numMonthlys; i++ {
+	for i := 0; i < algo.Market.NumMonthlyOptions; i++ {
 		expiry := utils.TimeToTimestamp(utils.GetLastFridayOfMonth(currentTime))
 		if !utils.IntInSlice(expiry, expirys) {
 			expirys = append(expirys, expiry)
@@ -510,7 +502,7 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 		currentTime = currentTime.Add(time.Hour * 24 * 28)
 	}
 	fmt.Printf("Generated expirys: %v\n", expirys)
-	strikes := utils.Arange(minStrike, maxStrike, strikeInterval)
+	strikes := utils.Arange(algo.Market.OptionMinStrike, algo.Market.OptionMaxStrike, algo.Market.OptionStrikeInterval)
 	fmt.Printf("Generated strikes: %v\n", strikes)
 	var optionContracts []models.OptionContract
 	for _, expiry := range expirys {
@@ -525,10 +517,10 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 					OptionType:       optionType,
 					AverageCost:      0,
 					Profit:           0,
-					TickSize:         tickSize,
+					TickSize:         algo.Market.OptionTickSize,
 					MakerFee:         algo.Market.MakerFee,
 					TakerFee:         algo.Market.TakerFee,
-					MinimumOrderSize: minOrderSize,
+					MinimumOrderSize: algo.Market.OptionMinOrderSize,
 					Position:         0,
 					OptionTheo:       *optionTheo,
 					Status:           "open",

@@ -23,11 +23,18 @@ type Market struct {
 	BuyOrders        OrderArray
 	SellOrders       OrderArray
 
-	QuantityPrecision   int
-	QuantityTickSize    int
-	PricePrecision      int
-	Futures             bool
-	Options             bool
-	BulkCancelSupported bool
-	OptionContracts     []OptionContract
+	QuantityPrecision    int
+	QuantityTickSize     int
+	PricePrecision       int
+	Futures              bool
+	Options              bool
+	BulkCancelSupported  bool
+	OptionContracts      []OptionContract
+	OptionStrikeInterval float64
+	OptionTickSize       float64
+	OptionMinOrderSize   float64
+	OptionMaxStrike      float64
+	OptionMinStrike      float64
+	NumWeeklyOptions     int
+	NumMonthlyOptions    int
 }
