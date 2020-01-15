@@ -9,7 +9,9 @@ import (
 	"github.com/tantralabs/yantra/models"
 )
 
-const (
+const env = "remote"
+
+var (
 	host     = "localhost"
 	port     = 5432
 	user     = "yantrauser"
@@ -17,12 +19,27 @@ const (
 	dbname   = "tantra"
 )
 
+func Setup(env string) {
+	if env == "remote" {
+		host = "tantradb.czzctnxje5ad.us-west-1.rds.amazonaws.com"
+		port = 5432
+		user = "yantrauser"
+		password = "soncdw0csxvpWUHDQNksamsda"
+		dbname = "template1"
+		fmt.Printf("Set up remote tantradb with URL %v\n", host)
+	} else {
+		fmt.Printf("Using local tantradb.")
+	}
+}
+
 func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
+	Setup(env)
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 	db, err := sqlx.Connect("postgres", psqlInfo)
 	if err != nil {
+		fmt.Printf("Error connecting to tantradb: %v\n", err)
 		panic(err)
 	}
 

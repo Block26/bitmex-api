@@ -12,13 +12,26 @@ import (
 	"github.com/tantralabs/yantra/models"
 )
 
-const (
+var (
 	host     = "localhost"
 	port     = 5432
 	user     = "yantrauser"
 	password = "password"
 	dbname   = "tantra"
 )
+
+func Setup(env string) {
+	if env == "remote" {
+		host = "tantradb.czzctnxje5ad.us-west-1.rds.amazonaws.com"
+		port = 5432
+		user = "yantrauser"
+		password = "soncdw0csxvpWUHDQNksamsda"
+		dbname = "tantra"
+		fmt.Printf("Set up remote db with URL %v\n", host)
+	} else {
+		fmt.Printf("Using local db.")
+	}
+}
 
 // GetData is called to fetch data from your local psql database setup by https://github.com/tantralabs/tantradb
 func GetData(symbol string, exchange string, interval string, startTimestamp time.Time, endTimestamp time.Time) []*models.Bar {
