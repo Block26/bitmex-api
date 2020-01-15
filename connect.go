@@ -129,10 +129,6 @@ func (algo *Algo) runTest(setupData func([]*models.Bar, Algo), rebalance func(Al
 		testAlgo.Market.Weight = 0
 		testAlgo = RunBacktest(data.GetBars(), testAlgo, rebalance, setupData)
 		testAlgo.logLiveState(true)
-		log.Println("test leverage", testAlgo.Market.Leverage, "actual leverage", algo.Market.Leverage)
-
-		// log.Println("test start", algo.Market.BaseAsset.Quantity)
-		// log.Println("test end for a", a.Market.BaseAsset.Quantity)
 		//TODO compare the states
 	}
 

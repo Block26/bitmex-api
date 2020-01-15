@@ -47,7 +47,7 @@ func (algo *Algo) setupOrders() {
 		orderSide := math.Copysign(1, quantityToOrder)
 		quantitySide := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 
-		if orderSide == quantitySide && math.Abs(shouldHaveQuantity) > algo.canBuy() {
+		if orderSide == quantitySide && math.Abs(shouldHaveQuantity) > algo.canBuy() && algo.Market.Leverage < algo.LeverageTarget {
 			shouldHaveQuantity = algo.canBuy() * quantitySide
 			quantityToOrder = shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
 		}
@@ -55,7 +55,7 @@ func (algo *Algo) setupOrders() {
 		// When deleveraging to meet canBuy don't go lower than can buy
 		// log.Println("quantityToOrder", quantityToOrder, "math.Abs(quantity+(quantityToOrder*side))", math.Abs(quantity+(quantityToOrder*side)), "side", side, (quantityToOrder * side))
 		// log.Printf("Weight: %v, quantitySide %v shouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
-		if (algo.Market.Weight != 0 && algo.Market.Weight == int(quantitySide)) && math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && math.Abs(algo.Market.QuoteAsset.Quantity+quantityToOrder) < algo.canBuy() {
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int(quantitySide)) && algo.Market.Leverage > algo.LeverageTarget && math.Abs(algo.Market.QuoteAsset.Quantity+quantityToOrder) < algo.canBuy() {
 			shouldHaveQuantity = algo.canBuy() * quantitySide
 			quantityToOrder = math.Abs(algo.Market.QuoteAsset.Quantity) - algo.canBuy()
 			// quantityToOrder = (math.Abs(quantity) - algo.canBuy()) * -quantitySide

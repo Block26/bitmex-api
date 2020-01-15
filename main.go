@@ -191,11 +191,13 @@ func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize fl
 	// Change order sizes for live to ensure similar boolen checks
 	exitOrderSize := algo.ExitOrderSize
 	entryOrderSize := algo.EntryOrderSize
+	deleverageOrderSize := algo.DeleverageOrderSize
 
 	if live != nil && live[0] {
 		if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
 			exitOrderSize = algo.ExitOrderSize / 60
 			entryOrderSize = algo.EntryOrderSize / 60
+			deleverageOrderSize = algo.DeleverageOrderSize / 60
 		}
 	}
 
@@ -207,7 +209,7 @@ func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize fl
 		// fmt.Printf("Getting exit order size with exit order size %v, leverage %v, weight %v\n", exitOrderSize, algo.Market.Leverage, algo.Market.Weight)
 		orderSize = algo.getExitOrderSize(exitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
 		side = float64(currentWeight * -1)
-	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+algo.DeleverageOrderSize) && adding {
+	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+deleverageOrderSize) && adding {
 		orderSize = algo.DeleverageOrderSize
 		side = float64(currentWeight * -1)
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
