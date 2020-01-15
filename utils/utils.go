@@ -318,7 +318,7 @@ func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionT
 	year := strconv.Itoa(expiryTime.Year())[2:3]
 	month := strings.ToUpper(expiryTime.Month().String())[:3]
 	day := strconv.Itoa(expiryTime.Day())
-	return "BTC-" + strconv.Itoa(int(strike)) + "-" + day + month + year + "-" + strings.ToUpper(optionType)
+	return currency + "-" + strconv.Itoa(int(strike)) + "-" + day + month + year + "-" + strings.ToUpper(optionType)
 }
 
 func GetNextFriday(currentTime time.Time) time.Time {

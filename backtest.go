@@ -488,9 +488,9 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 	const numWeeklys = 3
 	const numMonthlys = 5
 	//TODO: these should be based on underlying price
-	const minStrike = 5000.
-	const maxStrike = 20000.
-	const strikeInterval = 250.
+	const minStrike = 50.
+	const maxStrike = 1000.
+	const strikeInterval = 10.
 	const tickSize = .1
 	const minOrderSize = .1
 	//Build expirys

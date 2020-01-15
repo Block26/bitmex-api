@@ -23,7 +23,7 @@ type TheoEngine struct {
 const NumWeekly = 2
 const NumMonthly = 3
 const NumStrikes = 10
-const StrikeInterval = 250.
+const StrikeInterval = 10.
 const TickSize = .1
 const DefaultVolatility = .6
 
@@ -152,7 +152,7 @@ func BuildAvailableOptions(underlyingPrice float64, currentTime time.Time, volat
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
 				optionTheo := models.NewOptionTheo(optionType, underlyingPrice, strike, int(currentTime.UnixNano()/int64(time.Millisecond)), expiry, 0, volatility, -1)
-				symbol := utils.GetDeribitOptionSymbol(expiry, strike, "BTC", optionType)
+				symbol := utils.GetDeribitOptionSymbol(expiry, strike, "ETH", optionType)
 				optionContract := models.OptionContract{symbol, strike, expiry, optionType, 0, 0, TickSize, MakerFee,
 					TakerFee, MinimumOrderSize, orderArray, orderArray, 0., *optionTheo, "open", -1.}
 				optionContracts = append(optionContracts, optionContract)
