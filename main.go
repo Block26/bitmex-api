@@ -271,6 +271,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 	fields["EntryOrderSize"] = algo.EntryOrderSize
 	fields["ExitOrderSize"] = algo.ExitOrderSize
 	fields["DeleverageOrderSize"] = algo.DeleverageOrderSize
+	fields["LeverageTarget"] = algo.LeverageTarget
 
 	pt, err = client.NewPoint(
 		prefix+"params",

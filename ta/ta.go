@@ -26,6 +26,13 @@ func GetDX(high []float64, low []float64, close []float64, index int, datalength
 	return talib.Dx(high[index-datalength-1:index], low[index-datalength-1:index], close[index-datalength-1:index], length)
 }
 
+// GetDX Calculate a DX slice based on a data length and DX length. OHLC lengths > data length > length
+func GetRSI(close []float64, index int, dataLength int) float64 {
+	//TODO check live
+	rsi := talib.Rsi(close[index-dataLength-1:index], dataLength)
+	return rsi[len(rsi)-1]
+}
+
 // CreateEMA Create an EMA
 func CreateEMA(data []float64, length int) []float64 {
 	if length <= 1 {
