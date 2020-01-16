@@ -503,6 +503,9 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 		currentTime = currentTime.Add(time.Hour * 24 * 28)
 	}
 	// fmt.Printf("Generated expirys: %v\n", expirys)
+	if algo.Market.OptionStrikeInterval == 0 {
+		log.Fatalln("OptionStrikeInterval cannot be 0, does this exchange support options?")
+	}
 	minStrike := utils.RoundToNearest(algo.Market.Price.Close*(1+(algo.Market.OptionMinStrikePct/100.)), algo.Market.OptionStrikeInterval)
 	maxStrike := utils.RoundToNearest(algo.Market.Price.Close*(1+(algo.Market.OptionMaxStrikePct/100.)), algo.Market.OptionStrikeInterval)
 	strikes := utils.Arange(minStrike, maxStrike, algo.Market.OptionStrikeInterval)
