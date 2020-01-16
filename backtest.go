@@ -19,7 +19,6 @@ import (
 
 	// "github.com/tantralabs/yantra/options"
 	"github.com/tantralabs/yantra/tantradb"
-	. "gopkg.in/src-d/go-git.v4/_examples"
 )
 
 // var MinimumOrderSize = 25
@@ -373,10 +372,9 @@ func (algo *Algo) getFilledAskOrders(price float64) ([]float64, []float64) {
 }
 
 func logBacktest(algo Algo) {
-	influx, err := client.NewHTTPClient(client.HTTPConfig{
+	influx, _ := client.NewHTTPClient(client.HTTPConfig{
 		Addr: "http://ec2-34-222-170-225.us-west-2.compute.amazonaws.com:8086",
 	})
-	CheckIfError(err)
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  "backtests",
@@ -392,7 +390,7 @@ func logBacktest(algo Algo) {
 
 	algo.Result["id"] = uuid
 
-	pt, err := client.NewPoint(
+	pt, _ := client.NewPoint(
 		"result",
 		tags,
 		algo.Result,
@@ -401,7 +399,6 @@ func logBacktest(algo Algo) {
 	bp.AddPoint(pt)
 
 	client.Client.Write(influx, bp)
-	// CheckIfError(err)
 	influx.Close()
 }
 
