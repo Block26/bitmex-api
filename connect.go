@@ -206,7 +206,7 @@ func (algo *Algo) updateBars(ex iex.IExchange, trade iex.TradeBin) {
 
 func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, setupData func([]*models.Bar, Algo)) {
 	log.Println("Trade Update:", trade)
-	algo.Market.Price = utils.ConvertTradeBinToBar(trade)
+	algo.Market.Price = *data.GetBars()[algo.Index]
 	setupData(data.GetBars(), *algo)
 	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
 	log.Println("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
