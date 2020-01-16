@@ -33,8 +33,8 @@ type Market struct {
 	OptionStrikeInterval float64
 	OptionTickSize       float64
 	OptionMinOrderSize   float64
-	OptionMaxStrike      float64
-	OptionMinStrike      float64
+	OptionMaxStrikePct   float64
+	OptionMinStrikePct   float64
 	NumWeeklyOptions     int
 	NumMonthlyOptions    int
 }

@@ -46,6 +46,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
 		algo.Timestamp = utils.TimestampToTime(volStart).String()
 		volData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
+		algo.Market.Price = *data[0]
 		algo.Market.OptionContracts, lastOptionLoad = generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, &algo)
 		fmt.Printf("Len vol data: %v\n", len(volData))
 	}
@@ -414,7 +415,7 @@ func (algo *Algo) updateOptionsPositions() {
 		avgPrice := 0.
 		hasAmount := false
 		if len(option.SellOrders.Quantity) > 0 {
-			fmt.Printf("Found orders for option %v: %v\n", option.Symbol, option.SellOrders)
+			// fmt.Printf("Found orders for option %v: %v\n", option.Symbol, option.SellOrders)
 		}
 		for i, qty := range option.BuyOrders.Quantity {
 			price := option.BuyOrders.Price[i]
@@ -431,11 +432,11 @@ func (algo *Algo) updateOptionsPositions() {
 			}
 			adjPrice = utils.RoundToNearest(adjPrice, option.TickSize)
 			if adjPrice > 0 {
-				fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
+				// fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
 				avgPrice = ((avgPrice * total) + (adjPrice * qty)) / (total + qty)
 				total += qty
 			} else {
-				fmt.Printf("Cannot buy option %v for adjPrice 0\n", option.Symbol)
+				// fmt.Printf("Cannot buy option %v for adjPrice 0\n", option.Symbol)
 			}
 			hasAmount = true
 		}
@@ -454,17 +455,17 @@ func (algo *Algo) updateOptionsPositions() {
 			}
 			adjPrice = utils.RoundToNearest(adjPrice, option.TickSize)
 			if adjPrice > 0 {
-				fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
+				// fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
 				avgPrice = math.Abs(((avgPrice * total) + (adjPrice * qty)) / (total - qty))
 				total -= qty
 			} else {
-				fmt.Printf("Cannot sell option %v for adjPrice 0\n", option.Symbol)
+				// fmt.Printf("Cannot sell option %v for adjPrice 0\n", option.Symbol)
 			}
 			hasAmount = true
 		}
 		if hasAmount {
 			//Fill open orders
-			fmt.Printf("Calcing new avg cost with avg cost %v, position %v, avgprice %v, total %v\n", option.AverageCost, option.Position, avgPrice, total)
+			// fmt.Printf("Calcing new avg cost with avg cost %v, position %v, avgprice %v, total %v\n", option.AverageCost, option.Position, avgPrice, total)
 			option.AverageCost = ((option.AverageCost * option.Position) + (avgPrice * total)) / (option.Position + total)
 			option.Position += total
 			option.BuyOrders = models.OrderArray{
@@ -475,7 +476,7 @@ func (algo *Algo) updateOptionsPositions() {
 				Quantity: []float64{},
 				Price:    []float64{},
 			}
-			fmt.Printf("[%v] updated avgcost %v and position %v\n", option.Symbol, option.AverageCost, option.Position)
+			// fmt.Printf("[%v] updated avgcost %v and position %v\n", option.Symbol, option.AverageCost, option.Position)
 		}
 	}
 }
@@ -484,7 +485,7 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 	if utils.ToIntTimestamp(algo.Timestamp)-lastOptionLoad < optionLoadFreq*1000 {
 		return algo.Market.OptionContracts, lastOptionLoad
 	}
-	fmt.Printf("Generating active options with last option load %v, current timestamp %v\n", lastOptionLoad, utils.ToIntTimestamp(algo.Timestamp))
+	// fmt.Printf("Generating active options with last option load %v, current timestamp %v\n", lastOptionLoad, utils.ToIntTimestamp(algo.Timestamp))
 	//Build expirys
 	var expirys []int
 	currentTime := utils.ToTimeObject(algo.Timestamp)
@@ -501,9 +502,11 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 		}
 		currentTime = currentTime.Add(time.Hour * 24 * 28)
 	}
-	fmt.Printf("Generated expirys: %v\n", expirys)
-	strikes := utils.Arange(algo.Market.OptionMinStrike, algo.Market.OptionMaxStrike, algo.Market.OptionStrikeInterval)
-	fmt.Printf("Generated strikes: %v\n", strikes)
+	// fmt.Printf("Generated expirys: %v\n", expirys)
+	minStrike := utils.RoundToNearest(algo.Market.Price.Close*(1+(algo.Market.OptionMinStrikePct/100.)), algo.Market.OptionStrikeInterval)
+	maxStrike := utils.RoundToNearest(algo.Market.Price.Close*(1+(algo.Market.OptionMaxStrikePct/100.)), algo.Market.OptionStrikeInterval)
+	strikes := utils.Arange(minStrike, maxStrike, algo.Market.OptionStrikeInterval)
+	// fmt.Printf("Generated strikes with current price %v min strike %v and max strike %v: %v\n", algo.Market.Price.Close, minStrike, maxStrike, strikes)
 	var optionContracts []models.OptionContract
 	for _, expiry := range expirys {
 		for _, strike := range strikes {
@@ -547,7 +550,7 @@ func (algo *Algo) updateActiveOptions(lastOptionLoad, optionLoadFreq int, volDat
 		}
 		if isNew {
 			algo.Market.OptionContracts = append(algo.Market.OptionContracts, activeOption)
-			fmt.Printf("Found new active option: %v\n", activeOption.OptionTheo.String())
+			// fmt.Printf("Found new active option: %v\n", activeOption.OptionTheo.String())
 		}
 	}
 	return lastOptionLoad

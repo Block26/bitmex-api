@@ -200,8 +200,8 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				OptionStrikeInterval: 250.,
 				OptionTickSize:       .1,
 				OptionMinOrderSize:   .1,
-				OptionMaxStrike:      20000.,
-				OptionMinStrike:      5000.,
+				OptionMaxStrikePct:   300.,
+				OptionMinStrikePct:   -50.,
 				NumWeeklyOptions:     3,
 				NumMonthlyOptions:    5,
 			}, nil
@@ -212,7 +212,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				Exchange: "deribit",
 				BaseAsset: models.Asset{
 					Symbol:   "ETH",
-					Quantity: 1,
+					Quantity: 5,
 				},
 				QuoteAsset: models.Asset{
 					Symbol:   "ETH-PERPETUAL",
@@ -231,10 +231,10 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				Options:              false,
 				OptionContracts:      []models.OptionContract{},
 				OptionStrikeInterval: 10.,
-				OptionTickSize:       .1,
-				OptionMinOrderSize:   .1,
-				OptionMaxStrike:      1000.,
-				OptionMinStrike:      50.,
+				OptionTickSize:       .001,
+				OptionMinOrderSize:   1.,
+				OptionMaxStrikePct:   300.,
+				OptionMinStrikePct:   -50.,
 				NumWeeklyOptions:     3,
 				NumMonthlyOptions:    5,
 			}, nil
@@ -272,8 +272,8 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				OptionStrikeInterval: 250.,
 				OptionTickSize:       .1,
 				OptionMinOrderSize:   .1,
-				OptionMaxStrike:      20000.,
-				OptionMinStrike:      5000.,
+				OptionMaxStrikePct:   300.,
+				OptionMinStrikePct:   -50.,
 				NumWeeklyOptions:     3,
 				NumMonthlyOptions:    5,
 			}, nil
