@@ -11,7 +11,6 @@ import (
 	"github.com/tantralabs/yantra/data"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
-	"github.com/tantralabs/yantra/tantradb"
 	"github.com/tantralabs/yantra/utils"
 
 	"github.com/jinzhu/copier"
@@ -29,7 +28,7 @@ var lastTest int64
 //
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) {
-	tantradb.Setup("remote")
+	data.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
 	}

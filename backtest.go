@@ -16,9 +16,8 @@ import (
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
+	"github.com/tantralabs/yantra/data"
 
-	// "github.com/tantralabs/yantra/options"
-	"github.com/tantralabs/yantra/tantradb"
 )
 
 // var MinimumOrderSize = 25
@@ -28,14 +27,14 @@ var lastOptionBalance = 0.
 
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
-func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
+func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
 	// Set a UUID for the run
 	if currentRunUUID.IsZero() {
 		currentRunUUID = time.Now()
 	}
 
 	start := time.Now()
-	setupData(data, algo)
+	setupData(bars, algo)
 	var history []models.History
 	var timestamp time.Time
 	var volData []models.ImpliedVol
@@ -43,19 +42,19 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	var lastOptionLoad int
 	if algo.Market.Options {
 		lastOptionLoad = 0
-		volStart := int(data[0].Timestamp)
-		volEnd := int(data[len(data)-1].Timestamp)
+		volStart := int(bars[0].Timestamp)
+		volEnd := int(bars[len(bars)-1].Timestamp)
 		fmt.Printf("Vol data start: %v, end %v\n", volStart, volEnd)
 		algo.Timestamp = utils.TimestampToTime(volStart).String()
-		volData = tantradb.LoadImpliedVols("XBTUSD", volStart, volEnd)
-		algo.Market.Price = *data[0]
+		volData = data.LoadImpliedVols("XBTUSD", volStart, volEnd)
+		algo.Market.Price = *bars[0]
 		algo.Market.OptionContracts, lastOptionLoad = generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, &algo)
 		fmt.Printf("Len vol data: %v\n", len(volData))
 	}
 
 	idx := 0
-	log.Println("Running", len(data), "bars")
-	for _, bar := range data {
+	log.Println("Running", len(bars), "bars")
+	for _, bar := range bars {
 		if idx == 0 {
 			log.Println("Start Timestamp", time.Unix(bar.Timestamp/1000, 0))
 			fmt.Printf("Running backtest with quote asset quantity %v and base asset quantity %v, fill type %v\n", algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity, algo.FillType)
@@ -68,9 +67,7 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		if idx > algo.DataLength+1 {
 			algo.Index = idx
 			algo.Market.Price = *bar
-			//lastOptionLoad = algo.updateActiveOptions(volData)
 			algo = rebalance(algo)
-			// log.Println(data)
 			if algo.FillType == exchanges.FillType().Limit {
 				//Check which buys filled
 				pricesFilled, ordersFilled := algo.getFilledBidOrders(bar.Low)
