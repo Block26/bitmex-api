@@ -52,6 +52,7 @@ type Algo struct {
 	EntryOrderSize      float64 // The speed at which the algo enters positions during the RebalanceInterval
 	ExitOrderSize       float64 // The speed at which the algo exits positions during the RebalanceInterval
 	DeleverageOrderSize float64 // The speed at which the algo exits positions during the RebalanceInterval if it is over leveraged, current leverage is determined by Algo.LeverageTarget or Market.MaxLeverage.
+	shouldHaveQuantity  float64 // Keeps track of the order sizing when live.
 }
 
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
@@ -274,6 +275,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 	fields["ExitOrderSize"] = algo.ExitOrderSize
 	fields["DeleverageOrderSize"] = algo.DeleverageOrderSize
 	fields["LeverageTarget"] = algo.LeverageTarget
+	fields["ShouldHaveQuantity"] = algo.shouldHaveQuantity
 
 	pt, err = client.NewPoint(
 		prefix+"params",

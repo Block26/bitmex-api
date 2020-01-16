@@ -1,7 +1,6 @@
 package yantra
 
 import (
-	"fmt"
 	"log"
 	"math"
 	"sort"
@@ -38,51 +37,57 @@ func (algo *Algo) setupOrders() {
 		}
 
 		// Keep track of what we should have so the orders we place will grow and shrink
-		shouldHaveQuantity += quantity * side
+		algo.shouldHaveQuantity += quantity * side
 
 		// Get the difference of what we have and what we should have, thats what we should order
-		quantityToOrder := shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+		quantityToOrder := algo.shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
 
 		// Don't over order while adding to the position
 		orderSide := math.Copysign(1, quantityToOrder)
 		quantitySide := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 
-		if orderSide == quantitySide && math.Abs(shouldHaveQuantity) > algo.canBuy() && algo.Market.Leverage < algo.LeverageTarget {
-			shouldHaveQuantity = algo.canBuy() * quantitySide
-			quantityToOrder = shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+		if orderSide == quantitySide && math.Abs(algo.shouldHaveQuantity) > algo.canBuy() && algo.Market.Leverage < algo.LeverageTarget {
+			log.Println("Don't over order while adding to the position")
+			algo.shouldHaveQuantity = algo.canBuy() * quantitySide
+			quantityToOrder = algo.shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
 		}
 
 		// When deleveraging to meet canBuy don't go lower than can buy
 		// log.Println("quantityToOrder", quantityToOrder, "math.Abs(quantity+(quantityToOrder*side))", math.Abs(quantity+(quantityToOrder*side)), "side", side, (quantityToOrder * side))
-		// log.Printf("Weight: %v, quantitySide %v shouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, shouldHaveQuantity, algo.canBuy())
+		// log.Printf("Weight: %v, quantitySide %v algo.shouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, algo.shouldHaveQuantity, algo.canBuy())
 		if (algo.Market.Weight != 0 && algo.Market.Weight == int(quantitySide)) && algo.Market.Leverage > algo.LeverageTarget && math.Abs(algo.Market.QuoteAsset.Quantity+quantityToOrder) < algo.canBuy() {
-			shouldHaveQuantity = algo.canBuy() * quantitySide
-			quantityToOrder = math.Abs(algo.Market.QuoteAsset.Quantity) - algo.canBuy()
+			algo.shouldHaveQuantity = algo.canBuy() * quantitySide
+			quantityToOrder = (math.Abs(algo.Market.QuoteAsset.Quantity) - algo.canBuy()) * orderSide
 			// quantityToOrder = (math.Abs(quantity) - algo.canBuy()) * -quantitySide
-			log.Printf("Don't over order when reducing leverage should have qty: %v\n", shouldHaveQuantity)
+			log.Printf("Don't over order when reducing leverage should have qty: %v\n", algo.shouldHaveQuantity)
 		}
 
 		// Don't over order to go neutral
 		if algo.Market.Weight == 0 && math.Abs(quantityToOrder) > math.Abs(algo.Market.QuoteAsset.Quantity) {
-			shouldHaveQuantity = 0
+			log.Println("Don't over order to go neutral")
+			algo.shouldHaveQuantity = 0
 			quantityToOrder = -algo.Market.QuoteAsset.Quantity
 		}
 
-		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder, "leverage", algo.Market.Leverage, "leverage target", algo.LeverageTarget)
+		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", algo.shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder, "leverage", algo.Market.Leverage, "leverage target", algo.LeverageTarget)
 
 		if math.Abs(quantityToOrder) > 0 {
-			if side == 1 {
+			orderSide = math.Copysign(1, quantityToOrder)
+			if side == 1 && orderSide == 1 {
 				algo.Market.BuyOrders = models.OrderArray{
 					Quantity: []float64{math.Abs(quantityToOrder)},
 					Price:    []float64{algo.Market.Price.Close - algo.Market.TickSize},
 				}
 				algo.Market.SellOrders = models.OrderArray{}
-			} else if side == -1 {
+			} else if side == -1 && orderSide == -1 {
 				algo.Market.SellOrders = models.OrderArray{
 					Quantity: []float64{math.Abs(quantityToOrder)},
 					Price:    []float64{algo.Market.Price.Close + algo.Market.TickSize},
 				}
 				algo.Market.BuyOrders = models.OrderArray{}
+			} else {
+				algo.Market.BuyOrders = models.OrderArray{}
+				algo.Market.SellOrders = models.OrderArray{}
 			}
 		} else {
 			algo.Market.BuyOrders = models.OrderArray{}
@@ -139,6 +144,36 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 		newAsks = append(newAsks, order)
 	}
 
+	cancel := func(order iex.Order) {
+		// log.Println("Trying to cancel", order.OrderID)
+		log.Printf("Trying to cancel order %v\n", order.OrderID)
+		err := ex.CancelOrder(iex.CancelOrderF{
+			Market: order.Symbol,
+			Uuid:   order.OrderID,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	place := func(order iex.Order) {
+		log.Printf("Trying to place order %v\n", order)
+		_, err := ex.PlaceOrder(order)
+		if err != nil {
+			log.Fatal(err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if len(algo.Market.SellOrders.Price) == 0 && len(algo.Market.BuyOrders.Price) == 0 && len(openOrders) > 0 {
+		for _, order := range openOrders {
+			if order.Market == algo.Market.Symbol {
+				cancel(order)
+			}
+		}
+	}
+
 	totalQty := 0.0
 	for i, qty := range algo.Market.BuyOrders.Quantity {
 		totalQty = totalQty + qty
@@ -168,12 +203,16 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 	}
 
 	//Parse option orders
-	totalQty = 0.0
 	for _, option := range algo.Market.OptionContracts {
+		for _, order := range openOrders {
+			if order.Market == option.Symbol {
+				cancel(order)
+			}
+		}
+
 		for i, qty := range option.BuyOrders.Quantity {
 			// fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
-			totalQty += qty
-			if totalQty >= algo.Market.OptionMinOrderSize {
+			if qty >= algo.Market.OptionMinOrderSize {
 				orderPrice := option.BuyOrders.Price[i]
 				// Assume a price of 0 indicates market order
 				var orderType string
@@ -185,22 +224,18 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 				order := iex.Order{
 					Market:   option.Symbol,
 					Currency: algo.Market.QuoteAsset.Symbol,
-					Amount:   utils.ToFixed(totalQty, 1), //float64(int(totalQty)),
+					Amount:   utils.ToFixed(qty, 1), //float64(int(totalQty)),
 					Rate:     utils.ToFixed(orderPrice, algo.Market.PricePrecision),
 					Type:     orderType,
 					Side:     "Buy",
 				}
 				newBids = append(newBids, order)
-				totalQty = 0.0
 			}
 		}
-	}
-	totalQty = 0.0
-	for _, option := range algo.Market.OptionContracts {
+
 		for i, qty := range option.SellOrders.Quantity {
 			// fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
-			totalQty += qty
-			if totalQty >= algo.Market.OptionMinOrderSize {
+			if qty >= algo.Market.OptionMinOrderSize {
 				orderPrice := option.SellOrders.Price[i]
 				// Assume a price of 0 indicates market order
 				var orderType string
@@ -212,19 +247,18 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 				order := iex.Order{
 					Market:   option.Symbol,
 					Currency: algo.Market.QuoteAsset.Symbol,
-					Amount:   utils.ToFixed(totalQty, 1), //float64(int(totalQty)),
+					Amount:   utils.ToFixed(qty, 1), //float64(int(totalQty)),
 					Rate:     utils.ToFixed(orderPrice, algo.Market.PricePrecision),
 					Type:     orderType,
 					Side:     "Sell",
 				}
-				fmt.Printf("New ask from OptionContracts: %v\n", order)
+				// fmt.Printf("New ask from OptionContracts: %v\n", order)
 				newAsks = append(newAsks, order)
-				totalQty = 0.0
 			}
 		}
 	}
 
-	log.Println("Orders: Asks", newAsks, "Bids", newBids)
+	// log.Println("Orders: Asks", newAsks, "Bids", newBids)
 	// Get open buys, buys, open sells, sells, with matches filtered out
 	var openBids []iex.Order
 	var openAsks []iex.Order
@@ -234,7 +268,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 			openBids = append(openBids, order)
 		} else if strings.ToLower(order.Side) == "sell" {
 			openAsks = append(openAsks, order)
-			fmt.Printf("New ask from OpenOrders: %v\n", order)
+			// fmt.Printf("New ask from OpenOrders: %v\n", order)
 		}
 	}
 
@@ -290,28 +324,6 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 	sort.Slice(openAsks, func(a, b int) bool {
 		return openAsks[a].Rate < openAsks[b].Rate
 	})
-
-	cancel := func(order iex.Order) {
-		// log.Println("Trying to cancel", order.OrderID)
-		log.Printf("Trying to cancel order %v\n", order.OrderID)
-		err := ex.CancelOrder(iex.CancelOrderF{
-			Market: order.Symbol,
-			Uuid:   order.OrderID,
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-
-	place := func(order iex.Order) {
-		log.Printf("Trying to place order %v\n", order)
-		_, err := ex.PlaceOrder(order)
-		if err != nil {
-			log.Fatal(err)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
 
 	bidIndex := 0
 	askIndex := 0
@@ -426,6 +438,7 @@ func updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order) []iex.Order
 			if newOrder.OrdStatus == orderStatus.Cancelled || newOrder.OrdStatus == orderStatus.Filled || newOrder.OrdStatus == orderStatus.Rejected {
 				log.Println(newOrder.OrdStatus, newOrder.OrderID)
 			} else {
+				log.Println("New Order", newOrder.OrdStatus, newOrder.OrderID)
 				updatedOrders = append(updatedOrders, newOrder)
 			}
 		}

@@ -19,7 +19,6 @@ import (
 var orderStatus iex.OrderStatus
 var firstTrade bool
 var firstPositionUpdate bool
-var shouldHaveQuantity float64
 var commitHash string
 var lastTest int64
 
@@ -64,6 +63,11 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 
 	positions, _ := ex.GetPositions(algo.Market.BaseAsset.Symbol)
 	algo.updatePositions(positions)
+
+	var localOrders []iex.Order
+	orders, _ := ex.GetOpenOrders(iex.OpenOrderF{Currency: algo.Market.BaseAsset.Symbol})
+	localOrders = updateLocalOrders(localOrders, orders)
+	log.Println(len(localOrders), "orders found")
 	// SUBSCRIBE TO WEBSOCKETS
 
 	// channels to subscribe to
@@ -95,8 +99,6 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	if err != nil {
 		log.Println(err)
 	}
-
-	var localOrders []iex.Order
 
 	for {
 		select {
@@ -164,7 +166,7 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 		}
 		if firstPositionUpdate {
 			algo.logState()
-			shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
+			algo.shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
 			firstPositionUpdate = false
 		}
 	}
@@ -215,6 +217,7 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, setupData fu
 	}
 	// Update active option contracts from API
 	if algo.Market.Exchange == "deribit" && algo.Market.Options {
+		// TODO only call this every few hours or once per day.
 		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, true, "option")
 		if err == nil {
 			// log.Printf("Got markets from API: %v\n", markets)

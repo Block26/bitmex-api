@@ -137,14 +137,15 @@ func TestSetupOrdersAutoOrderPlacement(t *testing.T) {
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = 0
 	algo.Market.Weight = 0
-	shouldHaveQuantity = 0
+	algo.shouldHaveQuantity = 0
 
 	algo.logState(time.Now())
 	algo.setupOrders()
 
-	if len(algo.Market.BuyOrders.Quantity) != 0 && algo.Market.BuyOrders.Quantity[0] != 20 {
+	if len(algo.Market.BuyOrders.Quantity) != 0 {
 		t.Error("Weight is 0 and Quantity is 0 you should not be placing orders")
 	}
+
 	if len(algo.Market.SellOrders.Quantity) != 0 {
 		t.Error("Weight is 0 and Quantity is 0 you should not be placing orders")
 	}
@@ -153,7 +154,7 @@ func TestSetupOrdersAutoOrderPlacement(t *testing.T) {
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = 10
 	algo.Market.Weight = 0
-	shouldHaveQuantity = 1
+	algo.shouldHaveQuantity = 0
 
 	algo.logState(time.Now())
 	algo.setupOrders()
@@ -161,8 +162,11 @@ func TestSetupOrdersAutoOrderPlacement(t *testing.T) {
 	if len(algo.Market.BuyOrders.Quantity) != 0 {
 		t.Error("Weight is 0 and Quantity is 0 you should not be placing buy orders")
 	}
-	if len(algo.Market.SellOrders.Quantity) != 1 && algo.Market.SellOrders.Quantity[0] != 10 {
-		t.Error("Weight is 0 and Quantity is 1 you should be placing sell orders")
+	if len(algo.Market.SellOrders.Quantity) != 1 {
+		t.Error("Weight is 0 and Quantity is 10 you should be placing sell orders")
+	}
+	if algo.Market.SellOrders.Quantity[0] != 10 {
+		t.Error(algo.Market.SellOrders.Quantity[0], "!= 10 ")
 	}
 
 	// ensure second order is still 10
@@ -172,15 +176,19 @@ func TestSetupOrdersAutoOrderPlacement(t *testing.T) {
 	if len(algo.Market.BuyOrders.Quantity) != 0 {
 		t.Error("Weight is 0 and Quantity is 0 you should not be placing buy orders")
 	}
-	if len(algo.Market.SellOrders.Quantity) != 1 && algo.Market.SellOrders.Quantity[0] != 10 {
+	if len(algo.Market.SellOrders.Quantity) != 1 {
 		t.Error("Weight is 0 and Quantity is 1 you should be placing sell orders")
+	}
+
+	if algo.Market.SellOrders.Quantity[0] != 10 {
+		t.Error(algo.Market.SellOrders.Quantity[0], "!= 10")
 	}
 
 	resetOrders(&algo)
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = -10
 	algo.Market.Weight = 0
-	shouldHaveQuantity = -1
+	algo.shouldHaveQuantity = -1
 
 	algo.logState(time.Now())
 	algo.setupOrders()
@@ -198,7 +206,7 @@ func TestSetupOrdersAutoOrderPlacement(t *testing.T) {
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = 0
 	algo.Market.Weight = 1
-	shouldHaveQuantity = 0
+	algo.shouldHaveQuantity = 0
 
 	algo.logState(time.Now())
 	algo.setupOrders()
@@ -215,7 +223,7 @@ func TestSetupOrdersAutoOrderPlacement(t *testing.T) {
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = 100
 	algo.Market.Weight = 1
-	shouldHaveQuantity = 100
+	algo.shouldHaveQuantity = 100
 
 	algo.logState(time.Now())
 	algo.setupOrders()
@@ -232,16 +240,19 @@ func TestSetupOrdersAutoOrderPlacement(t *testing.T) {
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = 110
 	algo.Market.Weight = 1
-	shouldHaveQuantity = 111
+	algo.shouldHaveQuantity = 110
 
 	algo.logState(time.Now())
 	algo.setupOrders()
 
 	if len(algo.Market.BuyOrders.Quantity) != 0 {
-		t.Error("Weight is 1 and Quantity is 105 you should not be placing buy orders")
+		t.Error("Weight is 1 and Quantity is 110 you should not be placing buy orders")
 	}
-	if len(algo.Market.SellOrders.Quantity) != 1 && algo.Market.SellOrders.Quantity[0] != 10 {
+	if len(algo.Market.SellOrders.Quantity) != 1 {
 		t.Error("Weight is 1 and Quantity is 110 you should be placing sell orders TO DELEVERAGE")
+	}
+	if algo.Market.SellOrders.Quantity[0] != 5 {
+		t.Error(algo.Market.SellOrders.Quantity[0], "!= 5")
 	}
 
 	// WEIGHT -1 TESTS
@@ -250,7 +261,7 @@ func TestSetupOrdersAutoOrderPlacement(t *testing.T) {
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = 0
 	algo.Market.Weight = -1
-	shouldHaveQuantity = 0
+	algo.shouldHaveQuantity = 0
 
 	algo.logState(time.Now())
 	algo.setupOrders()
@@ -267,7 +278,7 @@ func TestSetupOrdersAutoOrderPlacement(t *testing.T) {
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = -100
 	algo.Market.Weight = -1
-	shouldHaveQuantity = -100
+	algo.shouldHaveQuantity = -100
 
 	algo.logState(time.Now())
 	algo.setupOrders()
@@ -287,14 +298,17 @@ func TestDeleverageShort(t *testing.T) {
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = -110
 	algo.Market.Weight = -1
-	shouldHaveQuantity = -110
+	algo.shouldHaveQuantity = -110
 
 	algo.logState(time.Now())
 	algo.setupOrders()
 
 	log.Println(algo.Market.BuyOrders.Quantity)
-	if len(algo.Market.BuyOrders.Quantity) == 1 && algo.Market.BuyOrders.Quantity[0] != 5 {
+	if len(algo.Market.BuyOrders.Quantity) != 1 {
 		t.Error("Weight is -1 and Quantity is -110 you should be placing buy orders")
+	}
+	if algo.Market.BuyOrders.Quantity[0] != 5 {
+		t.Error(algo.Market.BuyOrders.Quantity[0], "!= 5")
 	}
 	if len(algo.Market.SellOrders.Quantity) != 0 {
 		t.Error("Weight is -1 and Quantity is -110 you should not be placing sell orders")
@@ -304,8 +318,11 @@ func TestDeleverageShort(t *testing.T) {
 	algo.setupOrders()
 
 	log.Println(algo.Market.BuyOrders.Quantity)
-	if len(algo.Market.BuyOrders.Quantity) == 1 && algo.Market.BuyOrders.Quantity[0] != 10 {
+	if len(algo.Market.BuyOrders.Quantity) != 1 {
 		t.Error("Weight is -1 and Quantity is -110 you should be placing buy orders")
+	}
+	if algo.Market.BuyOrders.Quantity[0] != 10 {
+		t.Error(algo.Market.BuyOrders.Quantity[0], "!= 10")
 	}
 	if len(algo.Market.SellOrders.Quantity) != 0 {
 		t.Error("Weight is -1 and Quantity is -110 you should not be placing sell orders")
@@ -315,8 +332,11 @@ func TestDeleverageShort(t *testing.T) {
 	algo.setupOrders()
 
 	log.Println(algo.Market.BuyOrders.Quantity)
-	if len(algo.Market.BuyOrders.Quantity) == 1 && algo.Market.BuyOrders.Quantity[0] != 10 {
+	if len(algo.Market.BuyOrders.Quantity) != 1 {
 		t.Error("Weight is -1 and Quantity is -110 you should be placing buy orders")
+	}
+	if algo.Market.BuyOrders.Quantity[0] != 10 {
+		t.Error(algo.Market.BuyOrders.Quantity[0], "!= 10")
 	}
 	if len(algo.Market.SellOrders.Quantity) != 0 {
 		t.Error("Weight is -1 and Quantity is -110 you should not be placing sell orders")
@@ -330,7 +350,7 @@ func TestDeleverageLong(t *testing.T) {
 	algo.Market.BaseAsset.Quantity = 1
 	algo.Market.QuoteAsset.Quantity = 110
 	algo.Market.Weight = 1
-	shouldHaveQuantity = 110
+	algo.shouldHaveQuantity = 110
 
 	algo.logState(time.Now())
 	algo.setupOrders()
@@ -338,8 +358,13 @@ func TestDeleverageLong(t *testing.T) {
 	if len(algo.Market.BuyOrders.Quantity) != 0 {
 		t.Error("Weight is 1 and Quantity is 110 you should be placing buy orders")
 	}
-	if len(algo.Market.SellOrders.Quantity) != 1 && algo.Market.SellOrders.Quantity[0] != -5 {
-		t.Error("Weight is 1 and Quantity is 110 you should not be placing sell orders")
+
+	if len(algo.Market.SellOrders.Quantity) != 1 {
+		t.Error("You should be placing sell orders to deleverage")
+	}
+
+	if algo.Market.SellOrders.Quantity[0] != 5 {
+		t.Error(algo.Market.SellOrders.Quantity[0], "!= 5")
 	}
 
 	algo.logState(time.Now())
@@ -348,26 +373,12 @@ func TestDeleverageLong(t *testing.T) {
 	if len(algo.Market.BuyOrders.Quantity) != 0 {
 		t.Error("Weight is 1 and Quantity is 110 you should be placing buy orders")
 	}
-	if len(algo.Market.SellOrders.Quantity) != 1 && algo.Market.SellOrders.Quantity[0] != -10 {
+	if len(algo.Market.SellOrders.Quantity) != 1 {
 		t.Error("Weight is 1 and Quantity is -10 you should not be placing sell orders")
 	}
-
-	algo.logState(time.Now())
-	algo.setupOrders()
-
-	if len(algo.Market.BuyOrders.Quantity) != 0 {
-		t.Error("Weight is 1 and Quantity is 110 you should be placing buy orders")
+	if algo.Market.SellOrders.Quantity[0] != 10 {
+		t.Error(algo.Market.SellOrders.Quantity[0], "!= 10")
 	}
-	if len(algo.Market.SellOrders.Quantity) != 1 && algo.Market.SellOrders.Quantity[0] != -10 {
-		t.Error("Weight is 1 and Quantity is -10 you should not be placing sell orders")
-	}
-
-	resetOrders(&algo)
-	algo.LeverageTarget = 1
-	algo.Market.BaseAsset.Quantity = 1
-	algo.Market.QuoteAsset.Quantity = 110
-	algo.Market.Weight = 1
-	shouldHaveQuantity = 110
 
 	algo.logState(time.Now())
 	algo.setupOrders()
@@ -375,8 +386,31 @@ func TestDeleverageLong(t *testing.T) {
 	if len(algo.Market.BuyOrders.Quantity) != 0 {
 		t.Error("Weight is 1 and Quantity is 110 you should not be placing buy orders")
 	}
-	if len(algo.Market.SellOrders.Quantity) != 1 && algo.Market.SellOrders.Quantity[0] != -5 {
+	if len(algo.Market.SellOrders.Quantity) != 1 {
 		t.Error("Weight is 1 and Quantity is 110 you should be placing sell orders")
+	}
+	if algo.Market.SellOrders.Quantity[0] != 10 {
+		t.Error(algo.Market.SellOrders.Quantity[0], "!= 10")
+	}
+
+	resetOrders(&algo)
+	algo.LeverageTarget = 1
+	algo.Market.BaseAsset.Quantity = 1
+	algo.Market.QuoteAsset.Quantity = 110
+	algo.Market.Weight = 1
+	algo.shouldHaveQuantity = 110
+
+	algo.logState(time.Now())
+	algo.setupOrders()
+
+	if len(algo.Market.BuyOrders.Quantity) != 0 {
+		t.Error("Weight is 1 and Quantity is 110 you should not be placing buy orders")
+	}
+	if len(algo.Market.SellOrders.Quantity) != 1 {
+		t.Error("Weight is 1 and Quantity is 110 you should be placing sell orders")
+	}
+	if algo.Market.SellOrders.Quantity[0] != 5 {
+		t.Error(algo.Market.SellOrders.Quantity[0], "!= 5")
 	}
 
 	algo.LeverageTarget = 0.5
@@ -386,10 +420,11 @@ func TestDeleverageLong(t *testing.T) {
 	if len(algo.Market.BuyOrders.Quantity) != 0 {
 		t.Error("Weight is 1 and Quantity is 110 you should not be placing buy orders")
 	}
-	if len(algo.Market.SellOrders.Quantity) != 1 && algo.Market.SellOrders.Quantity[0] != -10 {
-		log.Println(algo.Market.Leverage, algo.LeverageTarget)
-		log.Println(algo.Market.SellOrders.Quantity[0])
+	if len(algo.Market.SellOrders.Quantity) != 1 {
 		t.Error("Weight is 1 and Quantity is 110 you should be placing sell orders")
+	}
+	if algo.Market.SellOrders.Quantity[0] != 10 {
+		t.Error(algo.Market.SellOrders.Quantity[0], "!= 10")
 	}
 
 	algo.logState(time.Now())
@@ -398,8 +433,11 @@ func TestDeleverageLong(t *testing.T) {
 	if len(algo.Market.BuyOrders.Quantity) != 0 {
 		t.Error("Weight is 1 and Quantity is 110 you should not be placing buy orders")
 	}
-	if len(algo.Market.SellOrders.Quantity) != 1 && algo.Market.SellOrders.Quantity[0] != -15 {
+	if len(algo.Market.SellOrders.Quantity) != 1 {
 		t.Error("Weight is 1 and Quantity is 110 you should be placing sell orders")
+	}
+	if algo.Market.SellOrders.Quantity[0] != 15 {
+		t.Error(algo.Market.SellOrders.Quantity[0], "!= 15")
 	}
 
 }
