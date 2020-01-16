@@ -422,15 +422,15 @@ func (algo *Algo) updateOptionsPositions() {
 			var adjPrice float64
 			if price > 0 {
 				// Limit order
-				adjPrice = utils.AdjustForSlippage(price, "buy", .05)
+				adjPrice = utils.AdjustForSlippage(price, "buy", algo.Market.OptionSlippage)
 			} else {
 				// Market order
 				if option.OptionTheo.Theo < 0 {
 					option.OptionTheo.CalcBlackScholesTheo(false)
 				}
-				adjPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "buy", .05)
+				adjPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "buy", algo.Market.OptionSlippage)
 			}
-			adjPrice = utils.RoundToNearest(adjPrice, option.TickSize)
+			adjPrice = utils.RoundToNearest(adjPrice, algo.Market.OptionTickSize)
 			if adjPrice > 0 {
 				fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
 				avgPrice = ((avgPrice * total) + (adjPrice * qty)) / (total + qty)
@@ -454,7 +454,7 @@ func (algo *Algo) updateOptionsPositions() {
 				}
 				adjPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "sell", .05)
 			}
-			adjPrice = utils.RoundToNearest(adjPrice, option.TickSize)
+			adjPrice = utils.RoundToNearest(adjPrice, algo.Market.OptionTickSize)
 			if adjPrice > 0 {
 				fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
 				avgPrice = math.Abs(((avgPrice * total) + (adjPrice * qty)) / (total + qty))
@@ -526,20 +526,16 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 				vol := getNearestVol(volData, utils.ToIntTimestamp(algo.Timestamp))
 				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price.Close, strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, vol, -1)
 				optionContract := models.OptionContract{
-					Symbol:           utils.GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
-					Strike:           strike,
-					Expiry:           expiry,
-					OptionType:       optionType,
-					AverageCost:      0,
-					Profit:           0,
-					TickSize:         algo.Market.OptionTickSize,
-					MakerFee:         algo.Market.MakerFee,
-					TakerFee:         algo.Market.TakerFee,
-					MinimumOrderSize: algo.Market.OptionMinOrderSize,
-					Position:         0,
-					OptionTheo:       *optionTheo,
-					Status:           "open",
-					MidMarketPrice:   -1.,
+					Symbol:         utils.GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
+					Strike:         strike,
+					Expiry:         expiry,
+					OptionType:     optionType,
+					AverageCost:    0,
+					Profit:         0,
+					Position:       0,
+					OptionTheo:     *optionTheo,
+					Status:         "open",
+					MidMarketPrice: -1.,
 				}
 				optionContracts = append(optionContracts, optionContract)
 			}

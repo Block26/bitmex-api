@@ -230,20 +230,16 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, setupData fu
 					expiry := market.Expiry
 					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price.Close, market.Strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1)
 					optionContract := models.OptionContract{
-						Symbol:           market.Symbol,
-						Strike:           market.Strike,
-						Expiry:           expiry,
-						OptionType:       market.OptionType,
-						AverageCost:      0,
-						Profit:           0,
-						TickSize:         market.TickSize,
-						MakerFee:         market.MakerCommission,
-						TakerFee:         market.TakerCommission,
-						MinimumOrderSize: market.MinTradeAmount,
-						Position:         0,
-						OptionTheo:       *optionTheo,
-						Status:           "open",
-						MidMarketPrice:   market.MidMarketPrice,
+						Symbol:         market.Symbol,
+						Strike:         market.Strike,
+						Expiry:         expiry,
+						OptionType:     market.OptionType,
+						AverageCost:    0,
+						Profit:         0,
+						Position:       0,
+						OptionTheo:     *optionTheo,
+						Status:         "open",
+						MidMarketPrice: market.MidMarketPrice,
 					}
 					// fmt.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
 					algo.Market.OptionContracts = append(algo.Market.OptionContracts, optionContract)

@@ -202,6 +202,9 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				OptionMinOrderSize:   .1,
 				OptionMaxStrikePct:   300.,
 				OptionMinStrikePct:   -50.,
+				OptionMakerFee:       .0004,
+				OptionTakerFee:       .0004,
+				OptionSlippage:       .05,
 				NumWeeklyOptions:     3,
 				NumMonthlyOptions:    5,
 			}, nil
@@ -235,6 +238,9 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				OptionMinOrderSize:   1.,
 				OptionMaxStrikePct:   300.,
 				OptionMinStrikePct:   -50.,
+				OptionMakerFee:       .0004,
+				OptionTakerFee:       .0004,
+				OptionSlippage:       .05,
 				NumWeeklyOptions:     3,
 				NumMonthlyOptions:    5,
 			}, nil
@@ -274,6 +280,9 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				OptionMinOrderSize:   .1,
 				OptionMaxStrikePct:   300.,
 				OptionMinStrikePct:   -50.,
+				OptionMakerFee:       .0004,
+				OptionTakerFee:       .0004,
+				OptionSlippage:       .05,
 				NumWeeklyOptions:     3,
 				NumMonthlyOptions:    5,
 			}, nil

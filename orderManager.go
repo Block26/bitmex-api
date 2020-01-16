@@ -173,7 +173,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 		for i, qty := range option.BuyOrders.Quantity {
 			// fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
-			if totalQty >= option.MinimumOrderSize {
+			if totalQty >= algo.Market.OptionMinOrderSize {
 				orderPrice := option.BuyOrders.Price[i]
 				// Assume a price of 0 indicates market order
 				var orderType string
@@ -200,7 +200,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 		for i, qty := range option.SellOrders.Quantity {
 			// fmt.Printf("Parsing order for option %v: price %v qty %v\n", option.OptionTheo.String(), i, qty)
 			totalQty += qty
-			if totalQty >= option.MinimumOrderSize {
+			if totalQty >= algo.Market.OptionMinOrderSize {
 				orderPrice := option.SellOrders.Price[i]
 				// Assume a price of 0 indicates market order
 				var orderType string
