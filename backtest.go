@@ -29,9 +29,12 @@ var lastOptionBalance = 0.
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
 func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
-	currentRunUUID = time.Now()
-	start := time.Now()
+	// Set a UUID for the run
+	if currentRunUUID.IsZero() {
+		currentRunUUID = time.Now()
+	}
 
+	start := time.Now()
 	setupData(data, algo)
 	var history []models.History
 	var timestamp time.Time
