@@ -13,11 +13,10 @@ import (
 	"gonum.org/v1/gonum/stat"
 
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/tantralabs/yantra/data"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
-	"github.com/tantralabs/yantra/data"
-
 )
 
 // var MinimumOrderSize = 25
@@ -72,11 +71,11 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 				//Check which buys filled
 				pricesFilled, ordersFilled := algo.getFilledBidOrders(bar.Low)
 				fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
-				algo.updateBalance(fillCost, algo.Market.Buying*fillPercentage)
+				algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Buying*fillPercentage, true)
 				//Check which sells filled
 				pricesFilled, ordersFilled = algo.getFilledAskOrders(bar.High)
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
-				algo.updateBalance(fillCost, algo.Market.Selling*-fillPercentage)
+				algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Selling*-fillPercentage, true)
 			} else if algo.FillType == exchanges.FillType().Close {
 				algo.updateBalanceFromFill(bar.Close)
 			} else if algo.FillType == exchanges.FillType().Open {
@@ -178,85 +177,85 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 }
 
 // Core Backtest functionality
-
 func (algo *Algo) updateBalanceFromFill(fillPrice float64) {
 	orderSize, side := algo.getOrderSize(fillPrice)
 	fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{orderSize})
-	algo.updateBalance(fillCost, ordersFilled*side)
+	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
+	var fillAmount float64
+	if currentWeight != float64(algo.Market.Weight) && (ordersFilled == algo.Market.Leverage || ordersFilled == algo.Market.Leverage*(-1)) {
+		// Leave entire position to have quantity 0
+		fillAmount = ((algo.Market.QuoteAsset.Quantity) * -1)
+	} else {
+		fillAmount = algo.canBuy() * (ordersFilled * side)
+	}
+	algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, fillAmount, true)
 }
 
-func (algo *Algo) updateBalance(fillCost float64, fillAmount float64) {
-	// log.Printf("fillCost %.2f -> fillAmount %.2f\n", fillCost, fillCost*fillAmount)
-	// fmt.Printf("Updating balance with fill cost %v, fill amount %v, qaq %v, baq %v\n", fillCost, fillAmount, algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity)
+func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity float64, averageCost float64, fillPrice float64, fillAmount float64, updateAlgo ...bool) (float64, float64, float64) {
 	if math.Abs(fillAmount) > 0 {
-		// fee := math.Abs(fillAmount/fillCost) * algo.Market.MakerFee
-		currentCost := (algo.Market.QuoteAsset.Quantity * algo.Market.AverageCost)
-		var newQuantity float64
-		// log.Printf("fillCost %.8f -> fillAmount %.8f -> newQuantity %0.8f\n", fillCost, fillAmount, newQuantity)
+		// fee := math.Abs(fillAmount/fillPrice) * algo.Market.MakerFee
+		// log.Printf("fillPrice %.2f -> fillAmount %.2f\n", fillPrice, fillAmount)
+		// fmt.Printf("Updating balance with fill cost %v, fill amount %v, qaq %v, baq %v\n", fillPrice, fillAmount, currentQuantity, currentBaseBalance)
+		currentCost := (currentQuantity * averageCost)
 		if algo.Market.Futures {
-			newQuantity := algo.canBuy() * fillAmount
-			currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-			// Leave entire position to have quantity 0
-			if currentWeight != float64(algo.Market.Weight) && (fillAmount == algo.Market.Leverage || fillAmount == algo.Market.Leverage*(-1)) {
-				newQuantity = ((algo.Market.QuoteAsset.Quantity) * -1)
-			}
-			totalQuantity := algo.Market.QuoteAsset.Quantity + newQuantity
-			newCost := fillCost * newQuantity
-			if (newQuantity >= 0 && algo.Market.QuoteAsset.Quantity >= 0) || (newQuantity <= 0 && algo.Market.QuoteAsset.Quantity <= 0) {
+			totalQuantity := currentQuantity + fillAmount
+			newCost := fillPrice * fillAmount
+			if (fillAmount >= 0 && currentQuantity >= 0) || (fillAmount <= 0 && currentQuantity <= 0) {
 				//Adding to position
-				algo.Market.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
-				// fmt.Printf("Adding to position: avg cost %v\n", algo.Market.AverageCost)
-			} else if ((newQuantity >= 0 && algo.Market.QuoteAsset.Quantity <= 0) || (newQuantity <= 0 && algo.Market.QuoteAsset.Quantity >= 0)) && math.Abs(newQuantity) >= math.Abs(algo.Market.QuoteAsset.Quantity) {
+				averageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
+			} else if ((fillAmount >= 0 && currentQuantity <= 0) || (fillAmount <= 0 && currentQuantity >= 0)) && math.Abs(fillAmount) >= math.Abs(currentQuantity) {
 				//Position changed
 				var diff float64
 				if fillAmount > 0 {
-					diff = utils.CalculateDifference(algo.Market.AverageCost, fillCost)
+					diff = utils.CalculateDifference(averageCost, fillPrice)
 				} else {
-					diff = utils.CalculateDifference(fillCost, algo.Market.AverageCost)
+					diff = utils.CalculateDifference(fillPrice, averageCost)
 				}
 				// Only use the remaining position that was filled to calculate cost
-				portionFillQuantity := math.Abs(algo.Market.QuoteAsset.Quantity)
-				// fmt.Printf("Updating portion fill qty with baq %v, portion fill qty %v, diff %v, avg cost %v\n", algo.Market.BaseAsset.Quantity, portionFillQuantity, diff, algo.Market.AverageCost)
-				algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((portionFillQuantity * diff) / algo.Market.AverageCost)
-				algo.Market.AverageCost = fillCost
+				portionFillQuantity := math.Abs(currentQuantity)
+				currentBaseBalance = currentBaseBalance + ((portionFillQuantity * diff) / averageCost)
+				averageCost = fillPrice
 			} else {
 				//Leaving Position
 				var diff float64
 				if algo.FillType == "close" {
-					fillCost = algo.Market.Price.Open
+					fillPrice = algo.Market.Price.Open
 				}
 				// Use price open to calculate diff for filltype: close or open
 				if fillAmount > 0 {
-					diff = utils.CalculateDifference(algo.Market.AverageCost, fillCost)
+					diff = utils.CalculateDifference(averageCost, fillPrice)
 				} else {
-					diff = utils.CalculateDifference(fillCost, algo.Market.AverageCost)
+					diff = utils.CalculateDifference(fillPrice, averageCost)
 				}
-				// fmt.Printf("Updating full fill quantity with baq %v, newQuantity %v, diff %v, avg cost %v\n", algo.Market.BaseAsset.Quantity, newQuantity, diff, algo.Market.AverageCost)
-				algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + ((math.Abs(newQuantity) * diff) / algo.Market.AverageCost)
+				// fmt.Printf("Updating full fill quantity with baq %v, fillAmount %v, diff %v, avg cost %v\n", currentBaseBalance, fillAmount, diff, currentCost)
+				currentBaseBalance = currentBaseBalance + ((math.Abs(fillAmount) * diff) / averageCost)
 			}
-			algo.Market.QuoteAsset.Quantity = algo.Market.QuoteAsset.Quantity + newQuantity
+			currentQuantity = currentQuantity + fillAmount
 		} else {
-			newQuantity = fillAmount / fillCost
-			totalQuantity := algo.Market.QuoteAsset.Quantity + newQuantity
-			newCost := fillCost * newQuantity
+			fillAmount = fillAmount / fillPrice
+			totalQuantity := currentQuantity + fillAmount
+			newCost := fillPrice * fillAmount
 
-			if newQuantity >= 0 && algo.Market.QuoteAsset.Quantity >= 0 {
+			if fillAmount >= 0 && currentQuantity >= 0 {
 				//Adding to position
-				algo.Market.AverageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
+				averageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
 			}
 
-			algo.Market.QuoteAsset.Quantity = algo.Market.QuoteAsset.Quantity - newCost
-			algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity + newQuantity
-
-			// log.Println("PV:", (algo.Market.BaseAsset.Quantity*algo.Market.Price)+algo.Market.QuoteAsset.Quantity)
-			// log.Println("Base", algo.Market.BaseAsset.Quantity, "Quote", algo.Market.QuoteAsset.Quantity)
+			currentQuantity = currentQuantity - newCost
+			currentBaseBalance = currentBaseBalance + fillAmount
 		}
-		// log.Printf("fillCost %.8f -> fillAmount %.8f -> newQuantity %0.8f\n", fillCost, fillAmount, newQuantity)
-		// algo.Market.BaseAsset.Quantity = algo.Market.BaseAsset.Quantity - fee
+		if updateAlgo != nil && updateAlgo[0] {
+			algo.Market.BaseAsset.Quantity = currentBaseBalance
+			algo.Market.QuoteAsset.Quantity = currentQuantity
+			algo.Market.AverageCost = averageCost
+		}
 	}
+
 	if algo.Market.Options {
 		algo.updateOptionBalance()
 	}
+
+	return currentBaseBalance, currentQuantity, averageCost
 }
 
 func (algo *Algo) updateOptionBalance() {
