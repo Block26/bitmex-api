@@ -18,10 +18,14 @@ var (
 	user     = "yantrauser"
 	password = "password"
 	dbname   = "tantra"
+	ENV      = ""
 )
 
-func Setup(env string) {
-	if env == "remote" {
+func Setup(env ...string) {
+	if env != nil && env[0] != ENV {
+		ENV = env[0]
+	}
+	if ENV == "remote" {
 		host = "tantradb.czzctnxje5ad.us-west-1.rds.amazonaws.com"
 		port = 5432
 		user = "yantrauser"
@@ -35,7 +39,6 @@ func Setup(env string) {
 
 // GetData is called to fetch data from your local psql database setup by https://github.com/tantralabs/tantradb
 func GetData(symbol string, exchange string, interval string, startTimestamp time.Time, endTimestamp time.Time) []*models.Bar {
-
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
@@ -63,6 +66,7 @@ func GetData(symbol string, exchange string, interval string, startTimestamp tim
 }
 
 func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
+	Setup()
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
