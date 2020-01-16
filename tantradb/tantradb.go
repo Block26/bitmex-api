@@ -9,11 +9,11 @@ import (
 	"github.com/tantralabs/yantra/models"
 )
 
-const env = "remote"
+const env = ""
 
 var (
 	host     = "localhost"
-	port     = 5432
+	port     = 5433
 	user     = "yantrauser"
 	password = "password"
 	dbname   = "tantra"
@@ -28,12 +28,11 @@ func Setup(env string) {
 		dbname = "template1"
 		fmt.Printf("Set up remote tantradb with URL %v\n", host)
 	} else {
-		fmt.Printf("Using local tantradb.")
+		fmt.Printf("Using local tantradb.\n")
 	}
 }
 
 func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
-	Setup(env)
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
