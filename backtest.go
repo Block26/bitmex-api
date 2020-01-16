@@ -85,6 +85,9 @@ func RunBacktest(data []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 			} else if algo.FillType == exchanges.FillType().Open {
 				algo.updateBalanceFromFill(bar.Open)
 			}
+			if algo.Market.Options {
+				algo.updateOptionsPositions()
+			}
 			state := algo.logState(timestamp)
 			history = append(history, state)
 		}
@@ -412,10 +415,11 @@ func (algo *Algo) updateOptionsPositions() {
 	for i := range algo.Market.OptionContracts {
 		option := &algo.Market.OptionContracts[i]
 		total := 0.
+		netTotal := 0.
 		avgPrice := 0.
 		hasAmount := false
 		if len(option.SellOrders.Quantity) > 0 {
-			// fmt.Printf("Found orders for option %v: %v\n", option.Symbol, option.SellOrders)
+			fmt.Printf("Found orders for option %v: %v\n", option.Symbol, option.SellOrders)
 		}
 		for i, qty := range option.BuyOrders.Quantity {
 			price := option.BuyOrders.Price[i]
@@ -432,11 +436,12 @@ func (algo *Algo) updateOptionsPositions() {
 			}
 			adjPrice = utils.RoundToNearest(adjPrice, option.TickSize)
 			if adjPrice > 0 {
-				// fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
+				fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
 				avgPrice = ((avgPrice * total) + (adjPrice * qty)) / (total + qty)
 				total += qty
+				netTotal += qty
 			} else {
-				// fmt.Printf("Cannot buy option %v for adjPrice 0\n", option.Symbol)
+				fmt.Printf("Cannot buy option %v for adjPrice 0\n", option.Symbol)
 			}
 			hasAmount = true
 		}
@@ -455,19 +460,27 @@ func (algo *Algo) updateOptionsPositions() {
 			}
 			adjPrice = utils.RoundToNearest(adjPrice, option.TickSize)
 			if adjPrice > 0 {
-				// fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
-				avgPrice = math.Abs(((avgPrice * total) + (adjPrice * qty)) / (total - qty))
-				total -= qty
+				fmt.Printf("Updating avgprice with avgprice %v total %v adjprice %v qty %v\n", avgPrice, total, adjPrice, qty)
+				avgPrice = math.Abs(((avgPrice * total) + (adjPrice * qty)) / (total + qty))
+				total += qty
+				netTotal -= qty
 			} else {
-				// fmt.Printf("Cannot sell option %v for adjPrice 0\n", option.Symbol)
+				fmt.Printf("Cannot sell option %v for adjPrice 0\n", option.Symbol)
 			}
 			hasAmount = true
 		}
 		if hasAmount {
 			//Fill open orders
-			// fmt.Printf("Calcing new avg cost with avg cost %v, position %v, avgprice %v, total %v\n", option.AverageCost, option.Position, avgPrice, total)
-			option.AverageCost = ((option.AverageCost * option.Position) + (avgPrice * total)) / (option.Position + total)
-			option.Position += total
+			fmt.Printf("Calcing new avg cost with avg cost %v, position %v, avgprice %v, total %v\n", option.AverageCost, option.Position, avgPrice, total)
+			if option.Position+netTotal == 0 {
+				option.Profit = option.Position * (avgPrice - option.AverageCost)
+				fmt.Printf("Net total %v closes out position %v with avgcost %v and avgprice %v, profit %v\n", netTotal, option.Position, option.AverageCost, avgPrice, option.Profit)
+				option.AverageCost = 0
+				option.Position = 0
+			} else {
+				option.AverageCost = ((option.AverageCost * option.Position) + (avgPrice * netTotal)) / (option.Position + netTotal)
+				option.Position += netTotal
+			}
 			option.BuyOrders = models.OrderArray{
 				Quantity: []float64{},
 				Price:    []float64{},
@@ -476,7 +489,7 @@ func (algo *Algo) updateOptionsPositions() {
 				Quantity: []float64{},
 				Price:    []float64{},
 			}
-			// fmt.Printf("[%v] updated avgcost %v and position %v\n", option.Symbol, option.AverageCost, option.Position)
+			fmt.Printf("[%v] updated avgcost %v and position %v\n", option.Symbol, option.AverageCost, option.Position)
 		}
 	}
 }

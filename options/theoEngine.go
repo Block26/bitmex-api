@@ -89,6 +89,7 @@ func PropagateVolatility(options []*models.OptionContract, defaultVolatility flo
 }
 
 func AggregateExpiredOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64) {
+	fmt.Printf("Aggregating expired option PNL at %v\n", currentTime)
 	options = PropagateVolatility(options, DefaultVolatility)
 	for _, option := range options {
 		if option.OptionTheo.Volatility < 0 {
@@ -96,16 +97,20 @@ func AggregateExpiredOptionPnl(options []*models.OptionContract, currentTime int
 		}
 	}
 	for _, option := range GetExpiredOptions(currentTime, options) {
-		option.Profit = option.Position * (option.OptionTheo.GetExpiryValue(currentPrice) - option.AverageCost)
-		// fmt.Printf("Aggregated profit at price %v for %v with position %v: %v\n", currentPrice, option.OptionTheo.String(), option.Position, option.Profit)
-		option.Position = 0
+		if option.AverageCost != 0 {
+			option.Profit = option.Position * (option.OptionTheo.GetExpiryValue(currentPrice) - option.AverageCost)
+			fmt.Printf("Aggregated profit at price %v for %v with position %v: %v\n", currentPrice, option.OptionTheo.String(), option.Position, option.Profit)
+			option.Position = 0
+		}
 	}
 }
 
 func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64, method string) {
+	fmt.Printf("Aggregating open option PNL at %v\n", currentTime)
 	for i := range options {
 		option := options[i]
 		if option.Position != 0 {
+			fmt.Printf("Found option %v with position %v\n", option.Symbol, option.Position)
 			option.OptionTheo.CurrentTime = currentTime
 			option.OptionTheo.UnderlyingPrice = currentPrice
 			theo := 0.
