@@ -87,7 +87,7 @@ func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, c
 			option.OptionTheo.UnderlyingPrice = currentPrice
 			theo := 0.
 			if method == "BlackScholes" {
-				option.OptionTheo.CalcBlackScholesTheo(false)
+				option.OptionTheo.CalcBlackScholesTheo(true)
 				theo = option.OptionTheo.Theo
 			} else if method == "BinomialTree" {
 				option.OptionTheo.CalcBinomialTreeTheo(.5, 15)
