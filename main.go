@@ -285,6 +285,33 @@ func (algo *Algo) logLiveState(test ...bool) {
 	)
 	bp.AddPoint(pt)
 
+	// LOG Options
+	for _, option := range algo.Market.OptionContracts {
+		if option.Position != 0 {
+			tmpTags := tags
+			tmpTags["symbol"] = option.Symbol
+			o := structs.Map(option.OptionTheo)
+			pt1, _ := client.NewPoint(
+				prefix+"optionTheo",
+				tmpTags,
+				o,
+				time.Now(),
+			)
+			bp.AddPoint(pt1)
+
+			o = structs.Map(option)
+			delete(o, "OptionTheo")
+			pt2, _ := client.NewPoint(
+				prefix+"options",
+				tmpTags,
+				o,
+				time.Now(),
+			)
+			bp.AddPoint(pt2)
+		}
+	}
+
+	// LOG orders placed
 	for index := 0; index < len(algo.Market.BuyOrders.Quantity); index++ {
 
 		fields = map[string]interface{}{
@@ -299,7 +326,6 @@ func (algo *Algo) logLiveState(test ...bool) {
 		)
 		bp.AddPoint(pt)
 	}
-
 	for index := 0; index < len(algo.Market.SellOrders.Quantity); index++ {
 		fields = map[string]interface{}{
 			fmt.Sprintf("%0.2f", algo.Market.SellOrders.Price[index]): algo.Market.SellOrders.Quantity[index],

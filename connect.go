@@ -54,12 +54,17 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 
 	log.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
 	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
+	// Set initial timestamp for algo
+	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
 	log.Printf("Got local bars: %v\n", len(localBars))
 	// log.Println(len(localBars), "downloaded")
 
 	// SETUP ALGO WITH RESTFUL CALLS
 	balances, _ := ex.GetBalances()
 	algo.updateAlgoBalances(balances)
+
+	//Get Option contracts before updating positions
+	algo.getOptionContracts(ex)
 
 	positions, _ := ex.GetPositions(algo.Market.BaseAsset.Symbol)
 	algo.updatePositions(positions)
@@ -217,6 +222,10 @@ func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, setupData fu
 		firstTrade = false
 	}
 	// Update active option contracts from API
+	algo.getOptionContracts(ex)
+}
+
+func (algo *Algo) getOptionContracts(ex iex.IExchange) {
 	if algo.Market.Exchange == "deribit" && algo.Market.Options {
 		// TODO only call this every few hours or once per day.
 		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, true, "option")
