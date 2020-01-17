@@ -13,8 +13,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.3.0
 	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70
-	github.com/tantralabs/eaopt v0.1.0
+	github.com/tantralabs/eaopt v0.1.1
 	github.com/tantralabs/tradeapi v0.0.0-20200117001314-d60e2ee36dd3
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	gonum.org/v1/gonum v0.6.2
 )
