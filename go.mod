@@ -3,7 +3,7 @@ module github.com/tantralabs/yantra
 go 1.13
 
 // replace github.com/tantralabs/eaopt => ../../tantralabs/eaopt
-replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
+// replace github.com/tantralabs/tradeapi => ../../../github.com/tantralabs/tradeapi
 
 require (
 	firebase.google.com/go v3.10.0+incompatible
@@ -19,7 +19,7 @@ require (
 	github.com/lib/pq v1.2.0
 	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70
 	github.com/tantralabs/eaopt v0.1.1-0.20191217192927-f9ded663d8fe
-	github.com/tantralabs/tradeapi v0.0.0-20200116221858-1196f437f821
+	github.com/tantralabs/tradeapi v0.0.0-20200117001314-d60e2ee36dd3
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	gonum.org/v1/gonum v0.0.0-20190724133715-a8659125a966
 	google.golang.org/api v0.13.0
