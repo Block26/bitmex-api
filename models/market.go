@@ -38,6 +38,7 @@ type Market struct {
 	OptionMakerFee       float64
 	OptionTakerFee       float64
 	OptionSlippage       float64
+	OptionProfit         float64
 	NumWeeklyOptions     int
 	NumMonthlyOptions    int
 }

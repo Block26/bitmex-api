@@ -82,9 +82,9 @@ func (algo *Algo) CurrentProfit(price float64) float64 {
 func (algo *Algo) getPositionAbsLoss() float64 {
 	positionLoss := 0.0
 	if algo.Market.QuoteAsset.Quantity < 0 {
-		positionLoss = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.High) * algo.Market.Leverage)
+		positionLoss = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.High) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
 	} else {
-		positionLoss = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Low) * algo.Market.Leverage)
+		positionLoss = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Low) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
 	}
 	return positionLoss
 }
@@ -92,9 +92,9 @@ func (algo *Algo) getPositionAbsLoss() float64 {
 func (algo *Algo) getPositionAbsProfit() float64 {
 	positionProfit := 0.0
 	if algo.Market.QuoteAsset.Quantity > 0 {
-		positionProfit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.High) * algo.Market.Leverage)
+		positionProfit = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.High) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
 	} else {
-		positionProfit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Low) * algo.Market.Leverage)
+		positionProfit = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Low) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
 	}
 	return positionProfit
 }
@@ -144,7 +144,7 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 
 	// fmt.Println(algo.Timestamp, "Funds", algo.Market.BaseAsset.Quantity, "Quantity", algo.Market.QuoteAsset.Quantity)
 	// fmt.Println(algo.Timestamp, algo.Market.BaseAsset.Quantity, algo.CurrentProfit(algo.Market.Price))
-	algo.Market.Profit = algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Close) * algo.Market.Leverage)
+	algo.Market.Profit = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Close) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
 	// fmt.Println(algo.Timestamp, algo.Market.Profit)
 
 	if timestamp != nil {

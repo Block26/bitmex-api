@@ -16,6 +16,7 @@ import (
 	"github.com/tantralabs/yantra/data"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/options"
 	"github.com/tantralabs/yantra/utils"
 )
 
@@ -82,10 +83,14 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 				algo.updateBalanceFromFill(bar.Open)
 			}
 			if algo.Market.Options {
-				algo.updateOptionsPositions()
+				algo.updateOptionPositions()
 			}
 			state := algo.logState(timestamp)
 			history = append(history, state)
+			if algo.Market.BaseAsset.Quantity <= 0 {
+				fmt.Printf("Ran out of balance, killing...\n")
+				break
+			}
 		}
 		idx++
 	}
@@ -251,31 +256,72 @@ func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity floa
 		}
 	}
 
-	if algo.Market.Options {
-		algo.updateOptionBalance()
-	}
-
 	return currentBaseBalance, currentQuantity, averageCost
 }
 
-func (algo *Algo) updateOptionBalance() {
-	// fmt.Printf("Updating option balance...\n")
-	optionBalance := 0.
-	for _, option := range algo.Market.OptionContracts {
-		// Calculate unrealized pnl
-		if math.Abs(option.Position) > 0 {
-			option.OptionTheo.UnderlyingPrice = algo.Market.Price.Close
-			option.OptionTheo.CalcBlackScholesTheo(false)
-			// fmt.Printf("Updating balance for %v with position %v theo %v avg cost %v\n", option.Symbol, option.Position, option.OptionTheo.Theo, option.AverageCost)
-			optionBalance += option.Position * (option.OptionTheo.Theo - option.AverageCost)
-			// Calculate realized pnl
-			optionBalance += option.Profit
+func (algo *Algo) updateOptionPositions() {
+	fmt.Printf("Updating options positions...\n")
+	// Fill our option orders, update positions and avg costs
+	for i := range algo.Market.OptionContracts {
+		option := &algo.Market.OptionContracts[i]
+		for i := range option.BuyOrders.Quantity {
+			optionPrice := option.BuyOrders.Price[i]
+			optionQty := option.BuyOrders.Quantity[i]
+			if optionPrice == 0 {
+				// Simulate market order
+				option.OptionTheo.CalcBlackScholesTheo(false)
+				var side string
+				if optionQty > 0 {
+					side = "buy"
+				} else if optionQty < 0 {
+					side = "sell"
+				}
+				optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, side, algo.Market.OptionSlippage)
+			}
+			fmt.Printf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
+			algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = algo.updateBalance(algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, optionQty)
+			fmt.Printf("Updated avgcost for option %v: %v\n", option.Symbol, option.AverageCost)
+		}
+		for i := range option.SellOrders.Quantity {
+			optionPrice := option.SellOrders.Price[i]
+			optionQty := option.SellOrders.Quantity[i]
+			if optionPrice == 0 {
+				// Simulate market order
+				option.OptionTheo.CalcBlackScholesTheo(false)
+				var side string
+				if optionQty > 0 {
+					side = "buy"
+				} else if optionQty < 0 {
+					side = "sell"
+				}
+				optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, side, algo.Market.OptionSlippage)
+			}
+			fmt.Printf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
+			algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = algo.updateBalance(algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, -optionQty)
+			fmt.Printf("Updated avgcost for option %v: %v\n", option.Symbol, option.AverageCost)
 		}
 	}
-	// fmt.Printf("Got option balance: %v\n", optionBalance)
-	diff := optionBalance - lastOptionBalance
-	algo.Market.BaseAsset.Quantity += diff
-	lastOptionBalance = optionBalance
+	currentTime := utils.ToTimeObject(algo.Timestamp)
+	currentTimeMillis := int(currentTime.UnixNano() / int64(time.Millisecond))
+	var optionContracts []*models.OptionContract
+	for i := 0; i < len(algo.Market.OptionContracts); i++ {
+		optionContracts = append(optionContracts, &algo.Market.OptionContracts[i])
+	}
+	// Update option profit
+	fmt.Printf("Aggregating open option pnl...\n")
+	options.AggregateOpenOptionPnl(optionContracts, currentTimeMillis, algo.Market.Price.Close, "BlackScholes")
+	fmt.Printf("Aggregating expired option pnl...\n")
+	options.AggregateExpiredOptionPnl(optionContracts, currentTimeMillis, algo.Market.Price.Close)
+}
+
+func (algo *Algo) CurrentOptionProfit() float64 {
+	currentProfit := 0.
+	for _, option := range algo.Market.OptionContracts {
+		currentProfit += option.Profit
+	}
+	fmt.Printf("Got current option profit: %v\n", currentProfit)
+	algo.Market.OptionProfit = currentProfit
+	return currentProfit
 }
 
 func (algo *Algo) getCostAverage(pricesFilled []float64, ordersFilled []float64) (float64, float64) {
