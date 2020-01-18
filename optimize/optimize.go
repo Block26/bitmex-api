@@ -43,11 +43,9 @@ func DiffEvoOptimize(Evaluate func([]float64) float64, min, max []float64) {
 }
 
 func ConstrainSearchParameters(searchParameters map[string]models.SearchParameter, x []float64) (sp map[string]models.SearchParameter) {
-	if len(searchParameters) != len(x) {
-		log.Fatalln("length of search parameters and search result do not match")
-	}
+	sp = make(map[string]models.SearchParameter)
 	i := 0
-	for key := range sp {
+	for key := range searchParameters {
 		sp[key] = searchParameters[key].SetValue(x[i])
 		i++
 	}
