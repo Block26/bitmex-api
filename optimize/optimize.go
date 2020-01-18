@@ -42,16 +42,16 @@ func DiffEvoOptimize(Evaluate func([]float64) float64, min, max []float64) {
 	fmt.Printf("Found minimum of %.5f\n", y)
 }
 
-func ConstrainSearchParameters(searchParameters map[string]models.SearchParameter, x []float64) map[string]models.SearchParameter {
+func ConstrainSearchParameters(searchParameters map[string]models.SearchParameter, x []float64) (sp map[string]models.SearchParameter) {
 	if len(searchParameters) != len(x) {
 		log.Fatalln("length of search parameters and search result do not match")
 	}
 	i := 0
-	for key := range searchParameters {
-		searchParameters[key] = searchParameters[key].SetValue(x[i])
+	for key := range sp {
+		sp[key] = searchParameters[key].SetValue(x[i])
 		i++
 	}
-	return searchParameters
+	return sp
 }
 
 func GetMinMaxSearchDomain(searchParameters map[string]models.SearchParameter) (min []float64, max []float64) {
