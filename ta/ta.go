@@ -11,7 +11,6 @@ import (
 func GetNATR(high []float64, low []float64, close []float64, index int, length int) []float64 {
 	return talib.Natr(high[index-length-1:index], low[index-length-1:index], close[index-length-1:index], length)
 }
-
 // CreateNATREMA Create an EMA from the NATR
 func CreateNATREMA(high []float64, low []float64, close []float64, index int, natrLength int, emaLength int) []float64 {
 	//TODO check live
@@ -61,23 +60,45 @@ func GetT3(close []float64, inTimePeriod int, inVFactor float64) []float64 {
 	return talib.T3(close, inTimePeriod, inVFactor)
 }
 // GetKama Create a Kama
-func GetKAMA(data []float64, length int) []float64 {
+func GetKAMA(close []float64, length int) []float64 {
 	if length <= 1 {
 	 log.Fatal("Length of the ema must be greater than 1")
 	}
-	kama := talib.Kama(data, length)
+	kama := talib.Kama(close, length)
 	return kama
 }
-   // GetHTTrendline Create a Trendline
-func GetHTTrendline(data []float64) []float64 {
-	trendline := talib.HtTrendline(data)
+// GetHTTrendline Create a Trendline
+func GetHTTrendline(close []float64) []float64 {
+	trendline := talib.HtTrendline(close)
 	return trendline
-}  
+} 
+// GetRsi calculates the RSI for a given time period. Scales from 0-100 where 70 usually signals overbought market and 30 signal oversold market
+func GetRsi(close []float64, inTimePeriod int) []float64 {
+	return talib.Rsi(close, inTimePeriod)
+}
+// GetUltOsc measures price momentum, similar to RSI, except uses 3 different time signals (7, 14, & 28). Above 70 is overbought, and below 30 is oversold (typically).
+func GetUltOsc(high []float64, low []float64, close []float64, inTimePeriod1 int, inTimePeriod2 int, inTimePeriod3 int) []float64 {
+	UltOsc := talib.UltOsc(high, low, close, inTimePeriod1, inTimePeriod2, inTimePeriod3)
+	return UltOsc
+}
+// GetBBands calculates an upper band, middle band, and lower band based on a given time period, upper STD, & lower STD (is the same as the upper but talib makes it negative for you)
+func GetBBands(close []float64, inTimePeriod int, inNbDevUp float64, inNbDevDn float64, inMAType talib.MaType) ([]float64, []float64, []float64) {
+	UpperBand, MiddleBand, LowerBand := talib.BBands(close, inTimePeriod, inNbDevUp, inNbDevDn, inMAType)
+	return UpperBand, MiddleBand, LowerBand
+}
+// GetTrima calculates triangular moving average, which is similar to an MA but is averaged twice. It is given a time period.
+func GetTrima(close []float64, inTimePeriod int) []float64 {
+	return talib.Trima(close, inTimePeriod)
+}
+// Get Wma calculates a weighted moving average given a time period, giving more weight to more recent data as opposed to older data
+func GetWma(close []float64, inTimePeriod int) []float64 {
+	return talib.Wma(close, inTimePeriod)
+}
 // CreateEMA Create an EMA
-func CreateEMA(data []float64, length int) []float64 {
+func CreateEMA(close []float64, length int) []float64 {
 	if length <= 1 {
 		log.Fatal("Length of the ema must be greater than 1")
 	}
-	ema := talib.Ema(data, length)
+	ema := talib.Ema(close, length)
 	return ema
 }
