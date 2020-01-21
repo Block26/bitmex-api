@@ -46,10 +46,8 @@ func GetData(symbol string, exchange string, interval string, startTimestamp tim
 	db, err := sqlx.Connect("postgres", psqlInfo)
 
 	if err != nil {
-		log.Println("not nil")
 		if host == "localhost" {
-			log.Println("localhost")
-			log.Println("Falied to connect to database, attempting to connect to cloud databse")
+			log.Println("Falied to connect to database, attempting to connect to cloud database. Please setup tantradb locally.")
 			Setup("remote")
 			return GetData(symbol, exchange, interval, startTimestamp, endTimestamp)
 		} else {
@@ -81,7 +79,7 @@ func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
 
 	if err != nil {
 		if host == "localhost" {
-			log.Println("Falied to connect to database, attempting to connect to cloud databse")
+			log.Println("Falied to connect to database, attempting to connect to cloud database. Please setup tantradb locally.")
 			Setup("remote")
 			return LoadImpliedVols(symbol, start, end)
 		} else {
