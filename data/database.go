@@ -14,7 +14,7 @@ import (
 
 var (
 	host     = "localhost"
-	port     = 5433
+	port     = 5432
 	user     = "yantrauser"
 	password = "password"
 	dbname   = "tantra"
