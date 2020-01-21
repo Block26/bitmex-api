@@ -43,10 +43,18 @@ func GetData(symbol string, exchange string, interval string, startTimestamp tim
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 
-	db, err := sqlx.Open("postgres", psqlInfo)
+	db, err := sqlx.Connect("postgres", psqlInfo)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Println("not nil")
+		if host == "localhost" {
+			log.Println("localhost")
+			log.Println("Falied to connect to database, attempting to connect to cloud databse")
+			Setup("remote")
+			return GetData(symbol, exchange, interval, startTimestamp, endTimestamp)
+		} else {
+			log.Fatal(err)
+		}
 	}
 
 	bars := []*models.Bar{}
@@ -66,14 +74,19 @@ func GetData(symbol string, exchange string, interval string, startTimestamp tim
 }
 
 func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
-	Setup()
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 	db, err := sqlx.Connect("postgres", psqlInfo)
+
 	if err != nil {
-		fmt.Printf("Error connecting to tantradb: %v\n", err)
-		panic(err)
+		if host == "localhost" {
+			log.Println("Falied to connect to database, attempting to connect to cloud databse")
+			Setup("remote")
+			return LoadImpliedVols(symbol, start, end)
+		} else {
+			log.Fatal(err)
+		}
 	}
 
 	ivs := []models.ImpliedVol{}
