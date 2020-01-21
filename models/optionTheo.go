@@ -14,38 +14,40 @@ const day = 86400
 const DefaultVolatility = .6
 
 type OptionTheo struct {
-	Strike          float64 // Strike price
-	UnderlyingPrice float64 // Underlying price
-	InterestRate    float64 // Risk free rate (assume 0)
-	Volatility      float64 // Implied volatility
-	CurrentTime     int     // Current time (ms)
-	Expiry          int     // Expiration date (ms)
-	TimeLeft        float64 // Time left until expiry (days)
-	OptionType      string  // "call" or "put"
-	Theo            float64 // Theoretical value calculated via Black-Scholes
-	BinomialTheo    float64 // Theoretical value calculated via binomial tree
-	Delta           float64 // Change in theo wrt. 1 USD change in UnderlyingPrice
-	Theta           float64 // Change in theo wrt. 1 day decrease in timeLeft
-	Gamma           float64 // Change in delta wrt. 1 USD change in UnderlyingPrice
-	Vega            float64 // Change in theo wrt. 1% increase in volatility
-	WeightedVega    float64 // Vega / Vega of ATM option
+	Strike                  float64 // Strike price
+	UnderlyingPrice         float64 // Underlying price
+	InterestRate            float64 // Risk free rate (assume 0)
+	Volatility              float64 // Implied volatility
+	CurrentTime             int     // Current time (ms)
+	Expiry                  int     // Expiration date (ms)
+	TimeLeft                float64 // Time left until expiry (days)
+	OptionType              string  // "call" or "put"
+	Theo                    float64 // Theoretical value calculated via Black-Scholes
+	BinomialTheo            float64 // Theoretical value calculated via binomial tree
+	Delta                   float64 // Change in theo wrt. 1 USD change in UnderlyingPrice
+	Theta                   float64 // Change in theo wrt. 1 day decrease in timeLeft
+	Gamma                   float64 // Change in delta wrt. 1 USD change in UnderlyingPrice
+	Vega                    float64 // Change in theo wrt. 1% increase in volatility
+	WeightedVega            float64 // Vega / Vega of ATM option
+	DenominatedInUnderlying bool    // True if option price is quoted in terms of underlying
 }
 
 // An unknown value (theo or volatility) is represented by -1.
 // Volatility is represented by a decimal. Theoretical values are in terms of underlying currency.
 func NewOptionTheo(optionType string, UnderlyingPrice float64, strike float64,
 	currentTime int, expiry int, r float64,
-	volatility float64, theo float64) *OptionTheo {
+	volatility float64, theo float64, denom bool) *OptionTheo {
 	o := &OptionTheo{
-		Strike:          strike,
-		UnderlyingPrice: UnderlyingPrice,
-		InterestRate:    r,
-		CurrentTime:     currentTime,
-		Expiry:          expiry,
-		TimeLeft:        getTimeLeft(currentTime, expiry),
-		OptionType:      optionType,
-		Volatility:      volatility,
-		Theo:            theo,
+		Strike:                  strike,
+		UnderlyingPrice:         UnderlyingPrice,
+		InterestRate:            r,
+		CurrentTime:             currentTime,
+		Expiry:                  expiry,
+		TimeLeft:                getTimeLeft(currentTime, expiry),
+		OptionType:              optionType,
+		Volatility:              volatility,
+		Theo:                    theo,
+		DenominatedInUnderlying: denom,
 	}
 	return o
 }
@@ -87,9 +89,17 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 		o.CalcVol()
 	} else {
 		if o.OptionType == "call" {
-			o.Theo = (o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)) / o.UnderlyingPrice
+			if o.DenominatedInUnderlying {
+				o.Theo = (o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)) / o.UnderlyingPrice
+			} else {
+				o.Theo = (o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2))
+			}
 		} else if o.OptionType == "put" {
-			o.Theo = (o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)) / o.UnderlyingPrice
+			if o.DenominatedInUnderlying {
+				o.Theo = (o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)) / o.UnderlyingPrice
+			} else {
+				o.Theo = (o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1))
+			}
 		}
 		// fmt.Printf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
 	}
@@ -108,6 +118,7 @@ func (o *OptionTheo) CalcGreeks() {
 	td1 := o.calcD1(o.Volatility)
 	td2 := o.calcD2(o.Volatility)
 	nPrime := math.Pow((2*PI), -(1/2)) * math.Exp(math.Pow(-0.5*(td1), 2))
+	// TODO: check greek values depending on underlying denom
 	if o.OptionType == "call" {
 		o.Delta = norm.Cdf(td1)
 		o.Gamma = (nPrime / (o.UnderlyingPrice * o.Volatility * math.Pow(o.TimeLeft, (1/2))))
@@ -131,7 +142,10 @@ func (o *OptionTheo) GetBlackScholesTheo(volatility float64) float64 {
 		theo = o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)
 	}
 	// fmt.Printf("got theo %v with vol %v, d1 %v d2 %v\n", theo, volatility, td1, td2)
-	return theo / o.UnderlyingPrice
+	if o.DenominatedInUnderlying {
+		return theo / o.UnderlyingPrice
+	}
+	return theo
 }
 
 // Use newton raphson method to find volatility
@@ -150,7 +164,12 @@ func (o *OptionTheo) CalcVol() {
 			if o.OptionType == "put" {
 				cp = -1.0
 			}
-			theo0 := (cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2)) / o.UnderlyingPrice
+			var theo0 float64
+			if o.DenominatedInUnderlying {
+				theo0 = (cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2)) / o.UnderlyingPrice
+			} else {
+				theo0 = (cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2))
+			}
 			v = v - (theo0-o.Theo)/vega
 			// fmt.Printf("Next vol: %v with theo %v, d1 %v d2 %v vega %v\n", v, theo0, d1, d2, vega)
 			if math.Abs(theo0-o.Theo) < math.Pow(10, -25) {
@@ -187,6 +206,7 @@ func (o *OptionTheo) CalcWeightedVega() {
 		o.InterestRate,
 		o.Volatility, // TODO: should we assume ATM volatility here?
 		-1.,
+		o.DenominatedInUnderlying,
 	)
 	atmOption.CalcBlackScholesTheo(false)
 	atmOption.CalcVega()
@@ -280,6 +300,10 @@ func (o *OptionTheo) CalcBinomialTreeTheo(prob float64, numTimesteps int) {
 	evSum := 0.
 	o.binomialWalk(move, prob, o.UnderlyingPrice, 1, path, &evSum, numTimesteps, walkCache)
 	// Calculate binomial tree theo quoted in terms of underlying price
-	o.BinomialTheo = evSum / o.UnderlyingPrice
 	// fmt.Printf("EV sum: %v, binomialTheo: %v, move: %v\n", evSum, o.binomialTheo, move)
+	if o.DenominatedInUnderlying {
+		o.BinomialTheo = evSum / o.UnderlyingPrice
+	} else {
+		o.BinomialTheo = evSum
+	}
 }
