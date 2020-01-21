@@ -231,6 +231,9 @@ func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity floa
 				currentBaseBalance = currentBaseBalance + ((math.Abs(fillAmount) * diff) / averageCost)
 			}
 			currentQuantity = currentQuantity + fillAmount
+			if currentQuantity == 0 {
+				averageCost = 0
+			}
 		} else {
 			fillAmount = fillAmount / fillPrice
 			totalQuantity := currentQuantity + fillAmount
