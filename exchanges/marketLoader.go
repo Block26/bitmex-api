@@ -222,7 +222,7 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 					Quantity: 0,
 				},
 				MinimumOrderSize:     10,
-				TickSize:             .5,
+				TickSize:             .05,
 				QuantityTickSize:     10,
 				QuantityPrecision:    0,
 				PricePrecision:       2,
