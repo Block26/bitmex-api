@@ -177,7 +177,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 	totalQty := 0.0
 	for i, qty := range algo.Market.BuyOrders.Quantity {
 		totalQty = totalQty + qty
-		if totalQty > algo.Market.MinimumOrderSize {
+		if totalQty >= algo.Market.MinimumOrderSize {
 			createBid(i, totalQty)
 			totalQty = 0.0
 		}
@@ -191,7 +191,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 	totalQty = 0.0
 	for i, qty := range algo.Market.SellOrders.Quantity {
 		totalQty = totalQty + qty
-		if totalQty > algo.Market.MinimumOrderSize {
+		if totalQty >= algo.Market.MinimumOrderSize {
 			createAsk(i, totalQty)
 			totalQty = 0.0
 		}
