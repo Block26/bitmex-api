@@ -323,7 +323,7 @@ func (algo *Algo) CurrentOptionProfit() float64 {
 	for _, option := range algo.Market.OptionContracts {
 		currentProfit += option.Profit
 	}
-	fmt.Printf("Got current option profit: %v\n", currentProfit)
+	// fmt.Printf("Got current option profit: %v\n", currentProfit)
 	algo.Market.OptionProfit = currentProfit
 	return currentProfit
 }
