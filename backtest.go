@@ -44,12 +44,12 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		lastOptionLoad = 0
 		volStart := int(bars[0].Timestamp)
 		volEnd := int(bars[len(bars)-1].Timestamp)
-		logger.Debugf("Vol data start: %v, end %v", volStart, volEnd)
+		logger.Logf("Vol data start: %v, end %v", volStart, volEnd)
 		algo.Timestamp = utils.TimestampToTime(volStart).String()
 		volData = data.LoadImpliedVols("XBTUSD", volStart, volEnd)
 		algo.Market.Price = *bars[0]
 		algo.Market.OptionContracts, lastOptionLoad = generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, &algo)
-		logger.Debugf("Len vol data: %v", len(volData))
+		logger.Logf("Len vol data: %v", len(volData))
 	}
 
 	// Set contract types
@@ -63,8 +63,8 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	logger.Infof("Running", len(bars), "bars")
 	for _, bar := range bars {
 		if idx == 0 {
-			logger.Debugf("Start Timestamp", time.Unix(bar.Timestamp/1000, 0))
-			logger.Debugf("Running backtest with quote asset quantity %v and base asset quantity %v, fill type %v", algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity, algo.FillType)
+			logger.Logf("Start Timestamp", time.Unix(bar.Timestamp/1000, 0))
+			logger.Logf("Running backtest with quote asset quantity %v and base asset quantity %v, fill type %v", algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity, algo.FillType)
 			// Set average cost if starting with a quote balance
 			if algo.Market.QuoteAsset.Quantity > 0 {
 				algo.Market.AverageCost = bar.Close
@@ -96,7 +96,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 			state := algo.logState(timestamp)
 			history = append(history, state)
 			if algo.Market.BaseAsset.Quantity <= 0 {
-				logger.Debugf("Ran out of balance, killing...")
+				logger.Logf("Ran out of balance, killing...")
 				break
 			}
 		}
@@ -104,13 +104,13 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	}
 
 	elapsed := time.Since(start)
-	logger.Debugf("End Timestamp", timestamp)
+	logger.Logf("End Timestamp", timestamp)
 	//TODO do this during test instead of after the test
 	minProfit, maxProfit, _, maxLeverage, drawdown := minMaxStats(history)
 
 	historyLength := len(history)
-	logger.Debugf("historyLength", historyLength)
-	logger.Debugf("Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
+	logger.Logf("historyLength", historyLength)
+	logger.Logf("Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
 	percentReturn := make([]float64, historyLength)
 	last := 0.0
 	for i := range history {
@@ -139,7 +139,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		score = -100
 	}
 
-	// logger.Debugf("Last option balance: %v", lastOptionBalance)
+	// logger.Logf("Last option balance: %v", lastOptionBalance)
 	algo.Params["EntryOrderSize"] = algo.EntryOrderSize
 	algo.Params["ExitOrderSize"] = algo.ExitOrderSize
 	algo.Params["DeleverageOrderSize"] = algo.DeleverageOrderSize
@@ -206,9 +206,9 @@ func (algo *Algo) updateBalanceFromFill(marketType string, fillPrice float64) {
 // Assume fill price is option theo adjusted for slippage
 func (algo *Algo) updateOptionBalanceFromFill(option *models.OptionContract) {
 	if len(option.BuyOrders.Quantity) > 0 {
-		logger.Debugf("Buy orders for option %v: %v", option.Symbol, option.BuyOrders)
+		logger.Logf("Buy orders for option %v: %v", option.Symbol, option.BuyOrders)
 	} else if len(option.SellOrders.Quantity) > 0 {
-		logger.Debugf("Sell orders for option %v: %v", option.Symbol, option.SellOrders)
+		logger.Logf("Sell orders for option %v: %v", option.Symbol, option.SellOrders)
 	}
 	for i := range option.BuyOrders.Quantity {
 		optionPrice := option.BuyOrders.Price[i]
@@ -224,14 +224,14 @@ func (algo *Algo) updateOptionBalanceFromFill(option *models.OptionContract) {
 			}
 			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, side, algo.Market.OptionSlippage)
 		}
-		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v", option.Symbol, option.Position, optionPrice, optionQty)
+		logger.Logf("Updating option position for %v: position %v, price %v, qty %v", option.Symbol, option.Position, optionPrice, optionQty)
 		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = algo.updateBalance(algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, optionQty, exchanges.MarketType().Option)
-		logger.Debugf("Updated buy avgcost for option %v: %v with baq %v", option.Symbol, option.AverageCost, algo.Market.BaseAsset.Quantity)
+		logger.Logf("Updated buy avgcost for option %v: %v with baq %v", option.Symbol, option.AverageCost, algo.Market.BaseAsset.Quantity)
 		option.BuyOrders = models.OrderArray{
 			Quantity: []float64{},
 			Price:    []float64{},
 		}
-		logger.Debugf("Reset buy orders for %v.", option.Symbol)
+		logger.Logf("Reset buy orders for %v.", option.Symbol)
 	}
 	for i := range option.SellOrders.Quantity {
 		optionPrice := option.SellOrders.Price[i]
@@ -247,23 +247,23 @@ func (algo *Algo) updateOptionBalanceFromFill(option *models.OptionContract) {
 			}
 			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, side, algo.Market.OptionSlippage)
 		}
-		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v", option.Symbol, option.Position, optionPrice, optionQty)
+		logger.Logf("Updating option position for %v: position %v, price %v, qty %v", option.Symbol, option.Position, optionPrice, optionQty)
 		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = algo.updateBalance(algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, -optionQty, exchanges.MarketType().Option)
-		logger.Debugf("Updated sell avgcost for option %v: %v with baq %v", option.Symbol, option.AverageCost, algo.Market.BaseAsset.Quantity)
+		logger.Logf("Updated sell avgcost for option %v: %v with baq %v", option.Symbol, option.AverageCost, algo.Market.BaseAsset.Quantity)
 		option.SellOrders = models.OrderArray{
 			Quantity: []float64{},
 			Price:    []float64{},
 		}
-		logger.Debugf("Reset sell orders for %v.", option.Symbol)
+		logger.Logf("Reset sell orders for %v.", option.Symbol)
 	}
 }
 
 func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity float64, averageCost float64, fillPrice float64, fillAmount float64, marketType string, updateAlgo ...bool) (float64, float64, float64) {
-	logger.Debugf("Updating balance with curr base bal %v, curr quant %v, avg cost %v, fill pr %v, fill a %v", currentBaseBalance, currentQuantity, averageCost, fillPrice, fillAmount)
+	logger.Logf("Updating balance with curr base bal %v, curr quant %v, avg cost %v, fill pr %v, fill a %v", currentBaseBalance, currentQuantity, averageCost, fillPrice, fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		// fee := math.Abs(fillAmount/fillPrice) * algo.Market.MakerFee
 		// logger.Printf("fillPrice %.2f -> fillAmount %.2f", fillPrice, fillAmount)
-		// logger.Debugf("Updating balance with fill cost %v, fill amount %v, qaq %v, baq %v", fillPrice, fillAmount, currentQuantity, currentBaseBalance)
+		// logger.Logf("Updating balance with fill cost %v, fill amount %v, qaq %v, baq %v", fillPrice, fillAmount, currentQuantity, currentBaseBalance)
 		currentCost := (currentQuantity * averageCost)
 		if marketType == exchanges.MarketType().Future {
 			totalQuantity := currentQuantity + fillAmount
@@ -281,7 +281,7 @@ func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity floa
 				}
 				// Only use the remaining position that was filled to calculate cost
 				portionFillQuantity := math.Abs(currentQuantity)
-				logger.Debugf("Updating current base balance w bb %v, portionFillQuantity %v, diff %v, avgcost %v", currentBaseBalance, portionFillQuantity, diff, averageCost)
+				logger.Logf("Updating current base balance w bb %v, portionFillQuantity %v, diff %v, avgcost %v", currentBaseBalance, portionFillQuantity, diff, averageCost)
 				currentBaseBalance = currentBaseBalance + ((portionFillQuantity * diff) / averageCost)
 				averageCost = fillPrice
 			} else {
@@ -296,7 +296,7 @@ func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity floa
 				} else {
 					diff = utils.CalculateDifference(fillPrice, averageCost)
 				}
-				logger.Debugf("Updating full fill quantity with baq %v, fillAmount %v, diff %v, avg cost %v", currentBaseBalance, fillAmount, diff, averageCost)
+				logger.Logf("Updating full fill quantity with baq %v, fillAmount %v, diff %v, avg cost %v", currentBaseBalance, fillAmount, diff, averageCost)
 				currentBaseBalance = currentBaseBalance + ((math.Abs(fillAmount) * diff) / averageCost)
 			}
 			currentQuantity = currentQuantity + fillAmount
@@ -330,7 +330,7 @@ func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity floa
 				} else {
 					balanceChange = currentQuantity * (fillPrice - averageCost) / algo.Market.Price.Close
 				}
-				logger.Debugf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v", currentBaseBalance, balanceChange, fillPrice, averageCost)
+				logger.Logf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v", currentBaseBalance, balanceChange, fillPrice, averageCost)
 				currentBaseBalance = currentBaseBalance + balanceChange
 				averageCost = fillPrice
 			} else {
@@ -341,7 +341,7 @@ func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity floa
 				} else {
 					balanceChange = fillAmount * (fillPrice - averageCost) / algo.Market.Price.Close
 				}
-				logger.Debugf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v", currentBaseBalance, balanceChange, fillPrice, averageCost)
+				logger.Logf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v", currentBaseBalance, balanceChange, fillPrice, averageCost)
 				currentBaseBalance = currentBaseBalance + balanceChange
 			}
 			currentQuantity = currentQuantity + fillAmount
@@ -357,7 +357,7 @@ func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity floa
 }
 
 func (algo *Algo) updateOptionPositions() {
-	logger.Debugf("Updating options positions with baq %v", algo.Market.BaseAsset.Quantity)
+	logger.Logf("Updating options positions with baq %v", algo.Market.BaseAsset.Quantity)
 	// Fill our option orders, update positions and avg costs
 	for i := range algo.Market.OptionContracts {
 		option := &algo.Market.OptionContracts[i]
@@ -370,9 +370,9 @@ func (algo *Algo) updateOptionPositions() {
 		optionContracts = append(optionContracts, &algo.Market.OptionContracts[i])
 	}
 	// Update option profit
-	logger.Debugf("Aggregating open option pnl...")
+	logger.Logf("Aggregating open option pnl...")
 	options.AggregateOpenOptionPnl(optionContracts, currentTimeMillis, algo.Market.Price.Close, "BlackScholes")
-	logger.Debugf("Aggregating expired option pnl...")
+	logger.Logf("Aggregating expired option pnl...")
 	options.AggregateExpiredOptionPnl(optionContracts, currentTimeMillis, algo.Market.Price.Close)
 }
 
@@ -381,7 +381,7 @@ func (algo *Algo) CurrentOptionProfit() float64 {
 	for _, option := range algo.Market.OptionContracts {
 		currentProfit += option.Profit
 	}
-	logger.Debugf("Got current option profit: %v", currentProfit)
+	logger.Logf("Got current option profit: %v", currentProfit)
 	algo.Market.OptionProfit = currentProfit
 	return currentProfit
 }
@@ -523,7 +523,7 @@ func logBacktest(algo Algo) {
 // 		avgPrice := 0.
 // 		hasAmount := false
 // 		if len(option.SellOrders.Quantity) > 0 {
-// 			logger.Debugf("Found orders for option %v: %v", option.Symbol, option.SellOrders)
+// 			logger.Logf("Found orders for option %v: %v", option.Symbol, option.SellOrders)
 // 		}
 // 		for i, qty := range option.BuyOrders.Quantity {
 // 			price := option.BuyOrders.Price[i]
@@ -540,12 +540,12 @@ func logBacktest(algo Algo) {
 // 			}
 // 			adjPrice = utils.RoundToNearest(adjPrice, algo.Market.OptionTickSize)
 // 			if adjPrice > 0 {
-// 				logger.Debugf("Updating avgprice with avgprice %v total %v adjprice %v qty %v", avgPrice, total, adjPrice, qty)
+// 				logger.Logf("Updating avgprice with avgprice %v total %v adjprice %v qty %v", avgPrice, total, adjPrice, qty)
 // 				avgPrice = ((avgPrice * total) + (adjPrice * qty)) / (total + qty)
 // 				total += qty
 // 				netTotal += qty
 // 			} else {
-// 				logger.Debugf("Cannot buy option %v for adjPrice 0", option.Symbol)
+// 				logger.Logf("Cannot buy option %v for adjPrice 0", option.Symbol)
 // 			}
 // 			hasAmount = true
 // 		}
@@ -564,21 +564,21 @@ func logBacktest(algo Algo) {
 // 			}
 // 			adjPrice = utils.RoundToNearest(adjPrice, algo.Market.OptionTickSize)
 // 			if adjPrice > 0 {
-// 				logger.Debugf("Updating avgprice with avgprice %v total %v adjprice %v qty %v", avgPrice, total, adjPrice, qty)
+// 				logger.Logf("Updating avgprice with avgprice %v total %v adjprice %v qty %v", avgPrice, total, adjPrice, qty)
 // 				avgPrice = math.Abs(((avgPrice * total) + (adjPrice * qty)) / (total + qty))
 // 				total += qty
 // 				netTotal -= qty
 // 			} else {
-// 				logger.Debugf("Cannot sell option %v for adjPrice 0", option.Symbol)
+// 				logger.Logf("Cannot sell option %v for adjPrice 0", option.Symbol)
 // 			}
 // 			hasAmount = true
 // 		}
 // 		if hasAmount {
 // 			//Fill open orders
-// 			logger.Debugf("Calcing new avg cost with avg cost %v, position %v, avgprice %v, total %v", option.AverageCost, option.Position, avgPrice, total)
+// 			logger.Logf("Calcing new avg cost with avg cost %v, position %v, avgprice %v, total %v", option.AverageCost, option.Position, avgPrice, total)
 // 			if option.Position+netTotal == 0 {
 // 				option.Profit = option.Position * (avgPrice - option.AverageCost)
-// 				logger.Debugf("Net total %v closes out position %v with avgcost %v and avgprice %v, profit %v", netTotal, option.Position, option.AverageCost, avgPrice, option.Profit)
+// 				logger.Logf("Net total %v closes out position %v with avgcost %v and avgprice %v, profit %v", netTotal, option.Position, option.AverageCost, avgPrice, option.Profit)
 // 				option.AverageCost = 0
 // 				option.Position = 0
 // 			} else {
@@ -593,7 +593,7 @@ func logBacktest(algo Algo) {
 // 				Quantity: []float64{},
 // 				Price:    []float64{},
 // 			}
-// 			logger.Debugf("[%v] updated avgcost %v and position %v", option.Symbol, option.AverageCost, option.Position)
+// 			logger.Logf("[%v] updated avgcost %v and position %v", option.Symbol, option.AverageCost, option.Position)
 // 		}
 // 	}
 // }
@@ -602,7 +602,7 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 	if utils.ToIntTimestamp(algo.Timestamp)-lastOptionLoad < optionLoadFreq*1000 {
 		return algo.Market.OptionContracts, lastOptionLoad
 	}
-	// logger.Debugf("Generating active options with last option load %v, current timestamp %v", lastOptionLoad, utils.ToIntTimestamp(algo.Timestamp))
+	// logger.Logf("Generating active options with last option load %v, current timestamp %v", lastOptionLoad, utils.ToIntTimestamp(algo.Timestamp))
 	//Build expirys
 	var expirys []int
 	currentTime := utils.ToTimeObject(algo.Timestamp)
@@ -619,14 +619,14 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 		}
 		currentTime = currentTime.Add(time.Hour * 24 * 28)
 	}
-	// logger.Debugf("Generated expirys: %v", expirys)
+	// logger.Logf("Generated expirys: %v", expirys)
 	if algo.Market.OptionStrikeInterval == 0 {
 		log.Fatalln("OptionStrikeInterval cannot be 0, does this exchange support options?")
 	}
 	minStrike := utils.RoundToNearest(algo.Market.Price.Close*(1+(algo.Market.OptionMinStrikePct/100.)), algo.Market.OptionStrikeInterval)
 	maxStrike := utils.RoundToNearest(algo.Market.Price.Close*(1+(algo.Market.OptionMaxStrikePct/100.)), algo.Market.OptionStrikeInterval)
 	strikes := utils.Arange(minStrike, maxStrike, algo.Market.OptionStrikeInterval)
-	// logger.Debugf("Generated strikes with current price %v min strike %v and max strike %v: %v", algo.Market.Price.Close, minStrike, maxStrike, strikes)
+	// logger.Logf("Generated strikes with current price %v min strike %v and max strike %v: %v", algo.Market.Price.Close, minStrike, maxStrike, strikes)
 	var optionContracts []models.OptionContract
 	for _, expiry := range expirys {
 		for _, strike := range strikes {
@@ -666,7 +666,7 @@ func (algo *Algo) updateActiveOptions(lastOptionLoad, optionLoadFreq int, volDat
 		}
 		if isNew {
 			algo.Market.OptionContracts = append(algo.Market.OptionContracts, activeOption)
-			// logger.Debugf("Found new active option: %v", activeOption.OptionTheo.String())
+			// logger.Logf("Found new active option: %v", activeOption.OptionTheo.String())
 		}
 	}
 	return lastOptionLoad
