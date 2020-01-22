@@ -10,6 +10,7 @@ import (
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/data"
 	"github.com/tantralabs/yantra/exchanges"
+	"github.com/tantralabs/yantra/logger"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 
@@ -27,6 +28,7 @@ var lastTest int64
 //
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) {
+	logger.SetLevel("info")
 	data.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
@@ -34,7 +36,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	firstTrade = true
 	firstPositionUpdate = true
 	config := utils.LoadConfiguration(settingsFile, secret)
-	log.Printf("Loaded config for %v \n", algo.Market.Exchange)
+	logger.Infof("Loaded config for %v \n", algo.Market.Exchange)
 	commitHash = time.Now().String()
 
 	exchangeVars := iex.ExchangeConf{
@@ -52,11 +54,11 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	}
 	orderStatus = ex.GetPotentialOrderStatus()
 
-	log.Printf("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
+	logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
 	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
 	// Set initial timestamp for algo
 	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
-	log.Printf("Got local bars: %v\n", len(localBars))
+	logger.Infof("Got local bars: %v\n", len(localBars))
 	// log.Println(len(localBars), "downloaded")
 
 	// SETUP ALGO WITH RESTFUL CALLS
@@ -164,7 +166,7 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 						option.Position = position.CurrentQty
 						option.AverageCost = position.AvgCostPrice
 						option.Profit = (option.MidMarketPrice - position.AvgCostPrice) * math.Abs(position.CurrentQty)
-						log.Printf("[%v] Updated position %v, average cost %v, profit %v\n", option.Symbol, option.Position, option.AverageCost, option.Profit)
+						logger.Infof("[%v] Updated position %v, average cost %v, profit %v\n", option.Symbol, option.Position, option.AverageCost, option.Profit)
 						break
 					}
 				}
@@ -185,13 +187,13 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 			walletAmount := float64(balances[i].Balance)
 			if walletAmount > 0 && walletAmount != algo.Market.BaseAsset.Quantity {
 				algo.Market.BaseAsset.Quantity = walletAmount
-				log.Printf("BaseAsset: %+v \n", walletAmount)
+				logger.Infof("BaseAsset: %+v \n", walletAmount)
 			}
 		} else if balances[i].Asset == algo.Market.QuoteAsset.Symbol {
 			walletAmount := float64(balances[i].Balance)
 			if walletAmount > 0 && walletAmount != algo.Market.QuoteAsset.Quantity {
 				algo.Market.QuoteAsset.Quantity = walletAmount
-				log.Printf("QuoteAsset: %+v \n", walletAmount)
+				logger.Infof("QuoteAsset: %+v \n", walletAmount)
 			}
 		}
 	}
@@ -230,7 +232,7 @@ func (algo *Algo) getOptionContracts(ex iex.IExchange) {
 		// TODO only call this every few hours or once per day.
 		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, true, "option")
 		if err == nil {
-			// log.Printf("Got markets from API: %v\n", markets)
+			// logger.Infof("Got markets from API: %v\n", markets)
 			for _, market := range markets {
 				containsSymbol := false
 				for _, option := range algo.Market.OptionContracts {
@@ -259,7 +261,7 @@ func (algo *Algo) getOptionContracts(ex iex.IExchange) {
 				}
 			}
 		} else {
-			log.Printf("Error getting markets: %v\n", err)
+			logger.Errorf("Error getting markets: %v\n", err)
 		}
 	}
 }
