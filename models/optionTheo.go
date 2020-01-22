@@ -65,6 +65,10 @@ func getTimeLeft(currentTime int, expiry int) float64 {
 	return float64(expiry-currentTime) / float64(1000*day*365)
 }
 
+func (o *OptionTheo) updateTimeLeft() {
+	o.TimeLeft = getTimeLeft(int(time.Now().UnixNano()/int64(time.Millisecond)), o.Expiry)
+}
+
 // Black-scholes parameter
 func (o *OptionTheo) calcD1(volatility float64) float64 {
 	return (math.Log(o.UnderlyingPrice/o.Strike) + (o.InterestRate+(math.Pow(volatility, 2))/2)*o.TimeLeft) / (volatility * math.Sqrt(o.TimeLeft))
