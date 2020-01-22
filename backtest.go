@@ -77,7 +77,6 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 			algo = rebalance(algo)
 			if algo.FillType == exchanges.FillType().Limit {
 				//Check which buys filled
-				quoteBalance := algo.Market.BaseAsset.Quantity * algo.Market.Price.Open
 				pricesFilled, ordersFilled := algo.getFilledBidOrders(bar.Low)
 				fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
 				algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Buying*fillPercentage, marketType, true)

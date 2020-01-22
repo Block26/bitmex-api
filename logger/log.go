@@ -16,12 +16,15 @@ func GetLevel() string {
 
 func SetDisplayLevel(lvl string) {
 	displayLevel = lvl
-	InitLogger(true)
 	Infof("Set logger display level to %v", displayLevel)
 }
 
 func SetLevel(lvl string) {
-	level = lvl
+	if lvl == "" {
+		level = "debug"
+	} else {
+		level = lvl
+	}
 	Logf("Set logger level to %v", level)
 }
 
