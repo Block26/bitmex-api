@@ -28,7 +28,6 @@ var lastTest int64
 //
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) {
-	logger.SetLevel("info")
 	data.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
@@ -50,7 +49,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 
 	ex, err := tradeapi.New(exchangeVars)
 	if err != nil {
-		log.Println(err)
+		logger.Error(err)
 	}
 	orderStatus = ex.GetPotentialOrderStatus()
 
@@ -59,7 +58,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	// Set initial timestamp for algo
 	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
 	logger.Infof("Got local bars: %v\n", len(localBars))
-	// log.Println(len(localBars), "downloaded")
+	// logger.Infof(len(localBars), "downloaded")
 
 	// SETUP ALGO WITH RESTFUL CALLS
 	balances, _ := ex.GetBalances()
@@ -74,7 +73,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	var localOrders []iex.Order
 	orders, _ := ex.GetOpenOrders(iex.OpenOrderF{Currency: algo.Market.BaseAsset.Symbol})
 	localOrders = updateLocalOrders(localOrders, orders)
-	log.Println(len(localOrders), "orders found")
+	logger.Infof("%v orders found", len(localOrders))
 	// SUBSCRIBE TO WEBSOCKETS
 
 	// channels to subscribe to
@@ -104,7 +103,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	})
 
 	if err != nil {
-		log.Println(err)
+		logger.Error(err)
 	}
 
 	for {
@@ -132,20 +131,29 @@ func (algo *Algo) runTest(setupData func([]*models.Bar, Algo), rebalance func(Al
 		lastTest = data.GetBars()[algo.Index].Timestamp
 		testAlgo := Algo{}
 		copier.Copy(&testAlgo, &algo)
-		log.Println(testAlgo.Market.BaseAsset.Quantity)
+		logger.Info(testAlgo.Market.BaseAsset.Quantity)
 		// RESET Algo but leave base balance
 		testAlgo.Market.QuoteAsset.Quantity = 0
 		testAlgo.Market.Leverage = 0
 		testAlgo.Market.Weight = 0
+		// Override logger level to info so that we don't pollute logs with backtest state changes
+		oldLevel := logger.GetLevel()
+		if oldLevel != algo.BacktestLogLevel {
+			logger.SetLevel(algo.BacktestLogLevel)
+		}
 		testAlgo = RunBacktest(data.GetBars(), testAlgo, rebalance, setupData)
 		testAlgo.logLiveState(true)
+		// Return logger back to previous scope
+		if algo.LogLevel != algo.BacktestLogLevel {
+			logger.SetLevel(algo.LogLevel)
+		}
 		//TODO compare the states
 	}
 
 }
 
 func (algo *Algo) updatePositions(positions []iex.WsPosition) {
-	log.Println("Position Update:", positions)
+	logger.Infof("Position Update:", positions)
 	if len(positions) > 0 {
 		for _, position := range positions {
 			if position.Symbol == algo.Market.QuoteAsset.Symbol || position.Symbol == algo.Market.Symbol {
@@ -155,10 +163,10 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 				} else if position.CurrentQty == 0 {
 					algo.Market.AverageCost = 0
 				}
-				log.Println("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
+				logger.Infof("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
 			} else if position.Symbol == algo.Market.BaseAsset.Symbol {
 				algo.Market.BaseAsset.Quantity = float64(position.CurrentQty)
-				log.Println("BaseAsset updated")
+				logger.Infof("BaseAsset updated")
 			} else {
 				for i := range algo.Market.OptionContracts {
 					option := &algo.Market.OptionContracts[i]
@@ -214,11 +222,11 @@ func (algo *Algo) updateBars(ex iex.IExchange, trade iex.TradeBin) {
 }
 
 func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, setupData func([]*models.Bar, Algo)) {
-	log.Println("Trade Update:", trade)
+	logger.Infof("Trade Update:", trade)
 	algo.Market.Price = *data.GetBars()[algo.Index]
 	setupData(data.GetBars(), *algo)
 	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
-	log.Println("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
+	logger.Infof("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
 		algo.logState()
 		firstTrade = false

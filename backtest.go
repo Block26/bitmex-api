@@ -28,7 +28,6 @@ var lastOptionBalance = 0.
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
 func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
-	logger.SetLevel("debug")
 	// Set a UUID for the run
 	if currentRunUUID.IsZero() {
 		currentRunUUID = time.Now()
@@ -158,7 +157,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		score,
 		kvparams,
 	)
-	logger.Infof("Execution Speed", elapsed)
+	logger.Infof("Execution Speed: %v", elapsed)
 
 	algo.Result = map[string]interface{}{
 		"balance":             history[historyLength-1].UBalance,
@@ -184,8 +183,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		}
 	}
 
-	loggerBacktest(algo)
-
+	logBacktest(algo)
 	return algo
 }
 
@@ -482,7 +480,7 @@ func (algo *Algo) getFilledAskOrders(price float64) ([]float64, []float64) {
 	return hitPrices, hitQuantities
 }
 
-func loggerBacktest(algo Algo) {
+func logBacktest(algo Algo) {
 	influx, _ := client.NewHTTPClient(client.HTTPConfig{
 		Addr: "http://ec2-34-222-170-225.us-west-2.compute.amazonaws.com:8086",
 	})

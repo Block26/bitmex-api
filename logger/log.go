@@ -6,13 +6,23 @@ import (
 	"go.uber.org/zap"
 )
 
-var level string = "debug"
+var displayLevel string = "info"
+var level string = displayLevel
 var logger *zap.SugaredLogger
+
+func GetLevel() string {
+	return level
+}
+
+func SetDisplayLevel(lvl string) {
+	displayLevel = lvl
+	InitLogger(true)
+	Infof("Set logger display level to %v", displayLevel)
+}
 
 func SetLevel(lvl string) {
 	level = lvl
-	InitLogger(true)
-	Infof("Set logger to level %v", level)
+	Logf("Set logger level to %v", level)
 }
 
 func InitLogger(force bool) {
@@ -22,7 +32,7 @@ func InitLogger(force bool) {
 	cfgString := fmt.Sprintf(`{
 		"level": "%s",
 		"encoding": "json",
-		"outputPaths": ["stdout", "/tmp/logs"],
+		"outputPaths": ["stdout", "/tmp/logs", "yantra.log"],
 		"errorOutputPaths": ["stderr"],
 		"initialFields": {},
 		"encoderConfig": {
@@ -45,19 +55,39 @@ func InitLogger(force bool) {
 	logger.Infof("Initialized logger with config %v", cfgString)
 }
 
+func Log(args ...interface{}) {
+	if level == "error" {
+		Error(args)
+	} else if level == "debug" {
+		Debug(args)
+	} else {
+		Info(args)
+	}
+}
+
 func Debug(args ...interface{}) {
 	InitLogger(false)
-	logger.Debug(args)
+	logger.Debug(args...)
 }
 
 func Info(args ...interface{}) {
 	InitLogger(false)
-	logger.Info(args)
+	logger.Info(args...)
 }
 
 func Error(args ...interface{}) {
 	InitLogger(false)
-	logger.Error(args)
+	logger.Error(args...)
+}
+
+func Logf(template string, args ...interface{}) {
+	if level == "error" {
+		Errorf(template, args...)
+	} else if level == "debug" {
+		Debugf(template, args...)
+	} else {
+		Infof(template, args...)
+	}
 }
 
 func Debugf(template string, args ...interface{}) {
