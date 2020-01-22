@@ -259,7 +259,7 @@ func DivArrs(a []float64, b []float64) []float64 {
 // PctDiffArrs Get the percentage difference of elements in two slices of the same length
 func PctDiffArrs(a []float64, b []float64) []float64 {
 	s := SubArrs(a, b)
-	return DivArr(s, a)
+	return DivArrs(s, a)
 }
 
 // MulArrs Multiply a slice by another slice of the same length
