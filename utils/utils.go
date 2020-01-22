@@ -238,6 +238,30 @@ func ExpArr(arr []float64, exp float64) []float64 {
 	return a
 }
 
+// SubArrs Subtract a slice from another slice of the same length
+func SubArrs(a []float64, b []float64) []float64 {
+	n := make([]float64, len(a))
+	for i := range a {
+		n[i] = a[i] - b[i]
+	}
+	return n
+}
+
+// DivArrs Divide a slice by another slice of the same length
+func DivArrs(a []float64, b []float64) []float64 {
+	n := make([]float64, len(a))
+	for i := range a {
+		n[i] = a[i] / b[i]
+	}
+	return n
+}
+
+// PctDiffArrs Get the percentage difference of elements in two slices of the same length
+func PctDiffArrs(a []float64, b []float64) []float64 {
+	s := SubArrs(a, b)
+	return DivArr(s, a)
+}
+
 // MulArrs Multiply a slice by another slice of the same length
 func MulArrs(a []float64, b []float64) []float64 {
 	n := make([]float64, len(a))
@@ -273,6 +297,7 @@ func SumArr(arr []float64) float64 {
 	}
 	return sum
 }
+
 
 func exponent(x, y float64) float64 {
 	return math.Pow(x, y)
