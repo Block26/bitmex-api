@@ -227,9 +227,9 @@ func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize fl
 
 //Log the state of the algo to influx db
 func (algo *Algo) logLiveState(test ...bool) {
-	prefix := ""
+	stateType := "live"
 	if test != nil {
-		prefix = "test_"
+		stateType = "test"
 	}
 
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
@@ -247,7 +247,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 		Precision: "us",
 	})
 
-	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash}
+	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash, "state_type": stateType}
 
 	fields := structs.Map(algo.Market)
 
@@ -262,7 +262,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 	fields["Quantity"] = algo.Market.QuoteAsset.Quantity
 
 	pt, err := client.NewPoint(
-		prefix+"market",
+		"market",
 		tags,
 		fields,
 		time.Now(),
@@ -278,7 +278,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 	fields["ShouldHaveQuantity"] = algo.shouldHaveQuantity
 
 	pt, err = client.NewPoint(
-		prefix+"params",
+		"params",
 		tags,
 		fields,
 		time.Now(),
@@ -292,7 +292,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 			tmpTags["symbol"] = option.Symbol
 			o := structs.Map(option.OptionTheo)
 			pt1, _ := client.NewPoint(
-				prefix+"optionTheo",
+				"optionTheo",
 				tmpTags,
 				o,
 				time.Now(),
@@ -302,7 +302,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 			o = structs.Map(option)
 			delete(o, "OptionTheo")
 			pt2, _ := client.NewPoint(
-				prefix+"options",
+				"options",
 				tmpTags,
 				o,
 				time.Now(),
@@ -319,7 +319,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 		}
 
 		pt, err = client.NewPoint(
-			prefix+"buy_orders",
+			"buy_orders",
 			tags,
 			fields,
 			time.Now(),
@@ -331,7 +331,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 			fmt.Sprintf("%0.2f", algo.Market.SellOrders.Price[index]): algo.Market.SellOrders.Quantity[index],
 		}
 		pt, err = client.NewPoint(
-			prefix+"sell_orders",
+			"sell_orders",
 			tags,
 			fields,
 			time.Now(),
@@ -341,7 +341,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 
 	if algo.State != nil {
 		pt, err := client.NewPoint(
-			prefix+"state",
+			"state",
 			tags,
 			algo.State,
 			time.Now(),
