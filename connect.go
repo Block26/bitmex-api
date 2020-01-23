@@ -268,7 +268,8 @@ func (algo *Algo) getOptionContracts(ex iex.IExchange) {
 		for i := 0; i < len(algo.Market.OptionContracts); i++ {
 			optionContracts = append(optionContracts, &algo.Market.OptionContracts[i])
 		}
-		options.SetMidMarketVols(optionContracts)
+		currentTime := utils.ToIntTimestamp(algo.Timestamp)
+		options.SetMidMarketVols(optionContracts, currentTime)
 		options.PropagateVolatility(optionContracts, options.DefaultVolatility)
 		logger.Infof("Propagated volatility for %v options.\n", len(algo.Market.OptionContracts))
 		for _, option := range algo.Market.OptionContracts {

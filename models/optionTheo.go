@@ -169,7 +169,7 @@ func (o *OptionTheo) GetBlackScholesTheo(volatility float64) float64 {
 
 // Use newton raphson method to find volatility given an option price
 func (o *OptionTheo) CalcVol(price float64) {
-	// logger.Debugf("Calculating vol for %v with theo %v, time left %v, underlying %v", o.String(), o.Theo, o.TimeLeft, o.UnderlyingPrice)
+	logger.Debugf("Calculating vol for %v with theo %v, time left %v, underlying %v", o.String(), o.Theo, o.TimeLeft, o.UnderlyingPrice)
 	if price > 0 {
 		norm := gaussian.NewGaussian(0, 1)
 		v := math.Sqrt(2*PI/o.TimeLeft) * price
@@ -196,7 +196,7 @@ func (o *OptionTheo) CalcVol(price float64) {
 				break
 			}
 		}
-		// logger.Debugf("Calculated vol %v for %v, price %v\n", v, o.String(), price)
+		logger.Debugf("Calculated vol %v for %v, price %v\n", v, o.String(), price)
 		o.Volatility = v
 	} else {
 		logger.Debugf("Can only calc vol with positive price. Found %v\n", price)

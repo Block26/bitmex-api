@@ -41,9 +41,10 @@ func GetOpenOptions(options []*models.OptionContract) []*models.OptionContract {
 	return openOptions
 }
 
-func SetMidMarketVols(options []*models.OptionContract) {
+func SetMidMarketVols(options []*models.OptionContract, currentTime int) {
 	for _, option := range options {
 		if option.MidMarketPrice > 0 {
+			option.OptionTheo.UpdateTimeLeft(currentTime)
 			option.OptionTheo.CalcVol(option.MidMarketPrice)
 		}
 	}
