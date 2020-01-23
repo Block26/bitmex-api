@@ -112,8 +112,8 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	minProfit, maxProfit, _, maxLeverage, drawdown := minMaxStats(history)
 
 	historyLength := len(history)
-	logger.Logf("historyLength", historyLength)
-	logger.Logf("Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
+	logger.Log("historyLength", historyLength)
+	logger.Log("Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
 	percentReturn := make([]float64, historyLength)
 	last := 0.0
 	for i := range history {

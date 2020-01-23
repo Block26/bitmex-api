@@ -153,7 +153,7 @@ func (algo *Algo) runTest(setupData func([]*models.Bar, Algo), rebalance func(Al
 }
 
 func (algo *Algo) updatePositions(positions []iex.WsPosition) {
-	logger.Infof("Position Update:", positions)
+	logger.Info("Position Update:", positions)
 	if len(positions) > 0 {
 		for _, position := range positions {
 			if position.Symbol == algo.Market.QuoteAsset.Symbol || position.Symbol == algo.Market.Symbol {
@@ -163,10 +163,10 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 				} else if position.CurrentQty == 0 {
 					algo.Market.AverageCost = 0
 				}
-				logger.Infof("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
+				logger.Info("AvgCostPrice", algo.Market.AverageCost, "Quantity", algo.Market.QuoteAsset.Quantity)
 			} else if position.Symbol == algo.Market.BaseAsset.Symbol {
 				algo.Market.BaseAsset.Quantity = float64(position.CurrentQty)
-				logger.Infof("BaseAsset updated")
+				logger.Info("BaseAsset updated")
 			} else {
 				for i := range algo.Market.OptionContracts {
 					option := &algo.Market.OptionContracts[i]
@@ -222,11 +222,11 @@ func (algo *Algo) updateBars(ex iex.IExchange, trade iex.TradeBin) {
 }
 
 func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, setupData func([]*models.Bar, Algo)) {
-	logger.Infof("Trade Update:", trade)
+	logger.Info("Trade Update:", trade)
 	algo.Market.Price = *data.GetBars()[algo.Index]
 	setupData(data.GetBars(), *algo)
 	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
-	logger.Infof("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
+	logger.Info("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
 		algo.logState()
 		firstTrade = false
