@@ -137,16 +137,8 @@ func (algo *Algo) runTest(setupData func([]*models.Bar, Algo), rebalance func(Al
 		testAlgo.Market.Leverage = 0
 		testAlgo.Market.Weight = 0
 		// Override logger level to info so that we don't pollute logs with backtest state changes
-		oldLevel := logger.GetLevel()
-		if oldLevel != algo.BacktestLogLevel {
-			logger.SetLevel(algo.BacktestLogLevel)
-		}
 		testAlgo = RunBacktest(data.GetBars(), testAlgo, rebalance, setupData)
 		testAlgo.logLiveState(true)
-		// Return logger back to previous scope
-		if algo.LogLevel != algo.BacktestLogLevel {
-			logger.SetLevel(algo.LogLevel)
-		}
 		//TODO compare the states
 	}
 

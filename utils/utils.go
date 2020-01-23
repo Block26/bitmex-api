@@ -14,8 +14,8 @@ import (
 	"encoding/base64"
 
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/logger"
+	"github.com/tantralabs/yantra/models"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -299,7 +299,6 @@ func SumArr(arr []float64) float64 {
 	return sum
 }
 
-
 func exponent(x, y float64) float64 {
 	return math.Pow(x, y)
 }
@@ -330,7 +329,7 @@ func RoundToNearest(num float64, interval float64) float64 {
 
 func AdjustForSlippage(premium float64, side string, slippage float64) float64 {
 	adjPremium := premium
-	logger.Logf("Premium %v, with slippage %v\n", premium, premium*(1.-slippage))
+	logger.Debugf("Premium %v, with slippage %v\n", premium, premium*(1.-slippage))
 	if side == "buy" {
 		adjPremium = premium * (1. + slippage)
 	} else if side == "sell" {

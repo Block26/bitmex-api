@@ -36,8 +36,8 @@ type Algo struct {
 	Result            map[string]interface{} // The result of your backtest
 	LogBacktestToCSV  bool                   // Exports the backtest history to a balance.csv in your local directory
 	State             map[string]interface{} // State of the algo, useful for logging live ta indicators.
-	LogLevel 		  string
-	BacktestLogLevel  string
+	LogLevel          int
+	BacktestLogLevel  int
 
 	// AutoOrderPlacement
 	// AutoOrderPlacement is not neccesary and can be false, it is the easiest way to create an algorithm with yantra

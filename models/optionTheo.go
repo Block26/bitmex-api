@@ -85,7 +85,7 @@ func (o *OptionTheo) calcD2(volatility float64) float64 {
 func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 	if o.Volatility < 0 && o.Theo < 0 {
 		o.Volatility = DefaultVolatility
-		logger.Logf("Set volatility for %v to default volatility %v\n", o.String(), o.Volatility)
+		logger.Debugf("Set volatility for %v to default volatility %v\n", o.String(), o.Volatility)
 	}
 	norm := gaussian.NewGaussian(0, 1)
 	td1 := o.calcD1(o.Volatility)
@@ -106,7 +106,7 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 				o.Theo = (o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1))
 			}
 		}
-		// logger.Logf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
+		// logger.Debugf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
 	}
 	if calcGreeks {
 		o.CalcGreeks()
@@ -115,9 +115,9 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 
 // Calculate greeks (delta, gamma, theta) for a given option (option volatility must be known)
 func (o *OptionTheo) CalcGreeks() {
-	logger.Logf("Calculating greeks for %v", o.String())
+	logger.Debugf("Calculating greeks for %v", o.String())
 	if o.Volatility < 0 {
-		logger.Logf("Volatility must be known for %v to calculate greeks.\n", o.String())
+		logger.Debugf("Volatility must be known for %v to calculate greeks.\n", o.String())
 		return
 	}
 	norm := gaussian.NewGaussian(0, 1)
@@ -144,7 +144,7 @@ func (o *OptionTheo) CalcGreeks() {
 		}
 	}
 	o.CalcVega()
-	logger.Logf("Theo %v, Delta %v, Gamma %v, Theta %v, Vega %v\n", o.Theo, o.Delta, o.Gamma, o.Theta, o.Vega)
+	logger.Debugf("Theo %v, Delta %v, Gamma %v, Theta %v, Vega %v\n", o.Theo, o.Delta, o.Gamma, o.Theta, o.Vega)
 }
 
 // Return the black-scholes theoretical value for an option for a given volatility value, but do not store it.
@@ -158,7 +158,7 @@ func (o *OptionTheo) GetBlackScholesTheo(volatility float64) float64 {
 	} else if o.OptionType == "put" {
 		theo = o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1)
 	}
-	// logger.Logf("got theo %v with vol %v, d1 %v d2 %v\n", theo, volatility, td1, td2)
+	// logger.Debugf("got theo %v with vol %v, d1 %v d2 %v\n", theo, volatility, td1, td2)
 	if o.DenominatedInUnderlying {
 		return theo / o.UnderlyingPrice
 	}
@@ -167,16 +167,16 @@ func (o *OptionTheo) GetBlackScholesTheo(volatility float64) float64 {
 
 // Use newton raphson method to find volatility
 func (o *OptionTheo) CalcVol() {
-	// logger.Logf("Calculating vol for %v with theo %v, time left %v, underlying %v", o.String(), o.Theo, o.TimeLeft, o.UnderlyingPrice)
+	// logger.Debugf("Calculating vol for %v with theo %v, time left %v, underlying %v", o.String(), o.Theo, o.TimeLeft, o.UnderlyingPrice)
 	if o.Theo > 0 {
 		norm := gaussian.NewGaussian(0, 1)
 		v := math.Sqrt(2*PI/o.TimeLeft) * o.Theo
-		logger.Logf("initial vol: %v\n", v)
+		logger.Debugf("initial vol: %v\n", v)
 		for i := 0; i < 10000; i++ {
 			d1 := o.calcD1(v)
 			d2 := o.calcD2(v)
 			vega := o.UnderlyingPrice * norm.Pdf(d1) * math.Sqrt(o.TimeLeft)
-			// logger.Logf("Underlying %v, pdf %v, time el %v\n", o.UnderlyingPrice, norm.Pdf(d1), math.Sqrt(o.TimeLeft))
+			// logger.Debugf("Underlying %v, pdf %v, time el %v\n", o.UnderlyingPrice, norm.Pdf(d1), math.Sqrt(o.TimeLeft))
 			cp := 1.0
 			if o.OptionType == "put" {
 				cp = -1.0
@@ -188,27 +188,27 @@ func (o *OptionTheo) CalcVol() {
 				theo0 = (cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2))
 			}
 			v = v - (theo0-o.Theo)/vega
-			// logger.Logf("Next vol: %v with theo %v, d1 %v d2 %v vega %v\n", v, theo0, d1, d2, vega)
+			// logger.Debugf("Next vol: %v with theo %v, d1 %v d2 %v vega %v\n", v, theo0, d1, d2, vega)
 			if math.Abs(theo0-o.Theo) < math.Pow(10, -25) {
-				logger.Logf("D1: %v, d2: %v\n", d1, d2)
+				logger.Debugf("D1: %v, d2: %v\n", d1, d2)
 				break
 			}
 		}
-		logger.Logf("Calculated vol %v for %v, theo %v\n", v, o.String(), o.Theo)
+		logger.Debugf("Calculated vol %v for %v, theo %v\n", v, o.String(), o.Theo)
 		o.Volatility = v
 	} else {
-		logger.Logf("Can only calc vol with positive theo. Found %v\n", o.Theo)
+		logger.Debugf("Can only calc vol with positive theo. Found %v\n", o.Theo)
 	}
 }
 
 // Calculate vega for an option by increasing implied volatility by 1% and calculating the change in theo
 func (o *OptionTheo) CalcVega() {
-	// logger.Logf("O theo for %v: %v at underlying price %v\n", o.String(), o.Theo, o.UnderlyingPrice)
+	// logger.Debugf("O theo for %v: %v at underlying price %v\n", o.String(), o.Theo, o.UnderlyingPrice)
 	volChange := .01
 	newTheo := o.GetBlackScholesTheo(o.Volatility + volChange)
-	// logger.Logf("newTheo %v, original theo %v with vol %v\n", newTheo, o.Theo, o.Volatility)
+	// logger.Debugf("newTheo %v, original theo %v with vol %v\n", newTheo, o.Theo, o.Volatility)
 	o.CalcBlackScholesTheo(false)
-	// logger.Logf("O theo after calc: %v\n", o.Theo)
+	// logger.Debugf("O theo after calc: %v\n", o.Theo)
 	o.Vega = (newTheo - o.Theo) * o.UnderlyingPrice
 }
 
@@ -231,7 +231,7 @@ func (o *OptionTheo) CalcWeightedVega() {
 	o.CalcVega()
 	o.WeightedVega = o.Vega / atmOption.Vega
 	// if o.WeightedVega > .05 {
-	// 	logger.Logf("[%v] Got significant weighted vega %v with vega %v and atm vega %v\n", o.String(), o.WeightedVega, o.Vega, atmOption.Vega)
+	// 	logger.Debugf("[%v] Got significant weighted vega %v with vega %v and atm vega %v\n", o.String(), o.WeightedVega, o.Vega, atmOption.Vega)
 	// }
 }
 
@@ -270,7 +270,7 @@ func (o *OptionTheo) binomialWalk(move float64, prob float64, currentPrice float
 	evSum *float64, timestepsLeft int, walkCache map[string]*float64) {
 	value, ok := walkCache[path]
 	if ok {
-		// logger.Logf("Loaded EV %v for path %v\n", *value, path)
+		// logger.Debugf("Loaded EV %v for path %v\n", *value, path)
 		*evSum += *value
 		return
 	} else if timestepsLeft <= 0 || currentPrice > maxPrice || currentPrice < minPrice || currentProb < minProb {
@@ -286,7 +286,7 @@ func (o *OptionTheo) binomialWalk(move float64, prob float64, currentPrice float
 		*evSum += ev
 		walkCache[path] = &ev
 		// log.Printf("Cached EV %v for path %v\n", ev, path)
-		// logger.Logf("Cached EV %v for path %v\n", ev, path)
+		// logger.Debugf("Cached EV %v for path %v\n", ev, path)
 		return
 	}
 	currentPrice = currentPrice * (1 + move)
@@ -311,13 +311,13 @@ func (o *OptionTheo) binomialWalk(move float64, prob float64, currentPrice float
 func (o *OptionTheo) CalcBinomialTreeTheo(prob float64, numTimesteps int) {
 	timestep := o.TimeLeft / float64(numTimesteps)
 	move := o.Volatility * math.Sqrt(timestep)
-	// logger.Logf("Calculating binomial tree theo with numTimesteps %v, move %v, prob %v, volatility %v\n", numTimesteps, move, prob, o.volatility)
+	// logger.Debugf("Calculating binomial tree theo with numTimesteps %v, move %v, prob %v, volatility %v\n", numTimesteps, move, prob, o.volatility)
 	path := ""
 	walkCache := make(map[string]*float64) // Stores an ev for a path whose ev is known
 	evSum := 0.
 	o.binomialWalk(move, prob, o.UnderlyingPrice, 1, path, &evSum, numTimesteps, walkCache)
 	// Calculate binomial tree theo quoted in terms of underlying price
-	// logger.Logf("EV sum: %v, binomialTheo: %v, move: %v\n", evSum, o.binomialTheo, move)
+	// logger.Debugf("EV sum: %v, binomialTheo: %v, move: %v\n", evSum, o.binomialTheo, move)
 	if o.DenominatedInUnderlying {
 		o.BinomialTheo = evSum / o.UnderlyingPrice
 	} else {
