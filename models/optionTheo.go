@@ -115,7 +115,7 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 
 // Calculate greeks (delta, gamma, theta) for a given option (option volatility must be known)
 func (o *OptionTheo) CalcGreeks() {
-	logger.Debugf("Calculating greeks for %v", o.String())
+	logger.Debugf("Calculating greeks for %v with vol %v\n", o.String(), o.Volatility)
 	if o.Volatility < 0 {
 		logger.Debugf("Volatility must be known for %v to calculate greeks.\n", o.String())
 		return
@@ -125,6 +125,7 @@ func (o *OptionTheo) CalcGreeks() {
 	td2 := o.calcD2(o.Volatility)
 	nPrime := math.Pow((2*PI), -(1/2)) * math.Exp(math.Pow(-0.5*(td1), 2))
 	// TODO: check greek values depending on underlying denom
+	logger.Debugf("Td1: %v, td2: %v, nprime: %v\n", td1, td2, nPrime)
 	if o.OptionType == "call" {
 		o.Delta = norm.Cdf(td1)
 		o.Gamma = (nPrime / (o.UnderlyingPrice * o.Volatility * math.Pow(o.TimeLeft, (1/2))))
@@ -143,8 +144,9 @@ func (o *OptionTheo) CalcGreeks() {
 			o.Theta = (nPrime)*(-o.UnderlyingPrice*o.Volatility*0.5/math.Sqrt(o.TimeLeft)) + o.InterestRate*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2)
 		}
 	}
+	logger.Debugf("Theo %v, Delta %v, Gamma %v, Theta %v\n", o.Theo, o.Delta, o.Gamma, o.Theta)
 	o.CalcVega()
-	logger.Debugf("Theo %v, Delta %v, Gamma %v, Theta %v, Vega %v\n", o.Theo, o.Delta, o.Gamma, o.Theta, o.Vega)
+	logger.Debugf("Vega %v\n", o.Vega)
 }
 
 // Return the black-scholes theoretical value for an option for a given volatility value, but do not store it.
