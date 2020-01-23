@@ -12,6 +12,7 @@ import (
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/logger"
 	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/options"
 	"github.com/tantralabs/yantra/utils"
 
 	"github.com/jinzhu/copier"
@@ -262,6 +263,18 @@ func (algo *Algo) getOptionContracts(ex iex.IExchange) {
 			}
 		} else {
 			logger.Errorf("Error getting markets: %v\n", err)
+		}
+		var optionContracts []*models.OptionContract
+		for i := 0; i < len(algo.Market.OptionContracts); i++ {
+			optionContracts = append(optionContracts, &algo.Market.OptionContracts[i])
+		}
+		options.SetMidMarketVols(optionContracts)
+		options.PropagateVolatility(optionContracts, options.DefaultVolatility)
+		logger.Infof("Propagated volatility for %v options.\n", len(algo.Market.OptionContracts))
+		for _, option := range algo.Market.OptionContracts {
+			if option.OptionTheo.Volatility < 0 {
+				logger.Debugf("Found option with negative volatitlity after propagation: %v\n", option.Symbol)
+			}
 		}
 	}
 }

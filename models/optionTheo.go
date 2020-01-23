@@ -91,7 +91,7 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 	td1 := o.calcD1(o.Volatility)
 	td2 := o.calcD2(o.Volatility)
 	if o.Volatility < 0 {
-		o.CalcVol()
+		o.CalcVol(o.Theo)
 	} else {
 		if o.OptionType == "call" {
 			if o.DenominatedInUnderlying {
@@ -125,7 +125,7 @@ func (o *OptionTheo) CalcGreeks() {
 	td2 := o.calcD2(o.Volatility)
 	nPrime := math.Pow((2*PI), -(1/2)) * math.Exp(math.Pow(-0.5*(td1), 2))
 	// TODO: check greek values depending on underlying denom
-	logger.Debugf("Td1: %v, td2: %v, nprime: %v\n", td1, td2, nPrime)
+	// logger.Debugf("Td1: %v, td2: %v, nprime: %v\n", td1, td2, nPrime)
 	if o.OptionType == "call" {
 		o.Delta = norm.Cdf(td1)
 		o.Gamma = (nPrime / (o.UnderlyingPrice * o.Volatility * math.Pow(o.TimeLeft, (1/2))))
@@ -167,13 +167,13 @@ func (o *OptionTheo) GetBlackScholesTheo(volatility float64) float64 {
 	return theo
 }
 
-// Use newton raphson method to find volatility
-func (o *OptionTheo) CalcVol() {
+// Use newton raphson method to find volatility given an option price
+func (o *OptionTheo) CalcVol(price float64) {
 	// logger.Debugf("Calculating vol for %v with theo %v, time left %v, underlying %v", o.String(), o.Theo, o.TimeLeft, o.UnderlyingPrice)
-	if o.Theo > 0 {
+	if price > 0 {
 		norm := gaussian.NewGaussian(0, 1)
-		v := math.Sqrt(2*PI/o.TimeLeft) * o.Theo
-		logger.Debugf("initial vol: %v\n", v)
+		v := math.Sqrt(2*PI/o.TimeLeft) * price
+		// logger.Debugf("initial vol: %v\n", v)
 		for i := 0; i < 10000; i++ {
 			d1 := o.calcD1(v)
 			d2 := o.calcD2(v)
@@ -189,17 +189,17 @@ func (o *OptionTheo) CalcVol() {
 			} else {
 				theo0 = (cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2))
 			}
-			v = v - (theo0-o.Theo)/vega
+			v = v - (theo0-price)/vega
 			// logger.Debugf("Next vol: %v with theo %v, d1 %v d2 %v vega %v\n", v, theo0, d1, d2, vega)
-			if math.Abs(theo0-o.Theo) < math.Pow(10, -25) {
-				logger.Debugf("D1: %v, d2: %v\n", d1, d2)
+			if math.Abs(theo0-price) < math.Pow(10, -25) {
+				// logger.Debugf("D1: %v, d2: %v\n", d1, d2)
 				break
 			}
 		}
-		logger.Debugf("Calculated vol %v for %v, theo %v\n", v, o.String(), o.Theo)
+		// logger.Debugf("Calculated vol %v for %v, price %v\n", v, o.String(), price)
 		o.Volatility = v
 	} else {
-		logger.Debugf("Can only calc vol with positive theo. Found %v\n", o.Theo)
+		logger.Debugf("Can only calc vol with positive price. Found %v\n", price)
 	}
 }
 
