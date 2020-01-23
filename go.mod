@@ -15,5 +15,6 @@ require (
 	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70
 	github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441
 	github.com/tantralabs/tradeapi v0.0.0-20200117001314-d60e2ee36dd3
+	go.uber.org/zap v1.13.0
 	gonum.org/v1/gonum v0.6.2
 )
