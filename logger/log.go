@@ -25,7 +25,7 @@ func SetLevel(lvl string) {
 	} else {
 		level = lvl
 	}
-	Logf("Set logger level to %v", level)
+	Debugf("Set logger level to %v", level)
 }
 
 func InitLogger(force bool) {
@@ -43,7 +43,7 @@ func InitLogger(force bool) {
 		  "levelKey": "level",
 		  "levelEncoder": "lowercase"
 		}
-	  }`, level)
+	  }`, displayLevel)
 	rawJSON := []byte(cfgString)
 
 	var cfg zap.Config
@@ -55,8 +55,7 @@ func InitLogger(force bool) {
 		fmt.Printf("Error instantiating logger with config %v\n", cfgString)
 	}
 	logger = rawLogger.Sugar()
-	logger.Infof("Initialized logger with config %v", cfgString)
-}
+	}
 
 func Log(args ...interface{}) {
 	if level == "error" {

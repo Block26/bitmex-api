@@ -31,9 +31,6 @@ func Setup(env ...string) {
 		user = "yantrauser"
 		password = "soncdw0csxvpWUHDQNksamsda"
 		dbname = "tantra"
-		fmt.Printf("Set up remote db with URL %v\n", host)
-	} else {
-		fmt.Printf("Using local db.")
 	}
 }
 

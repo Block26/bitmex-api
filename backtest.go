@@ -29,6 +29,7 @@ var lastOptionBalance = 0.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
 func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
 	// Set a UUID for the run
+	logger.SetLevel(algo.BacktestLogLevel)
 	if currentRunUUID.IsZero() {
 		currentRunUUID = time.Now()
 	}
@@ -60,10 +61,10 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		marketType = exchanges.MarketType().Spot
 	}
 	idx := 0
-	logger.Infof("Running", len(bars), "bars")
+	log.Println("Running", len(bars), "bars")
 	for _, bar := range bars {
 		if idx == 0 {
-			logger.Logf("Start Timestamp", time.Unix(bar.Timestamp/1000, 0))
+			log.Println("Start Timestamp", time.Unix(bar.Timestamp/1000, 0))
 			logger.Logf("Running backtest with quote asset quantity %v and base asset quantity %v, fill type %v", algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity, algo.FillType)
 			// Set average cost if starting with a quote balance
 			if algo.Market.QuoteAsset.Quantity > 0 {
@@ -103,7 +104,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	}
 
 	elapsed := time.Since(start)
-	logger.Logf("End Timestamp", timestamp)
+	log.Println("End Timestamp", timestamp)
 	//TODO do this during test instead of after the test
 	minProfit, maxProfit, _, maxLeverage, drawdown := minMaxStats(history)
 
@@ -144,7 +145,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	algo.Params["DeleverageOrderSize"] = algo.DeleverageOrderSize
 
 	kvparams := utils.CreateKeyValuePairs(algo.Params)
-	logger.Infof("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s",
+	log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s \n",
 		history[historyLength-1].Balance,
 		history[historyLength-1].AverageCost,
 		history[historyLength-1].Quantity,
@@ -157,7 +158,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		score,
 		kvparams,
 	)
-	logger.Infof("Execution Speed: %v", elapsed)
+	log.Printf("Execution Speed: %v \n", elapsed)
 
 	algo.Result = map[string]interface{}{
 		"balance":             history[historyLength-1].UBalance,
@@ -184,6 +185,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	}
 
 	logBacktest(algo)
+	logger.SetLevel(algo.LogLevel)
 	return algo
 }
 
