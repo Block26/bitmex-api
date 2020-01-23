@@ -170,7 +170,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		"max_position_dd":     minProfit,
 		"max_dd":              drawdown,
 		"params":              kvparams,
-		"score":               score,
+		"score":               utils.ToFixed(score, 3),
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
 	if algo.LogBacktestToCSV {
