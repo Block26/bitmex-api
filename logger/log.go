@@ -1,14 +1,13 @@
 package logger
 
 import (
-	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 )
 
 var displayLevel string = "info"
 var level string = displayLevel
-var zapLogger *zap.Logger
+
+// var zapLogger *zap.Logger
 
 func GetLevel() string {
 	return level
@@ -29,58 +28,61 @@ func SetLevel(lvl string) {
 }
 
 func InitLogger(force bool) {
-	if !force && zapLogger != nil {
-		return
-	}
-	cfgString := fmt.Sprintf(`{
-		"level": "%s",
-		"encoding": "json",
-		"outputPaths": ["stdout", "/tmp/logs", "yantra.log"],
-		"errorOutputPaths": ["stderr"],
-		"initialFields": {},
-		"encoderConfig": {
-		  "messageKey": "message",
-		  "levelKey": "level",
-		  "levelEncoder": "lowercase"
-		}
-	  }`, displayLevel)
-	rawJSON := []byte(cfgString)
+	// if !force && zapLogger != nil {
+	// 	return
+	// }
+	// cfgString := fmt.Sprintf(`{
+	// 	"level": "%s",
+	// 	"encoding": "json",
+	// 	"outputPaths": ["stdout", "/tmp/logs", "yantra.log"],
+	// 	"errorOutputPaths": ["stderr"],
+	// 	"initialFields": {},
+	// 	"encoderConfig": {
+	// 	  "messageKey": "message",
+	// 	  "levelKey": "level",
+	// 	  "levelEncoder": "lowercase"
+	// 	}
+	//   }`, displayLevel)
+	// rawJSON := []byte(cfgString)
 
-	var cfg zap.Config
-	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
-		panic(err)
-	}
-	var err error
-	zapLogger, err = cfg.Build()
-	if err != nil {
-		fmt.Printf("Error instantiating logger with config %v\n", cfgString)
-	}
-	// zapLogger = rawLogger .Sugar()
+	// var cfg zap.Config
+	// if err := json.Unmarshal(rawJSON, &cfg); err != nil {
+	// 	panic(err)
+	// }
+	// var err error
+	// zapLogger, err = cfg.Build()
+	// if err != nil {
+	// 	fmt.Printf("Error instantiating logger with config %v\n", cfgString)
+	// }
+	// // zapLogger = rawLogger .Sugar()
 }
 
 func Log(args ...interface{}) {
 	if level == "error" {
-		Error(args)
+		Error(args...)
 	} else if level == "debug" {
-		Debug(args)
+		Debug(args...)
 	} else {
-		Info(args)
+		Info(args...)
 	}
 }
 
 func Debug(args ...interface{}) {
-	InitLogger(false)
-	zapLogger.Sugar().Debug(args...)
+	// InitLogger(false)
+	// zapLogger.Sugar().Debug(args...)
+	fmt.Println(args...)
 }
 
 func Info(args ...interface{}) {
-	InitLogger(false)
-	zapLogger.Sugar().Info(args...)
+	// InitLogger(false)
+	// zapLogger.Sugar().Info(args...)
+	fmt.Println(args...)
 }
 
 func Error(args ...interface{}) {
-	InitLogger(false)
-	zapLogger.Sugar().Error(args...)
+	// InitLogger(false)
+	// zapLogger.Sugar().Error(args...)
+	fmt.Println(args...)
 }
 
 func Logf(template string, args ...interface{}) {
@@ -94,16 +96,19 @@ func Logf(template string, args ...interface{}) {
 }
 
 func Debugf(template string, args ...interface{}) {
-	InitLogger(false)
-	zapLogger.Sugar().Debugf(template, args...)
+	// InitLogger(false)
+	// zapLogger.Sugar().Debugf(template, args...)
+	fmt.Printf(template, args...)
 }
 
 func Infof(template string, args ...interface{}) {
-	InitLogger(false)
-	zapLogger.Sugar().Infof(template, args...)
+	// InitLogger(false)
+	// zapLogger.Sugar().Infof(template, args...)
+	fmt.Printf(template, args...)
 }
 
 func Errorf(template string, args ...interface{}) {
-	InitLogger(false)
-	zapLogger.Sugar().Errorf(template, args...)
+	// InitLogger(false)
+	// zapLogger.Sugar().Errorf(template, args...)
+	fmt.Printf(template, args...)
 }
