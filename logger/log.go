@@ -8,7 +8,7 @@ import (
 
 var displayLevel string = "info"
 var level string = displayLevel
-var zapLogger zap.SugaredLogger
+var zapLogger *zap.SugaredLogger
 
 func GetLevel() string {
 	return level
