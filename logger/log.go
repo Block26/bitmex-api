@@ -8,7 +8,7 @@ import (
 
 var displayLevel string = "info"
 var level string = displayLevel
-var logger *zap.SugaredLogger
+var zapLogger zap.SugaredLogger
 
 func GetLevel() string {
 	return level
@@ -29,7 +29,7 @@ func SetLevel(lvl string) {
 }
 
 func InitLogger(force bool) {
-	if !force && logger != nil {
+	if !force && zapLogger != nil {
 		return
 	}
 	cfgString := fmt.Sprintf(`{
@@ -54,7 +54,7 @@ func InitLogger(force bool) {
 	if err != nil {
 		fmt.Printf("Error instantiating logger with config %v\n", cfgString)
 	}
-	logger = rawLogger.Sugar()
+	zapLogger = rawLogger.Sugar()
 	}
 
 func Log(args ...interface{}) {
@@ -69,17 +69,17 @@ func Log(args ...interface{}) {
 
 func Debug(args ...interface{}) {
 	InitLogger(false)
-	logger.Debug(args...)
+	zapLogger.Debug(args...)
 }
 
 func Info(args ...interface{}) {
 	InitLogger(false)
-	logger.Info(args...)
+	zapLogger.Info(args...)
 }
 
 func Error(args ...interface{}) {
 	InitLogger(false)
-	logger.Error(args...)
+	zapLogger.Error(args...)
 }
 
 func Logf(template string, args ...interface{}) {
@@ -94,15 +94,15 @@ func Logf(template string, args ...interface{}) {
 
 func Debugf(template string, args ...interface{}) {
 	InitLogger(false)
-	logger.Debugf(template, args...)
+	zapLogger.Debugf(template, args...)
 }
 
 func Infof(template string, args ...interface{}) {
 	InitLogger(false)
-	logger.Infof(template, args...)
+	zapLogger.Infof(template, args...)
 }
 
 func Errorf(template string, args ...interface{}) {
 	InitLogger(false)
-	logger.Errorf(template, args...)
+	zapLogger.Errorf(template, args...)
 }
