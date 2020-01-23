@@ -94,5 +94,6 @@ func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
 	}
 
 	db.Close()
+	sort.Slice(ivs, func(i, j int) bool { return ivs[i].Timestamp < ivs[j].Timestamp })
 	return ivs
 }

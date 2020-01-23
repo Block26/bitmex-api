@@ -43,11 +43,14 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	var lastOptionLoad int
 	if algo.Market.Options {
 		lastOptionLoad = 0
-		volStart := int(bars[0].Timestamp)
-		volEnd := int(bars[len(bars)-1].Timestamp)
+		volStart := int(bars[0].Timestamp) / 1000
+		volEnd := int(bars[len(bars)-1].Timestamp) / 1000
 		logger.Logf("Vol data start: %v, end %v", volStart, volEnd)
 		algo.Timestamp = utils.TimestampToTime(volStart).String()
-		volData = data.LoadImpliedVols("XBTUSD", volStart, volEnd)
+		volData = data.LoadImpliedVols(algo.Market.Symbol, volStart, volEnd)
+		if len(volData) == 0 {
+			log.Fatalln("There is no vol data in the database for", algo.Market.Symbol, "from", volStart, "to", volEnd)
+		}
 		algo.Market.Price = *bars[0]
 		algo.Market.OptionContracts, lastOptionLoad = generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, &algo)
 		logger.Logf("Len vol data: %v", len(volData))
