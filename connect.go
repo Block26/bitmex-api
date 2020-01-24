@@ -119,6 +119,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			algo.placeOrdersOnBook(ex, localOrders)
 			algo.logState()
 			algo.runTest(setupData, rebalance)
+			algo.updateOptionPositions()
 		case newOrders := <-channels.OrderChan:
 			localOrders = updateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
