@@ -16,7 +16,6 @@ jobs:
       - run: go mod download
       - run: go get gotest.tools/gotestsum
       - run: go mod vendor
-      - run: mv /tmp/project/vendor/github.com/tantralabs/yantra/ca-certificates.crt /tmp/project/ca-certificates.crt
       - run: gotestsum --junitfile results.xml
       - run: mkdir /tmp/project/tests
       - run: mv /tmp/project/results.xml /tmp/project/tests/results.xml
