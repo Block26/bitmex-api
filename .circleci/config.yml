@@ -9,8 +9,7 @@ jobs:
       - image: golang:1.13-alpine
     working_directory: /tmp/project
     steps:
-      - run: apk add --no-cache git mercurial
-      - run: apk add --no-cache openssh
+      - run: apk add --no-cache git mercurial openssh gcc build-base
       - checkout
       - run: printf "\n[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig
       - run: go mod download
