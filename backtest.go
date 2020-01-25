@@ -1,9 +1,12 @@
 package yantra
 
 import (
+	"flag"
 	"log"
 	"math"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"time"
 
 	"github.com/gocarina/gocsv"
@@ -22,12 +25,25 @@ import (
 
 // var MinimumOrderSize = 25
 var currentRunUUID time.Time
-
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
+var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 var lastOptionBalance = 0.
 
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
 func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
 	// Set a UUID for the run
 	logger.SetLogLevel(algo.BacktestLogLevel)
 	if currentRunUUID.IsZero() {
@@ -188,6 +204,18 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 
 	logBacktest(algo)
 	logger.SetLogLevel(algo.LogLevel)
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal("could not create memory profile: ", err)
+		}
+		defer f.Close()
+		runtime.GC() // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			log.Fatal("could not write memory profile: ", err)
+		}
+	}
 	return algo
 }
 
