@@ -69,7 +69,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		algo.Market.Price = *bars[0]
 		lastOptionLoad = 0
 		algo.Market.OptionContracts, lastOptionLoad = generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, &algo)
-		lastOptionLoad = int(utils.GetNextFriday(utils.ToTimeObject(algo.Timestamp)).Local().UnixNano() / 1000000)
+		lastOptionLoad = int(utils.GetNextFriday(utils.ToTimeObject(algo.Timestamp)).UTC().UnixNano() / 1000000)
 		logger.Debugf("Last option load: %v, option load freq: %v\n", lastOptionLoad, optionLoadFreq)
 		logger.Debugf("Len vol data: %v\n", len(volData))
 	}
@@ -85,14 +85,14 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	log.Println("Running", len(bars), "bars")
 	for _, bar := range bars {
 		if idx == 0 {
-			log.Println("Start Timestamp", time.Unix(bar.Timestamp/1000, 0))
+			log.Println("Start Timestamp", time.Unix(bar.Timestamp/1000, 0).UTC())
 			logger.Debugf("Running backtest with quote asset quantity %v and base asset quantity %v, fill type %v\n", algo.Market.QuoteAsset.Quantity, algo.Market.BaseAsset.Quantity, algo.FillType)
 			// Set average cost if starting with a quote balance
 			if algo.Market.QuoteAsset.Quantity > 0 {
 				algo.Market.AverageCost = bar.Close
 			}
 		}
-		timestamp = time.Unix(bar.Timestamp/1000, 0)
+		timestamp = time.Unix(bar.Timestamp/1000, 0).UTC()
 		var start int64
 		if idx > algo.DataLength+1 {
 			algo.Index = idx
