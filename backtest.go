@@ -219,9 +219,9 @@ func (algo *Algo) updateBalanceFromFill(marketType string, fillPrice float64) {
 // Assume fill price is option theo adjusted for slippage
 func (algo *Algo) updateOptionBalanceFromFill(option *models.OptionContract) {
 	if len(option.BuyOrders.Quantity) > 0 {
-		logger.Debugf("Buy orders for option %v: %v\n", option.Symbol, option.BuyOrders)
+		logger.Debugf("[%v] Buy orders for option %v: %v\n", utils.ToTimeObject(algo.Timestamp), option.Symbol, option.BuyOrders)
 	} else if len(option.SellOrders.Quantity) > 0 {
-		logger.Debugf("Sell orders for option %v: %v\n", option.Symbol, option.SellOrders)
+		logger.Debugf("[%v] Sell orders for option %v: %v\n", utils.ToTimeObject(algo.Timestamp), option.Symbol, option.SellOrders)
 	}
 	for i := range option.BuyOrders.Quantity {
 		optionPrice := option.BuyOrders.Price[i]
@@ -688,20 +688,21 @@ func (algo *Algo) updateActiveOptions(lastOptionLoad, optionLoadFreq int, volDat
 	activeOptions, lastOptionLoad := generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, algo)
 	logger.Debugf("Generating active options took %v ns\n", time.Now().UnixNano()-start)
 	start = time.Now().UnixNano()
-	for _, activeOption := range activeOptions {
-		// Check to see if this option is already known
-		isNew := true
-		for _, option := range algo.Market.OptionContracts {
-			if option.Symbol == activeOption.Symbol {
-				isNew = false
-				break
-			}
+
+	var expirys []int
+	for _, option := range algo.Market.OptionContracts {
+		if !utils.IntInSlice(option.Expiry, expirys) {
+			expirys = append(expirys, option.Expiry)
 		}
-		if isNew {
+	}
+
+	for _, activeOption := range activeOptions {
+		if !utils.IntInSlice(activeOption.Expiry, expirys) {
 			algo.Market.OptionContracts = append(algo.Market.OptionContracts, activeOption)
 			logger.Debugf("Found new active option: %v\n", activeOption.OptionTheo.String())
 		}
 	}
+
 	logger.Debugf("Filtering generated options took %v ns\n", time.Now().UnixNano()-start)
 	return lastOptionLoad
 }
