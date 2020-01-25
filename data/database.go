@@ -85,7 +85,7 @@ func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
 	}
 
 	ivs := []models.ImpliedVol{}
-	cmd := fmt.Sprintf("select symbol, iv, timestamp, interval, indexprice, vwiv, strike, timetoexpiry, volume from impliedvol where timestamp >= %d and timestamp <= %d order by timestamp\n", start, end)
+	cmd := fmt.Sprintf("select symbol, iv, timestamp, interval, indexprice, vwiv, strike, timetoexpiry, volume from impliedvol where symbol = '%s' and timestamp >= %d and timestamp <= %d order by timestamp\n", symbol, start, end)
 	fmt.Printf("Command: %v", cmd)
 	err = db.Select(&ivs, cmd)
 
