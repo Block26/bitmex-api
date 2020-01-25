@@ -1,9 +1,9 @@
 package models
 
 import (
-	"fmt"
 	"math"
-	// "strconv"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/chobie/go-gaussian"
@@ -54,7 +54,11 @@ func NewOptionTheo(optionType string, UnderlyingPrice float64, strike float64,
 }
 
 func (o *OptionTheo) String() string {
-	return fmt.Sprintf("%v %v with expiry %v\n", o.Strike, o.OptionType, o.getExpiryString())
+	expiryTime := time.Unix(int64(o.Expiry/1000), 0)
+	year := strconv.Itoa(expiryTime.Year())[2:3]
+	month := strings.ToUpper(expiryTime.Month().String())[:3]
+	day := strconv.Itoa(expiryTime.Day())
+	return strconv.Itoa(int(o.Strike)) + "-" + day + month + year + "-" + strings.ToUpper(o.OptionType)
 }
 
 func (o *OptionTheo) getExpiryString() string {
@@ -72,6 +76,7 @@ func (o *OptionTheo) UpdateTimeLeft(currentTime int) {
 
 // Black-scholes parameter
 func (o *OptionTheo) calcD1(volatility float64) float64 {
+	// logger.Debugf("Calc D1 with underlying %v, strike %v, timeleft %v, interest %v\n", o.UnderlyingPrice, o.String(), o.TimeLeft, o.InterestRate)
 	return (math.Log(o.UnderlyingPrice/o.Strike) + (o.InterestRate+(math.Pow(volatility, 2))/2)*o.TimeLeft) / (volatility * math.Sqrt(o.TimeLeft))
 }
 
@@ -83,16 +88,16 @@ func (o *OptionTheo) calcD2(volatility float64) float64 {
 // Use Black-Scholes pricing model to calculate theoretical option value, or back out volatility from given theoretical option value.
 // Calculate greeks if specified.
 func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
-	if o.Volatility < 0 && o.Theo < 0 {
+	if (o.Volatility < 0 || math.IsNaN(o.Volatility)) && (o.Theo < 0 || math.IsNaN(o.Theo)) {
 		o.Volatility = DefaultVolatility
 		logger.Debugf("Set volatility for %v to default volatility %v\n", o.String(), o.Volatility)
 	}
-	norm := gaussian.NewGaussian(0, 1)
-	td1 := o.calcD1(o.Volatility)
-	td2 := o.calcD2(o.Volatility)
-	if o.Volatility < 0 {
+	if o.Volatility < 0 || math.IsNaN(o.Volatility) {
 		o.CalcVol(o.Theo)
 	} else {
+		norm := gaussian.NewGaussian(0, 1)
+		td1 := o.calcD1(o.Volatility)
+		td2 := o.calcD2(o.Volatility)
 		if o.OptionType == "call" {
 			if o.DenominatedInUnderlying {
 				o.Theo = (o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)) / o.UnderlyingPrice
@@ -106,7 +111,7 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 				o.Theo = (o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1))
 			}
 		}
-		// logger.Debugf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
+		logger.Debugf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
 	}
 	if calcGreeks {
 		o.CalcGreeks()
@@ -144,9 +149,9 @@ func (o *OptionTheo) CalcGreeks() {
 			o.Theta = (nPrime)*(-o.UnderlyingPrice*o.Volatility*0.5/math.Sqrt(o.TimeLeft)) + o.InterestRate*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2)
 		}
 	}
-	logger.Debugf("Theo %v, Delta %v, Gamma %v, Theta %v\n", o.Theo, o.Delta, o.Gamma, o.Theta)
+	logger.Debugf("[%v] Theo %v, Delta %v, Gamma %v, Theta %v\n", o.String(), o.Theo, o.Delta, o.Gamma, o.Theta)
 	o.CalcVega()
-	logger.Debugf("Vega %v\n", o.Vega)
+	// logger.Debugf("Vega %v\n", o.Vega)
 }
 
 // Return the black-scholes theoretical value for an option for a given volatility value, but do not store it.
