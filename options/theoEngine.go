@@ -1,8 +1,11 @@
 package options
 
 import (
+	"math"
+
 	"github.com/tantralabs/yantra/logger"
 	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/utils"
 )
 
 type TheoEngine struct {
@@ -39,29 +42,42 @@ func GetOpenOptions(options []*models.OptionContract) []*models.OptionContract {
 	return openOptions
 }
 
-func PropagateVolatility(options []*models.OptionContract, defaultVolatility float64) []*models.OptionContract {
+func SetMidMarketVols(options []*models.OptionContract, currentTime int) {
+	for _, option := range options {
+		if option.MidMarketPrice > 0 {
+			option.OptionTheo.UpdateTimeLeft(currentTime)
+			option.OptionTheo.CalcVol(option.MidMarketPrice)
+		}
+	}
+}
+
+func PropagateVolatility(options []*models.OptionContract, defaultVolatility float64) {
 	logger.Debugf("Propagating volatility for %v options with default volatility %v\n", len(options), defaultVolatility)
 	expiryToVol := map[int]float64{}
-	for _, option := range options {
+	for _, option := range GetOpenOptions(options) {
 		if option.OptionTheo.Volatility > 0 {
 			if _, ok := expiryToVol[option.Expiry]; !ok {
 				expiryToVol[option.Expiry] = option.OptionTheo.Volatility
 			}
 		}
 	}
-	for _, option := range options {
+	for _, option := range GetOpenOptions(options) {
 		if vol, ok := expiryToVol[option.Expiry]; ok {
-			option.OptionTheo.Volatility = vol
+			if !math.IsNaN(vol) {
+				option.OptionTheo.Volatility = vol
+			} else {
+				option.OptionTheo.Volatility = defaultVolatility
+			}
+
 		} else {
 			option.OptionTheo.Volatility = defaultVolatility
 		}
 	}
-	return options
 }
 
 func AggregateExpiredOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64) {
-	logger.Debugf("Aggregating expired option PNL at %v\n", currentTime)
-	options = PropagateVolatility(options, DefaultVolatility)
+	logger.Debugf("Aggregating expired option PNL at %v\n", utils.TimestampToTime(currentTime))
+	PropagateVolatility(options, DefaultVolatility)
 	for _, option := range options {
 		if option.OptionTheo.Volatility < 0 {
 			logger.Debugf("Found option with negative volatitlity after propagation: %v\n", option.Symbol)
@@ -77,9 +93,8 @@ func AggregateExpiredOptionPnl(options []*models.OptionContract, currentTime int
 }
 
 func AggregateOpenOptionPnl(options []*models.OptionContract, currentTime int, currentPrice float64, method string) {
-	logger.Debugf("Aggregating open option PNL at %v\n", currentTime)
-	for i := range options {
-		option := options[i]
+	logger.Debugf("Aggregating open option PNL at %v\n", utils.TimestampToTime(currentTime))
+	for _, option := range GetOpenOptions(options) {
 		if option.Position != 0 {
 			logger.Debugf("Found option %v with position %v\n", option.Symbol, option.Position)
 			option.OptionTheo.CurrentTime = currentTime

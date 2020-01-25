@@ -1,9 +1,9 @@
 package models
 
 import (
-	"fmt"
 	"math"
-	// "strconv"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/chobie/go-gaussian"
@@ -54,7 +54,11 @@ func NewOptionTheo(optionType string, UnderlyingPrice float64, strike float64,
 }
 
 func (o *OptionTheo) String() string {
-	return fmt.Sprintf("%v %v with expiry %v\n", o.Strike, o.OptionType, o.getExpiryString())
+	expiryTime := time.Unix(int64(o.Expiry/1000), 0)
+	year := strconv.Itoa(expiryTime.Year())[2:3]
+	month := strings.ToUpper(expiryTime.Month().String())[:3]
+	day := strconv.Itoa(expiryTime.Day())
+	return strconv.Itoa(int(o.Strike)) + "-" + day + month + year + "-" + strings.ToUpper(o.OptionType)
 }
 
 func (o *OptionTheo) getExpiryString() string {
@@ -72,6 +76,7 @@ func (o *OptionTheo) UpdateTimeLeft(currentTime int) {
 
 // Black-scholes parameter
 func (o *OptionTheo) calcD1(volatility float64) float64 {
+	// logger.Debugf("Calc D1 with underlying %v, strike %v, timeleft %v, interest %v\n", o.UnderlyingPrice, o.String(), o.TimeLeft, o.InterestRate)
 	return (math.Log(o.UnderlyingPrice/o.Strike) + (o.InterestRate+(math.Pow(volatility, 2))/2)*o.TimeLeft) / (volatility * math.Sqrt(o.TimeLeft))
 }
 
@@ -83,16 +88,16 @@ func (o *OptionTheo) calcD2(volatility float64) float64 {
 // Use Black-Scholes pricing model to calculate theoretical option value, or back out volatility from given theoretical option value.
 // Calculate greeks if specified.
 func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
-	if o.Volatility < 0 && o.Theo < 0 {
+	if (o.Volatility < 0 || math.IsNaN(o.Volatility)) && (o.Theo < 0 || math.IsNaN(o.Theo)) {
 		o.Volatility = DefaultVolatility
 		logger.Debugf("Set volatility for %v to default volatility %v\n", o.String(), o.Volatility)
 	}
-	norm := gaussian.NewGaussian(0, 1)
-	td1 := o.calcD1(o.Volatility)
-	td2 := o.calcD2(o.Volatility)
-	if o.Volatility < 0 {
-		o.CalcVol()
+	if o.Volatility < 0 || math.IsNaN(o.Volatility) {
+		o.CalcVol(o.Theo)
 	} else {
+		norm := gaussian.NewGaussian(0, 1)
+		td1 := o.calcD1(o.Volatility)
+		td2 := o.calcD2(o.Volatility)
 		if o.OptionType == "call" {
 			if o.DenominatedInUnderlying {
 				o.Theo = (o.UnderlyingPrice*norm.Cdf(td1) - o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(td2)) / o.UnderlyingPrice
@@ -106,7 +111,7 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 				o.Theo = (o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2) - o.UnderlyingPrice*norm.Cdf(-td1))
 			}
 		}
-		// logger.Debugf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
+		logger.Debugf("[%v] Calculated theo %v with vol %v, time %v, d1 %v, d2 %v\n", o.String(), o.Theo, o.Volatility, o.TimeLeft, td1, td2)
 	}
 	if calcGreeks {
 		o.CalcGreeks()
@@ -115,7 +120,7 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 
 // Calculate greeks (delta, gamma, theta) for a given option (option volatility must be known)
 func (o *OptionTheo) CalcGreeks() {
-	logger.Debugf("Calculating greeks for %v", o.String())
+	logger.Debugf("Calculating greeks for %v with vol %v\n", o.String(), o.Volatility)
 	if o.Volatility < 0 {
 		logger.Debugf("Volatility must be known for %v to calculate greeks.\n", o.String())
 		return
@@ -125,6 +130,7 @@ func (o *OptionTheo) CalcGreeks() {
 	td2 := o.calcD2(o.Volatility)
 	nPrime := math.Pow((2*PI), -(1/2)) * math.Exp(math.Pow(-0.5*(td1), 2))
 	// TODO: check greek values depending on underlying denom
+	// logger.Debugf("Td1: %v, td2: %v, nprime: %v\n", td1, td2, nPrime)
 	if o.OptionType == "call" {
 		o.Delta = norm.Cdf(td1)
 		o.Gamma = (nPrime / (o.UnderlyingPrice * o.Volatility * math.Pow(o.TimeLeft, (1/2))))
@@ -143,8 +149,9 @@ func (o *OptionTheo) CalcGreeks() {
 			o.Theta = (nPrime)*(-o.UnderlyingPrice*o.Volatility*0.5/math.Sqrt(o.TimeLeft)) + o.InterestRate*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(-td2)
 		}
 	}
+	logger.Debugf("[%v] Theo %v, Delta %v, Gamma %v, Theta %v\n", o.String(), o.Theo, o.Delta, o.Gamma, o.Theta)
 	o.CalcVega()
-	logger.Debugf("Theo %v, Delta %v, Gamma %v, Theta %v, Vega %v\n", o.Theo, o.Delta, o.Gamma, o.Theta, o.Vega)
+	// logger.Debugf("Vega %v\n", o.Vega)
 }
 
 // Return the black-scholes theoretical value for an option for a given volatility value, but do not store it.
@@ -165,13 +172,13 @@ func (o *OptionTheo) GetBlackScholesTheo(volatility float64) float64 {
 	return theo
 }
 
-// Use newton raphson method to find volatility
-func (o *OptionTheo) CalcVol() {
-	// logger.Debugf("Calculating vol for %v with theo %v, time left %v, underlying %v", o.String(), o.Theo, o.TimeLeft, o.UnderlyingPrice)
-	if o.Theo > 0 {
+// Use newton raphson method to find volatility given an option price
+func (o *OptionTheo) CalcVol(price float64) {
+	logger.Debugf("Calculating vol for %v with theo %v, time left %v, underlying %v", o.String(), o.Theo, o.TimeLeft, o.UnderlyingPrice)
+	if price > 0 {
 		norm := gaussian.NewGaussian(0, 1)
-		v := math.Sqrt(2*PI/o.TimeLeft) * o.Theo
-		logger.Debugf("initial vol: %v\n", v)
+		v := math.Sqrt(2*PI/o.TimeLeft) * price
+		// logger.Debugf("initial vol: %v\n", v)
 		for i := 0; i < 10000; i++ {
 			d1 := o.calcD1(v)
 			d2 := o.calcD2(v)
@@ -187,17 +194,17 @@ func (o *OptionTheo) CalcVol() {
 			} else {
 				theo0 = (cp*o.UnderlyingPrice*norm.Cdf(cp*d1) - cp*o.Strike*math.Exp(-o.InterestRate*o.TimeLeft)*norm.Cdf(cp*d2))
 			}
-			v = v - (theo0-o.Theo)/vega
+			v = v - (theo0-price)/vega
 			// logger.Debugf("Next vol: %v with theo %v, d1 %v d2 %v vega %v\n", v, theo0, d1, d2, vega)
-			if math.Abs(theo0-o.Theo) < math.Pow(10, -25) {
-				logger.Debugf("D1: %v, d2: %v\n", d1, d2)
+			if math.Abs(theo0-price) < math.Pow(10, -25) {
+				// logger.Debugf("D1: %v, d2: %v\n", d1, d2)
 				break
 			}
 		}
-		logger.Debugf("Calculated vol %v for %v, theo %v\n", v, o.String(), o.Theo)
+		logger.Debugf("Calculated vol %v for %v, price %v\n", v, o.String(), price)
 		o.Volatility = v
 	} else {
-		logger.Debugf("Can only calc vol with positive theo. Found %v\n", o.Theo)
+		logger.Debugf("Can only calc vol with positive price. Found %v\n", price)
 	}
 }
 

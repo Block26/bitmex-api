@@ -347,11 +347,11 @@ func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionT
 }
 
 func GetNextFriday(currentTime time.Time) time.Time {
-	dayDiff := currentTime.Weekday()
+	dayDiff := 5 - currentTime.Weekday()
 	if dayDiff <= 0 {
 		dayDiff += 7
 	}
-	return currentTime.Truncate(24 * time.Hour).Add(time.Hour * time.Duration(24*dayDiff))
+	return currentTime.Truncate(24 * time.Hour).Add(time.Hour * 24 * time.Duration(dayDiff))
 }
 
 func GetLastFridayOfMonth(currentTime time.Time) time.Time {
