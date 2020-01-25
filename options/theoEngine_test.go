@@ -58,7 +58,7 @@ func Arange(start, stop, step float64) []float64 {
 func TestLiveData(t *testing.T) {
 	currentTime := int(time.Now().Unix()) * 1000
 	fmt.Printf("Current time: %v\n", currentTime)
-	o := models.NewOptionTheo("call", 7340, 9000, currentTime, currentTime+(60*86400000), 0, .69, -1)
+	o := models.NewOptionTheo("call", 7340, 9000, currentTime, currentTime+(60*86400000), 0, .69, -1, true)
 	o.CalcBlackScholesTheo(false)
 	o.CalcBinomialTreeTheo(.5, 15)
 	fmt.Printf("Black scholes theo for %v: %v, binomial tree theo: %v", o.String(), o.Theo, o.BinomialTheo)
