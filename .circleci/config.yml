@@ -12,17 +12,20 @@ jobs:
       - run: apk add --no-cache git mercurial
       - run: apk add --no-cache openssh
       - checkout
-      - run: apk add --no-cache --update python3
-      - run: python3 deploy/create_version_json.py 
       - run: printf "\n[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig
       - run: go mod download
-      - run: CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+      - run: go get gotest.tools/gotestsum
+      - run: go mod vendor
+      - run: mv /tmp/project/vendor/github.com/tantralabs/yantra/ca-certificates.crt /tmp/project/ca-certificates.crt
+      - run: gotestsum --junitfile results.xml
+      - run: mkdir /tmp/project/tests
+      - run: mv /tmp/project/results.xml /tmp/project/tests/results.xml
+      - store_test_results:
+          path: /tmp/project/tests
       - persist_to_workspace:
           root: /tmp/project
           paths: 
-            - settings/*
             - ca-certificates.crt
-            - version.json
             - main
             - Dockerfile
 
