@@ -115,7 +115,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			algo.updateBars(ex, trade[0])
 			algo.updateState(ex, trade[0], setupData)
 			algo = rebalance(algo)
-			algo.setupOrders()
+			algo.setupOrders(trade[0].Close)
 			algo.placeOrdersOnBook(ex, localOrders)
 			algo.logState()
 			algo.runTest(setupData, rebalance)
@@ -143,7 +143,6 @@ func (algo *Algo) runTest(setupData func([]*models.Bar, Algo), rebalance func(Al
 		testAlgo.logLiveState(true)
 		//TODO compare the states
 	}
-
 }
 
 func (algo *Algo) updatePositions(positions []iex.WsPosition) {

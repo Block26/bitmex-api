@@ -17,7 +17,8 @@ func deltaFloat(a, b, delta float64) bool {
 	return math.Abs(a-b) <= delta
 }
 
-func (algo *Algo) setupOrders() {
+func (algo *Algo) setupOrders(currentPrice float64) {
+	price := currentPrice
 	if algo.AutoOrderPlacement {
 		orderSize, side := algo.getOrderSize(algo.Market.Price.Close, true)
 		if side == 0 {
@@ -76,13 +77,13 @@ func (algo *Algo) setupOrders() {
 			if side == 1 && orderSide == 1 {
 				algo.Market.BuyOrders = models.OrderArray{
 					Quantity: []float64{math.Abs(quantityToOrder)},
-					Price:    []float64{algo.Market.Price.Close - algo.Market.TickSize},
+					Price:    []float64{price - algo.Market.TickSize},
 				}
 				algo.Market.SellOrders = models.OrderArray{}
 			} else if side == -1 && orderSide == -1 {
 				algo.Market.SellOrders = models.OrderArray{
 					Quantity: []float64{math.Abs(quantityToOrder)},
-					Price:    []float64{algo.Market.Price.Close + algo.Market.TickSize},
+					Price:    []float64{price + algo.Market.TickSize},
 				}
 				algo.Market.BuyOrders = models.OrderArray{}
 			} else {
