@@ -173,7 +173,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	algo.Params["DeleverageOrderSize"] = algo.DeleverageOrderSize
 
 	kvparams := utils.CreateKeyValuePairs(algo.Params)
-	log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.4f \n Params: %s \n",
+	log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.3f \n Params: %s \n",
 		history[historyLength-1].Balance,
 		history[historyLength-1].AverageCost,
 		history[historyLength-1].Quantity,
