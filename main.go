@@ -34,6 +34,7 @@ type Algo struct {
 	History           []models.History       // Used to Store historical states
 	Params            map[string]interface{} // Save the initial Params of the Algo, for logging purposes. This is used to check the params after running a genetic search.
 	Result            map[string]interface{} // The result of your backtest
+	Signals           map[string][]float64   // Log the signals of your test
 	LogBacktestToCSV  bool                   // Exports the backtest history to a balance.csv in your local directory
 	State             map[string]interface{} // State of the algo, useful for logging live ta indicators.
 	LogLevel          int

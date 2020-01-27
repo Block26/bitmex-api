@@ -199,6 +199,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	}
 	//Very primitive score, how much leverage did I need to achieve this balance
 	if algo.LogBacktestToCSV {
+		// Log balance history
 		os.Remove("balance.csv")
 		historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 		if err != nil {
@@ -207,6 +208,19 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		defer historyFile.Close()
 
 		err = gocsv.MarshalFile(&history, historyFile) // Use this to save the CSV back to the file
+		if err != nil {
+			panic(err)
+		}
+
+		// Log signal history
+		os.Remove("signals.csv")
+		file, err := os.OpenFile("signals.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+		if err != nil {
+			panic(err)
+		}
+		defer file.Close()
+
+		err = gocsv.MarshalFile(&algo.Signals, file) // Use this to save the CSV back to the file
 		if err != nil {
 			panic(err)
 		}
