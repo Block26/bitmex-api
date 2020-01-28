@@ -1,7 +1,9 @@
 package yantra
 
 import (
+	"encoding/csv"
 	"flag"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -220,10 +222,36 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		}
 		defer file.Close()
 
-		err = gocsv.MarshalFile(&algo.Signals, file) // Use this to save the CSV back to the file
-		if err != nil {
-			panic(err)
+		writer := csv.NewWriter(file)
+		headers := make([]string, 0)
+		rows := make([][]float64, 0)
+		for key, values := range algo.Signals {
+			headers = append(headers, key)
+			rows = append(rows, values)
 		}
+
+		if len(rows) > 0 {
+			r := make([]string, 0, 1+len(headers))
+			r = append(
+				r,
+				headers...,
+			)
+			writer.Write(r)
+			for i := range rows[0] {
+				r := make([]string, 0, 1+len(headers))
+				vals := make([]string, 0, 1+len(headers))
+				for x := range headers {
+					vals = append(vals, fmt.Sprintf("%0.8f", rows[x][i]))
+				}
+				r = append(
+					r,
+					vals...,
+				)
+				writer.Write(r)
+			}
+		}
+
+		writer.Flush()
 	}
 
 	logBacktest(algo)
