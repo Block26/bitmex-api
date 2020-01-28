@@ -246,7 +246,9 @@ func (algo *Algo) getFillPrice() float64 {
 		fillPrice = algo.Market.Price.Close
 	} else if algo.FillType == exchanges.FillType().Open {
 		fillPrice = algo.Market.Price.Open
-	} else if algo.FillType == exchanges.FillType().Mean {
+	} else if algo.FillType == exchanges.FillType().MeanOC {
+		fillPrice = (algo.Market.Price.Open + algo.Market.Price.Close) / 2
+	} else if algo.FillType == exchanges.FillType().MeanHL {
 		fillPrice = (algo.Market.Price.High + algo.Market.Price.Low) / 2
 	}
 	return fillPrice
