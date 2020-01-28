@@ -228,6 +228,30 @@ func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize fl
 	return
 }
 
+func (algo *Algo) getFillPrice() float64 {
+	var fillPrice float64
+	if algo.FillType == exchanges.FillType().Worst {
+		if algo.Market.Weight > 0 && algo.Market.QuoteAsset.Quantity > 0 {
+			fillPrice = algo.Market.Price.High
+		} else if algo.Market.Weight < 0 && algo.Market.QuoteAsset.Quantity < 0 {
+			fillPrice = algo.Market.Price.Low
+		} else if algo.Market.Weight != 1 && algo.Market.QuoteAsset.Quantity > 0 {
+			fillPrice = algo.Market.Price.Low
+		} else if algo.Market.Weight != -1 && algo.Market.QuoteAsset.Quantity < 0 {
+			fillPrice = algo.Market.Price.High
+		} else {
+			fillPrice = algo.Market.Price.Close
+		}
+	} else if algo.FillType == exchanges.FillType().Close {
+		fillPrice = algo.Market.Price.Close
+	} else if algo.FillType == exchanges.FillType().Open {
+		fillPrice = algo.Market.Price.Open
+	} else if algo.FillType == exchanges.FillType().Mean {
+		fillPrice = (algo.Market.Price.High + algo.Market.Price.Low) / 2
+	}
+	return fillPrice
+}
+
 //Log the state of the algo to influx db
 func (algo *Algo) logLiveState(test ...bool) {
 	stateType := "live"

@@ -59,6 +59,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	var volData []models.ImpliedVol
 	const optionLoadFreq = 7 * 86400000 //ms
 	var lastOptionLoad int
+
 	if algo.Market.Options {
 		volStart := int(bars[0].Timestamp)
 		volEnd := int(bars[len(bars)-1].Timestamp)
@@ -111,11 +112,10 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 				pricesFilled, ordersFilled = algo.getFilledAskOrders(bar.High)
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
 				algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Selling*-fillPercentage, marketType, true)
-			} else if algo.FillType == exchanges.FillType().Close {
-				algo.updateBalanceFromFill(marketType, bar.Close)
-			} else if algo.FillType == exchanges.FillType().Open {
-				algo.updateBalanceFromFill(marketType, bar.Open)
+			} else {
+				algo.updateBalanceFromFill(marketType, algo.getFillPrice())
 			}
+
 			if algo.Market.Options {
 				start = time.Now().UnixNano()
 				lastOptionLoad = algo.updateActiveOptions(lastOptionLoad, optionLoadFreq, volData)
