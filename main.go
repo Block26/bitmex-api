@@ -159,6 +159,7 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 			AverageCost: algo.Market.AverageCost,
 			Leverage:    algo.Market.Leverage,
 			Profit:      algo.Market.Profit,
+			Weight:      algo.Market.Weight,
 			MaxLoss:     algo.getPositionAbsLoss(),
 			MaxProfit:   algo.getPositionAbsProfit(),
 			Price:       algo.Market.Price.Close,

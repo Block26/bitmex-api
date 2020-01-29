@@ -8,6 +8,7 @@ type History struct {
 	AverageCost float64
 	Leverage    float64
 	Profit      float64
+	Weight      int
 	MaxLoss     float64
 	MaxProfit   float64
 	Price       float64
