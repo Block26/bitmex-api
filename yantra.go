@@ -21,6 +21,7 @@ import (
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/utils"
+	te "github.com/tantralabs/theo-engine"
 )
 
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
@@ -116,9 +117,9 @@ func logState(algo *Algo, timestamp ...time.Time) (state History) {
 	// fmt.Println(algo.Timestamp, algo.Market.Profit)
 
 	if timestamp != nil {
-		algo.Timestamp = timestamp[0].String()
-		state = History{
-			Timestamp:   algo.Timestamp,
+		algo.Timestamp = timestamp[0]
+		state = models.History{
+			Timestamp:   algo.Timestamp.String(),
 			Balance:     balance,
 			Quantity:    algo.Market.QuoteAsset.Quantity,
 			AverageCost: algo.Market.AverageCost,

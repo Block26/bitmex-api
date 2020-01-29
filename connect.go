@@ -7,12 +7,13 @@ import (
 	"time"
 
 	. "github.com/tantralabs/models"
+	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/database"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/options"
+	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 
 	"github.com/jinzhu/copier"
@@ -53,21 +54,23 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(Alg
 	if err != nil {
 		logger.Error(err)
 	}
+	if algo.Market.Options {
+		// Build theo engine
+		theoEngine := te.NewTheoEngine(&algo.Market, ex, &algo.Timestamp, 60000, 86400000, true)
+		algo.TheoEngine = &theoEngine
+	}
 	orderStatus = ex.GetPotentialOrderStatus()
 
 	logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
 	localBars := database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
 	// Set initial timestamp for algo
-	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
+	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
 	logger.Infof("Got local bars: %v\n", len(localBars))
 	// logger.Infof(len(localBars), "downloaded")
 
 	// SETUP ALGO WITH RESTFUL CALLS
 	balances, _ := ex.GetBalances()
 	updateAlgoBalances(&algo, balances)
-
-	//Get Option contracts before updating positions
-	getOptionContracts(&algo, ex)
 
 	positions, _ := ex.GetPositions(algo.Market.BaseAsset.Symbol)
 	updatePositions(&algo, positions)
@@ -236,66 +239,16 @@ func updateBars(algo *Algo, ex iex.IExchange, trade iex.TradeBin) {
 
 func updateState(algo *Algo, ex iex.IExchange, trade iex.TradeBin, setupData func([]*Bar, Algo)) {
 	logger.Info("Trade Update:", trade)
-	algo.Market.Price = *database.GetBars()[algo.Index]
-	setupData(database.GetBars(), *algo)
-	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
+	setupData(data.GetBars(), *algo)
+	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
+	algo.Market.Price = *data.GetBars()[algo.Index]
 	logger.Info("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
 		logState(algo)
 		firstTrade = false
 	}
-	// Update active option contracts from API
-	getOptionContracts(algo, ex)
-}
-
-func getOptionContracts(algo *Algo, ex iex.IExchange) {
-	if algo.Market.Exchange == "deribit" && algo.Market.Options {
-		// TODO only call this every few hours or once per day.
-		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, true, "option")
-		if err == nil {
-			// logger.Infof("Got markets from API: %v\n", markets)
-			for _, market := range markets {
-				containsSymbol := false
-				for _, option := range algo.Market.OptionContracts {
-					if option.Symbol == market.Symbol {
-						containsSymbol = true
-					}
-				}
-				if !containsSymbol {
-					// expiry := market.Expiry * 1000
-					expiry := market.Expiry
-					optionTheo := NewOptionTheo(market.OptionType, algo.Market.Price.Close, market.Strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1, algo.Market.DenominatedInUnderlying)
-					optionContract := OptionContract{
-						Symbol:         market.Symbol,
-						Strike:         market.Strike,
-						Expiry:         expiry,
-						OptionType:     market.OptionType,
-						AverageCost:    0,
-						Profit:         0,
-						Position:       0,
-						OptionTheo:     *optionTheo,
-						Status:         "open",
-						MidMarketPrice: market.MidMarketPrice,
-					}
-					// fmt.Printf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
-					algo.Market.OptionContracts = append(algo.Market.OptionContracts, optionContract)
-				}
-			}
-		} else {
-			logger.Errorf("Error getting markets: %v\n", err)
-		}
-		var optionContracts []*OptionContract
-		for i := 0; i < len(algo.Market.OptionContracts); i++ {
-			optionContracts = append(optionContracts, &algo.Market.OptionContracts[i])
-		}
-		currentTime := utils.ToIntTimestamp(algo.Timestamp)
-		options.SetMidMarketVols(optionContracts, currentTime)
-		options.PropagateVolatility(optionContracts, options.DefaultVolatility)
-		logger.Infof("Propagated volatility for %v options.\n", len(algo.Market.OptionContracts))
-		for _, option := range algo.Market.OptionContracts {
-			if option.OptionTheo.Volatility < 0 {
-				logger.Debugf("Found option with negative volatitlity after propagation: %v\n", option.Symbol)
-			}
-		}
+	if algo.Market.Options {
+		// Update active option contracts from API
+		algo.TheoEngine.BuildOptionContracts()
 	}
 }

@@ -14,11 +14,10 @@ require (
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lib/pq v1.3.0
 	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70
-	github.com/stretchr/testify v1.4.0 // indirect
 	github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441
 	github.com/tantralabs/models v0.0.0-20200203185059-b6fff24390f2
+	github.com/tantralabs/theo-engine v0.0.0-20200203203803-d79c0003cac2
 	github.com/tantralabs/tradeapi v0.0.0-20200203203050-47b24237c8a1
-	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
 	gonum.org/v1/gonum v0.6.2
 	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect

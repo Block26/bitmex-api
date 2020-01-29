@@ -340,10 +340,16 @@ func AdjustForSlippage(premium float64, side string, slippage float64) float64 {
 
 func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionType string) string {
 	expiryTime := time.Unix(int64(expiry/1000), 0)
-	year := strconv.Itoa(expiryTime.Year())[2:3]
+	year := strconv.Itoa(expiryTime.Year())[2:4]
 	month := strings.ToUpper(expiryTime.Month().String())[:3]
 	day := strconv.Itoa(expiryTime.Day())
-	return currency + "-" + strconv.Itoa(int(strike)) + "-" + day + month + year + "-" + strings.ToUpper(optionType)
+	var oType string
+	if optionType == "call" {
+		oType = "C"
+	} else if optionType == "put" {
+		oType = "P"
+	}
+	return currency + "-" + strconv.Itoa(int(strike)) + "-" + day + month + year + "-" + oType
 }
 
 func GetNextFriday(currentTime time.Time) time.Time {

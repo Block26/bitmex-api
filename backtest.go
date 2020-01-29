@@ -17,11 +17,10 @@ import (
 	"gonum.org/v1/gonum/stat"
 
 	client "github.com/influxdata/influxdb1-client/v2"
-	. "github.com/tantralabs/models"
-	"github.com/tantralabs/yantra/database"
+	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/options"
+	. "github.com/tantralabs/models"
 	"github.com/tantralabs/yantra/utils"
 )
 
@@ -54,27 +53,13 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 
 	start := time.Now()
 	setupData(bars, algo)
-	var history []History
-	var timestamp time.Time
-	var volData []ImpliedVol
-	const optionLoadFreq = 7 * 86400000 //ms
-	var lastOptionLoad int
-
+	var history []models.History
+	algo.Timestamp = utils.TimestampToTime(int(bars[0].Timestamp))
 	if algo.Market.Options {
-		volStart := int(bars[0].Timestamp)
-		volEnd := int(bars[len(bars)-1].Timestamp)
-		logger.Debugf("Vol data start: %v, end %v\n", volStart, volEnd)
-		algo.Timestamp = utils.TimestampToTime(volStart).String()
-		volData = database.LoadImpliedVols(algo.Market.Symbol, volStart, volEnd)
-		if len(volData) == 0 {
-			log.Fatalln("There is no vol data in the database for", algo.Market.Symbol, "from", volStart, "to", volEnd)
-		}
-		algo.Market.Price = *bars[0]
-		lastOptionLoad = 0
-		algo.Market.OptionContracts, lastOptionLoad = generateActiveOptions(&algo, lastOptionLoad, optionLoadFreq, volData)
-		lastOptionLoad = int(utils.GetNextFriday(utils.ToTimeObject(algo.Timestamp)).UTC().UnixNano() / 1000000)
-		logger.Debugf("Last option load: %v, option load freq: %v\n", lastOptionLoad, optionLoadFreq)
-		logger.Debugf("Len vol data: %v\n", len(volData))
+		// Build theo engine
+		logger.Infof("Building new theo engine at %v\n", algo.Timestamp)
+		theoEngine := te.NewTheoEngine(&algo.Market, nil, &algo.Timestamp, 60000, 86400000, true)
+		algo.TheoEngine = &theoEngine
 	}
 	// Set contract types
 	var marketType string
@@ -94,7 +79,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 				algo.Market.AverageCost = bar.Close
 			}
 		}
-		timestamp = time.Unix(bar.Timestamp/1000, 0).UTC()
+		algo.Timestamp = utils.TimestampToTime(int(bar.Timestamp))
 		var start int64
 		if idx > algo.DataLength+1 && idx < len(bars)-1 {
 			algo.Index = idx
@@ -117,7 +102,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 
 			if algo.Market.Options {
 				start = time.Now().UnixNano()
-				lastOptionLoad = updateActiveOptions(&algo, lastOptionLoad, optionLoadFreq, volData)
+				algo.TheoEngine.UpdateActiveOptions()
 				logger.Debugf("Updating active options took %v ns\n", time.Now().UnixNano()-start)
 				start = time.Now().UnixNano()
 				updateOptionPositions(&algo)
@@ -134,7 +119,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 	}
 
 	elapsed := time.Since(start)
-	log.Println("End Timestamp", timestamp)
+	log.Println("End Timestamp", algo.Timestamp)
 	//TODO do this during test instead of after the test
 	minProfit, maxProfit, _, maxLeverage, drawdown := minMaxStats(history)
 
@@ -299,9 +284,9 @@ func updateBalanceFromFill(algo *Algo, marketType string, fillPrice float64) {
 // Assume fill price is option theo adjusted for slippage
 func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 	if len(option.BuyOrders.Quantity) > 0 {
-		logger.Debugf("[%v] Buy orders for option %v: %v\n", utils.ToTimeObject(algo.Timestamp), option.Symbol, option.BuyOrders)
+		logger.Debugf("[%v] Buy orders for option %v: %v\n", algo.Timestamp, option.Symbol, option.BuyOrders)
 	} else if len(option.SellOrders.Quantity) > 0 {
-		logger.Debugf("[%v] Sell orders for option %v: %v\n", utils.ToTimeObject(algo.Timestamp), option.Symbol, option.SellOrders)
+		logger.Debugf("[%v] Sell orders for option %v: %v\n", algo.Timestamp, option.Symbol, option.SellOrders)
 	}
 	for i := range option.BuyOrders.Quantity {
 		optionPrice := option.BuyOrders.Price[i]
@@ -456,15 +441,7 @@ func updateOptionPositions(algo *Algo) {
 		option := &algo.Market.OptionContracts[i]
 		updateOptionBalanceFromFill(algo, option)
 	}
-	currentTime := utils.ToTimeObject(algo.Timestamp)
-	currentTimeMillis := int(currentTime.UnixNano() / int64(time.Millisecond))
-	var optionContracts []*OptionContract
-	for i := 0; i < len(algo.Market.OptionContracts); i++ {
-		optionContracts = append(optionContracts, &algo.Market.OptionContracts[i])
-	}
-	// Update option profit
-	options.AggregateExpiredOptionPnl(optionContracts, currentTimeMillis, algo.Market.Price.Close)
-	options.AggregateOpenOptionPnl(optionContracts, currentTimeMillis, algo.Market.Price.Close, "BlackScholes")
+	algo.TheoEngine.ScanOptions(false, false)
 }
 
 // Delete all expired options without profit values to conserve time and space resources
@@ -615,186 +592,4 @@ func logBacktest(algo Algo) {
 
 	client.Client.Write(influx, bp)
 	influx.Close()
-}
-
-//Options backtesting functionality
-
-// func (algo *Algo) updateOptionsPositions() {
-// 	//Aggregate positions
-// 	for i := range algo.Market.OptionContracts {
-// 		option := &algo.Market.OptionContracts[i]
-// 		total := 0.
-// 		netTotal := 0.
-// 		avgPrice := 0.
-// 		hasAmount := false
-// 		if len(option.SellOrders.Quantity) > 0 {
-// 			logger.Debugf("Found orders for option %v: %v", option.Symbol, option.SellOrders)
-// 		}
-// 		for i, qty := range option.BuyOrders.Quantity {
-// 			price := option.BuyOrders.Price[i]
-// 			var adjPrice float64
-// 			if price > 0 {
-// 				// Limit order
-// 				adjPrice = utils.AdjustForSlippage(price, "buy", algo.Market.OptionSlippage)
-// 			} else {
-// 				// Market order
-// 				if option.OptionTheo.Theo < 0 {
-// 					option.OptionTheo.CalcBlackScholesTheo(false)
-// 				}
-// 				adjPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "buy", algo.Market.OptionSlippage)
-// 			}
-// 			adjPrice = utils.RoundToNearest(adjPrice, algo.Market.OptionTickSize)
-// 			if adjPrice > 0 {
-// 				logger.Debugf("Updating avgprice with avgprice %v total %v adjprice %v qty %v", avgPrice, total, adjPrice, qty)
-// 				avgPrice = ((avgPrice * total) + (adjPrice * qty)) / (total + qty)
-// 				total += qty
-// 				netTotal += qty
-// 			} else {
-// 				logger.Debugf("Cannot buy option %v for adjPrice 0", option.Symbol)
-// 			}
-// 			hasAmount = true
-// 		}
-// 		for i, qty := range option.SellOrders.Quantity {
-// 			price := option.SellOrders.Price[i]
-// 			var adjPrice float64
-// 			if price > 0 {
-// 				// Limit order
-// 				adjPrice = utils.AdjustForSlippage(price, "sell", .05)
-// 			} else {
-// 				// Market order
-// 				if option.OptionTheo.Theo < 0 {
-// 					option.OptionTheo.CalcBlackScholesTheo(false)
-// 				}
-// 				adjPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "sell", .05)
-// 			}
-// 			adjPrice = utils.RoundToNearest(adjPrice, algo.Market.OptionTickSize)
-// 			if adjPrice > 0 {
-// 				logger.Debugf("Updating avgprice with avgprice %v total %v adjprice %v qty %v", avgPrice, total, adjPrice, qty)
-// 				avgPrice = math.Abs(((avgPrice * total) + (adjPrice * qty)) / (total + qty))
-// 				total += qty
-// 				netTotal -= qty
-// 			} else {
-// 				logger.Debugf("Cannot sell option %v for adjPrice 0", option.Symbol)
-// 			}
-// 			hasAmount = true
-// 		}
-// 		if hasAmount {
-// 			//Fill open orders
-// 			logger.Debugf("Calcing new avg cost with avg cost %v, position %v, avgprice %v, total %v", option.AverageCost, option.Position, avgPrice, total)
-// 			if option.Position+netTotal == 0 {
-// 				option.Profit = option.Position * (avgPrice - option.AverageCost)
-// 				logger.Debugf("Net total %v closes out position %v with avgcost %v and avgprice %v, profit %v", netTotal, option.Position, option.AverageCost, avgPrice, option.Profit)
-// 				option.AverageCost = 0
-// 				option.Position = 0
-// 			} else {
-// 				option.AverageCost = ((option.AverageCost * option.Position) + (avgPrice * netTotal)) / (option.Position + netTotal)
-// 				option.Position += netTotal
-// 			}
-// 			option.BuyOrders = OrderArray{
-// 				Quantity: []float64{},
-// 				Price:    []float64{},
-// 			}
-// 			option.SellOrders = OrderArray{
-// 				Quantity: []float64{},
-// 				Price:    []float64{},
-// 			}
-// 			logger.Debugf("[%v] updated avgcost %v and position %v", option.Symbol, option.AverageCost, option.Position)
-// 		}
-// 	}
-// }
-
-func generateActiveOptions(algo *Algo, lastOptionLoad int, optionLoadFreq int, volData []ImpliedVol) ([]OptionContract, int) {
-	logger.Debugf("Generating active options at %v\n", algo.Timestamp)
-	var expirys []int
-	if utils.ToIntTimestamp(algo.Timestamp)-lastOptionLoad < optionLoadFreq {
-		return algo.Market.OptionContracts, lastOptionLoad
-	}
-	removeExpiredOptions(algo)
-	// logger.Debugf("Generating active options with last option load %v, current timestamp %v", lastOptionLoad, utils.ToIntTimestamp(algo.Timestamp))
-	//Build expirys
-	currentTime := utils.ToTimeObject(algo.Timestamp)
-	for i := 0; i < algo.Market.NumWeeklyOptions; i++ {
-		expiry := utils.TimeToTimestamp(utils.GetNextFriday(currentTime))
-		expirys = append(expirys, expiry)
-		currentTime = currentTime.Add(time.Hour * 24 * 7)
-	}
-	logger.Debugf("Generated expirys with currentTime %v: %v\n", currentTime, expirys)
-	currentTime = utils.ToTimeObject(algo.Timestamp)
-	for i := 0; i < algo.Market.NumMonthlyOptions; i++ {
-		expiry := utils.TimeToTimestamp(utils.GetLastFridayOfMonth(currentTime))
-		if !utils.IntInSlice(expiry, expirys) {
-			expirys = append(expirys, expiry)
-		}
-		currentTime = currentTime.Add(time.Hour * 24 * 28)
-	}
-	// logger.Debugf("Generated expirys: %v", expirys)
-	if algo.Market.OptionStrikeInterval == 0 {
-		log.Fatalln("OptionStrikeInterval cannot be 0, does this exchange support options?")
-	}
-	minStrike := utils.RoundToNearest(algo.Market.Price.Close*(1+(algo.Market.OptionMinStrikePct/100.)), algo.Market.OptionStrikeInterval)
-	maxStrike := utils.RoundToNearest(algo.Market.Price.Close*(1+(algo.Market.OptionMaxStrikePct/100.)), algo.Market.OptionStrikeInterval)
-	strikes := utils.Arange(minStrike, maxStrike, algo.Market.OptionStrikeInterval)
-	// logger.Debugf("Generated strikes with current price %v min strike %v and max strike %v: %v", algo.Market.Price.Close, minStrike, maxStrike, strikes)
-	var optionContracts []OptionContract
-	for _, expiry := range expirys {
-		for _, strike := range strikes {
-			for _, optionType := range []string{"call", "put"} {
-				vol := getNearestVol(volData, utils.ToIntTimestamp(algo.Timestamp))
-				optionTheo := NewOptionTheo(optionType, algo.Market.Price.Close, strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, vol, -1, algo.Market.DenominatedInUnderlying)
-				optionContract := OptionContract{
-					Symbol:         utils.GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
-					Strike:         strike,
-					Expiry:         expiry,
-					OptionType:     optionType,
-					AverageCost:    0,
-					Profit:         0,
-					Position:       0,
-					OptionTheo:     *optionTheo,
-					Status:         "open",
-					MidMarketPrice: -1.,
-				}
-				optionContracts = append(optionContracts, optionContract)
-			}
-		}
-	}
-	lastOptionLoad = utils.ToIntTimestamp(algo.Timestamp)
-	logger.Debugf("Generated options (%v).\n", len(optionContracts))
-	return optionContracts, lastOptionLoad
-}
-
-func updateActiveOptions(algo *Algo, lastOptionLoad, optionLoadFreq int, volData []ImpliedVol) int {
-	logger.Debugf("Updating active options at %v\n", algo.Timestamp)
-	start := time.Now().UnixNano()
-	activeOptions, lastOptionLoad := generateActiveOptions(algo, lastOptionLoad, optionLoadFreq, volData)
-	logger.Debugf("Generating active options took %v ns\n", time.Now().UnixNano()-start)
-	start = time.Now().UnixNano()
-
-	var expirys []int
-	for _, option := range algo.Market.OptionContracts {
-		if !utils.IntInSlice(option.Expiry, expirys) {
-			expirys = append(expirys, option.Expiry)
-		}
-	}
-
-	for _, activeOption := range activeOptions {
-		if !utils.IntInSlice(activeOption.Expiry, expirys) {
-			algo.Market.OptionContracts = append(algo.Market.OptionContracts, activeOption)
-			logger.Debugf("Found new active option: %v\n", activeOption.OptionTheo.String())
-		}
-	}
-
-	logger.Debugf("Filtering generated options took %v ns\n", time.Now().UnixNano()-start)
-	return lastOptionLoad
-}
-
-func getNearestVol(volData []ImpliedVol, time int) float64 {
-	vol := -1.
-	for _, row := range volData {
-		timeDiff := time - row.Timestamp
-		if timeDiff < 0 {
-			vol = row.IV / 100 //Assume volData quotes IV in pct
-			break
-		}
-	}
-	return vol
 }
