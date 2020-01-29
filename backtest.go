@@ -1,7 +1,9 @@
 package yantra
 
 import (
+	"encoding/csv"
 	"flag"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -57,6 +59,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 	var volData []models.ImpliedVol
 	const optionLoadFreq = 7 * 86400000 //ms
 	var lastOptionLoad int
+
 	if algo.Market.Options {
 		volStart := int(bars[0].Timestamp)
 		volEnd := int(bars[len(bars)-1].Timestamp)
@@ -109,11 +112,10 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 				pricesFilled, ordersFilled = algo.getFilledAskOrders(bar.High)
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
 				algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Selling*-fillPercentage, marketType, true)
-			} else if algo.FillType == exchanges.FillType().Close {
-				algo.updateBalanceFromFill(marketType, bar.Close)
-			} else if algo.FillType == exchanges.FillType().Open {
-				algo.updateBalanceFromFill(marketType, bar.Open)
+			} else {
+				algo.updateBalanceFromFill(marketType, algo.getFillPrice())
 			}
+
 			if algo.Market.Options {
 				start = time.Now().UnixNano()
 				lastOptionLoad = algo.updateActiveOptions(lastOptionLoad, optionLoadFreq, volData)
@@ -220,10 +222,36 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		}
 		defer file.Close()
 
-		err = gocsv.MarshalFile(&algo.Signals, file) // Use this to save the CSV back to the file
-		if err != nil {
-			panic(err)
+		writer := csv.NewWriter(file)
+		headers := make([]string, 0)
+		rows := make([][]float64, 0)
+		for key, values := range algo.Signals {
+			headers = append(headers, key)
+			rows = append(rows, values)
 		}
+
+		if len(rows) > 0 {
+			r := make([]string, 0, 1+len(headers))
+			r = append(
+				r,
+				headers...,
+			)
+			writer.Write(r)
+			for i := range rows[0] {
+				r := make([]string, 0, 1+len(headers))
+				vals := make([]string, 0, 1+len(headers))
+				for x := range headers {
+					vals = append(vals, fmt.Sprintf("%0.8f", rows[x][i]))
+				}
+				r = append(
+					r,
+					vals...,
+				)
+				writer.Write(r)
+			}
+		}
+
+		writer.Flush()
 	}
 
 	logBacktest(algo)
