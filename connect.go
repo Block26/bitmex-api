@@ -35,7 +35,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	}
 	firstTrade = true
 	firstPositionUpdate = true
-	config := utils.LoadConfiguration(settingsFile, secret)
+	config := utils.LoadSecret(settingsFile, secret)
 	logger.Infof("Loaded config for %v \n", algo.Market.Exchange)
 	commitHash = time.Now().String()
 

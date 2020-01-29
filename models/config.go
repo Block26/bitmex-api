@@ -6,10 +6,10 @@ import (
 )
 
 type Config struct {
-	Name     string `json: "name"`
-	Exchange string `json: "exchange"`
-	Symbol   string `json: "symbol"`
-	Secret   string `json: "secret"`
+	Name     string `json:"name"`
+	Exchange string `json:"exchange"`
+	Symbol   string `json:"symbol"`
+	Secret   string `json:"secret"`
 }
 
 func Load(fileName string) (config Config) {

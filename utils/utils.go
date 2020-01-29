@@ -87,26 +87,26 @@ func getSecret(secretName string) string {
 	}
 }
 
-// LoadConfiguration Load a config file containing sensitive information from a local
+// LoadSecret Load a secret file containing sensitive information from a local
 // json file or from an amazon secrets file
-func LoadConfiguration(file string, secret bool) models.Config {
-	var config models.Config
-	if secret {
-		secret := getSecret(file)
-		config = models.Config{}
-		json.Unmarshal([]byte(secret), &config)
-		return config
+func LoadSecret(file string, cloud bool) models.Secret {
+	var secret models.Secret
+	if cloud {
+		secretFile := getSecret(file)
+		secret = models.Secret{}
+		json.Unmarshal([]byte(secretFile), &secret)
+		return secret
 	} else {
-		fmt.Printf("Loading config from file: %v\n", file)
-		configFile, err := os.Open(file)
-		defer configFile.Close()
+		fmt.Printf("Loading secret from file: %v\n", file)
+		secretFile, err := os.Open(file)
+		defer secretFile.Close()
 		if err != nil {
 			log.Println(err.Error())
 		}
-		jsonParser := json.NewDecoder(configFile)
-		jsonParser.Decode(&config)
+		jsonParser := json.NewDecoder(secretFile)
+		jsonParser.Decode(&secret)
 		fmt.Printf("Parsed json: %v\n", jsonParser)
-		return config
+		return secret
 	}
 }
 
