@@ -21,6 +21,10 @@ import (
 	"github.com/tantralabs/yantra/utils"
 )
 
+func main() {
+	log.Println("Import this into your algo and use it's features. Yantra is not meant to be run alone.")
+}
+
 // Algo is where you will define your initial state and it will keep track of your state throughout a test and during live execution.
 type Algo struct {
 	Name              string                 // A UUID that tells the live system what algorithm is executing trades
