@@ -288,7 +288,7 @@ func (algo *Algo) logFilledTrade(trade iex.Order) {
 
 	fields := structs.Map(trade)
 	pt, err := client.NewPoint(
-		"market",
+		"trades",
 		tags,
 		fields,
 		time.Now(),
