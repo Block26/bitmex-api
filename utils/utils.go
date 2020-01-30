@@ -327,15 +327,16 @@ func RoundToNearest(num float64, interval float64) float64 {
 	return math.Round(num/interval) * interval
 }
 
-func AdjustForSlippage(premium float64, side string, slippage float64) float64 {
-	adjPremium := premium
-	logger.Debugf("Premium %v, with slippage %v\n", premium, premium*(1.-slippage))
+func AdjustForSlippage(price float64, side string, slippage float64) float64 {
+	adjPrice := price
 	if side == "buy" {
-		adjPremium = premium * (1. + slippage)
+		adjPrice = price * (1. + slippage)
+		logger.Debugf("Price %v, with slippage %v\n", price, adjPrice)
 	} else if side == "sell" {
-		adjPremium = premium * (1. - slippage)
+		adjPrice = price * (1. - slippage)
+		logger.Debugf("Price %v, with slippage %v\n", price, adjPrice)
 	}
-	return adjPremium
+	return adjPrice
 }
 
 func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionType string) string {

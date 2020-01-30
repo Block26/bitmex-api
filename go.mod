@@ -2,6 +2,12 @@ module github.com/tantralabs/yantra
 
 go 1.13
 
+//replace github.com/tantralabs/theo-engine/models => ../theo-engine/models
+
+//replace github.com/tantralabs/theo-engine => ../theo-engine
+
+//replace github.com/tantralabs/tradeapi => ../tradeapi
+
 require (
 	github.com/aws/aws-sdk-go v1.28.7
 	github.com/davecgh/go-spew v1.1.1 // indirect

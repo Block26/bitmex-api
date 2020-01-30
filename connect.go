@@ -56,7 +56,7 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(Alg
 	}
 	if algo.Market.Options {
 		// Build theo engine
-		theoEngine := te.NewTheoEngine(&algo.Market, ex, &algo.Timestamp, 60000, 86400000, true)
+		theoEngine := te.NewTheoEngine(&algo.Market, ex, &algo.Timestamp, 60000, 86400000, true, 0, 0)
 		algo.TheoEngine = &theoEngine
 	}
 	orderStatus = ex.GetPotentialOrderStatus()

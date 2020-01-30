@@ -58,7 +58,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 	if algo.Market.Options {
 		// Build theo engine
 		logger.Infof("Building new theo engine at %v\n", algo.Timestamp)
-		theoEngine := te.NewTheoEngine(&algo.Market, nil, &algo.Timestamp, 60000, 86400000, true)
+		theoEngine := te.NewTheoEngine(&algo.Market, nil, &algo.Timestamp, 60000, 86400000, true, int(bars[0].Timestamp), int(bars[len(bars)-1].Timestamp))
 		algo.TheoEngine = &theoEngine
 	}
 	// Set contract types
@@ -292,15 +292,8 @@ func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 		optionPrice := option.BuyOrders.Price[i]
 		optionQty := option.BuyOrders.Quantity[i]
 		if optionPrice == 0 {
-			// Simulate market order
-			option.OptionTheo.CalcBlackScholesTheo(false)
-			var side string
-			if optionQty > 0 {
-				side = "buy"
-			} else if optionQty < 0 {
-				side = "sell"
-			}
-			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, side, algo.Market.OptionSlippage)
+			// Simulate market order, assume theo is updated
+			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "buy", algo.Market.OptionSlippage)
 		}
 		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
 		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = updateBalance(algo, algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, optionQty, exchanges.MarketType().Option)
@@ -315,15 +308,8 @@ func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 		optionPrice := option.SellOrders.Price[i]
 		optionQty := option.SellOrders.Quantity[i]
 		if optionPrice == 0 {
-			// Simulate market order
-			option.OptionTheo.CalcBlackScholesTheo(false)
-			var side string
-			if optionQty > 0 {
-				side = "buy"
-			} else if optionQty < 0 {
-				side = "sell"
-			}
-			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, side, algo.Market.OptionSlippage)
+			// Simulate market order, assume theo is updated
+			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "sell", algo.Market.OptionSlippage)
 		}
 		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
 		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = updateBalance(algo, algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, -optionQty, exchanges.MarketType().Option)
