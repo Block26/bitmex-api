@@ -76,7 +76,6 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		logger.Debugf("Last option load: %v, option load freq: %v\n", lastOptionLoad, optionLoadFreq)
 		logger.Debugf("Len vol data: %v\n", len(volData))
 	}
-
 	// Set contract types
 	var marketType string
 	if algo.Market.Futures {
@@ -97,7 +96,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		}
 		timestamp = time.Unix(bar.Timestamp/1000, 0).UTC()
 		var start int64
-		if idx > algo.DataLength+1 {
+		if idx > algo.DataLength+1 && idx < len(bars)-1 {
 			algo.Index = idx
 			algo.Market.Price = *bar
 			start = time.Now().UnixNano()
@@ -113,7 +112,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
 				algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Selling*-fillPercentage, marketType, true)
 			} else {
-				algo.updateBalanceFromFill(marketType, algo.getFillPrice())
+				algo.updateBalanceFromFill(marketType, algo.getFillPrice(bars[idx+algo.FillShift]))
 			}
 
 			if algo.Market.Options {

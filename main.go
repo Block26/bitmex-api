@@ -55,6 +55,7 @@ type Algo struct {
 	// EX) If Market.MaxLeverage is 1 and Algo.LeverageTarget is 1 then your algorithm will be fully leveraged when it enters it's position.
 	AutoOrderPlacement  bool    // AutoOrderPlacement whether yantra should manage your orders / leverage for you.
 	CanBuyBasedOnMax    bool    // If true then yantra will calculate leverage based on Market.MaxLeverage, if false then yantra will calculate leverage based on Algo.LeverageTarget
+	FillShift           int     // The simulation fill shift for this Algo. 0 = filling at beginning of interval, 1 = filling at end of interval
 	LeverageTarget      float64 // The target leverage for the Algo, 1 would be 100%, 0.5 would be 50% of the MaxLeverage defined by Market.
 	EntryOrderSize      float64 // The speed at which the algo enters positions during the RebalanceInterval
 	ExitOrderSize       float64 // The speed at which the algo exits positions during the RebalanceInterval
@@ -233,28 +234,28 @@ func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize fl
 	return
 }
 
-func (algo *Algo) getFillPrice() float64 {
+func (algo *Algo) getFillPrice(bar *models.Bar) float64 {
 	var fillPrice float64
 	if algo.FillType == exchanges.FillType().Worst {
 		if algo.Market.Weight > 0 && algo.Market.QuoteAsset.Quantity > 0 {
-			fillPrice = algo.Market.Price.High
+			fillPrice = bar.High
 		} else if algo.Market.Weight < 0 && algo.Market.QuoteAsset.Quantity < 0 {
-			fillPrice = algo.Market.Price.Low
+			fillPrice = bar.Low
 		} else if algo.Market.Weight != 1 && algo.Market.QuoteAsset.Quantity > 0 {
-			fillPrice = algo.Market.Price.Low
+			fillPrice = bar.Low
 		} else if algo.Market.Weight != -1 && algo.Market.QuoteAsset.Quantity < 0 {
-			fillPrice = algo.Market.Price.High
+			fillPrice = bar.High
 		} else {
-			fillPrice = algo.Market.Price.Close
+			fillPrice = bar.Close
 		}
 	} else if algo.FillType == exchanges.FillType().Close {
-		fillPrice = algo.Market.Price.Close
+		fillPrice = bar.Close
 	} else if algo.FillType == exchanges.FillType().Open {
-		fillPrice = algo.Market.Price.Open
+		fillPrice = bar.Open
 	} else if algo.FillType == exchanges.FillType().MeanOC {
-		fillPrice = (algo.Market.Price.Open + algo.Market.Price.Close) / 2
+		fillPrice = (bar.Open + bar.Close) / 2
 	} else if algo.FillType == exchanges.FillType().MeanHL {
-		fillPrice = (algo.Market.Price.High + algo.Market.Price.Low) / 2
+		fillPrice = (bar.High + bar.Low) / 2
 	}
 	return fillPrice
 }
