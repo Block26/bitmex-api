@@ -416,7 +416,8 @@ func (algo *Algo) updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order
 				if newOrder.OrdStatus == orderStatus.Cancelled || newOrder.OrdStatus == orderStatus.Rejected {
 					logger.Debug(newOrder.OrdStatus, oldOrder.OrderID)
 				} else if newOrder.OrdStatus == orderStatus.Filled {
-					logger.Debug("Log filled order to influx")
+					newOrder.Rate = oldOrder.Rate
+					newOrder.Side = oldOrder.Side
 					algo.logFilledTrade(newOrder)
 				} else {
 					updatedOrders = append(updatedOrders, newOrder)
@@ -444,6 +445,7 @@ func (algo *Algo) updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order
 				logger.Debug(newOrder.OrdStatus, newOrder.OrderID)
 			} else {
 				logger.Debug("New Order", newOrder.OrdStatus, newOrder.OrderID)
+				algo.logTrade(newOrder)
 				updatedOrders = append(updatedOrders, newOrder)
 			}
 		}

@@ -272,9 +272,9 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 
 // Core Backtest functionality
 func (algo *Algo) updateBalanceFromFill(marketType string, fillPrice float64) {
+	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 	orderSize, side := algo.getOrderSize(fillPrice)
 	fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{orderSize})
-	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 	var fillAmount float64
 	if currentWeight != float64(algo.Market.Weight) && (ordersFilled == algo.Market.Leverage || ordersFilled == algo.Market.Leverage*(-1)) {
 		// Leave entire position to have quantity 0
@@ -282,6 +282,15 @@ func (algo *Algo) updateBalanceFromFill(marketType string, fillPrice float64) {
 	} else {
 		fillAmount = algo.canBuy() * (ordersFilled * side)
 	}
+
+	orderSide := math.Copysign(1, fillAmount)
+	if orderSide == 1 {
+		fillCost = fillCost * (1 + algo.Market.Slippage)
+	} else if orderSide == -1 {
+		fillCost = fillCost * (1 - algo.Market.Slippage)
+	}
+
+	algo.FillPrice = fillCost
 	algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, fillAmount, marketType, true)
 }
 

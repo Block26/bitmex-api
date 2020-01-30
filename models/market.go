@@ -10,6 +10,7 @@ type Market struct {
 	MaxOrders        int
 	Weight           int
 	Price            Bar
+	Slippage         float64
 	Profit           float64
 	AverageCost      float64
 	TickSize         float64
