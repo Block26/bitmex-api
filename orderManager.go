@@ -9,6 +9,7 @@ import (
 
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/exchanges"
+	"github.com/tantralabs/yantra/logger"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 )
@@ -405,15 +406,18 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 	}
 }
 
-func updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order) []iex.Order {
+func (algo *Algo) updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order) []iex.Order {
 	var updatedOrders []iex.Order
 	for _, oldOrder := range oldOrders {
 		found := false
 		for _, newOrder := range newOrders {
 			if newOrder.OrderID == oldOrder.OrderID {
 				found = true
-				if newOrder.OrdStatus == orderStatus.Cancelled || newOrder.OrdStatus == orderStatus.Filled || newOrder.OrdStatus == orderStatus.Rejected {
-					log.Println(newOrder.OrdStatus, oldOrder.OrderID)
+				if newOrder.OrdStatus == orderStatus.Cancelled || newOrder.OrdStatus == orderStatus.Rejected {
+					logger.Debug(newOrder.OrdStatus, oldOrder.OrderID)
+				} else if newOrder.OrdStatus == orderStatus.Filled {
+					logger.Debug("Log filled order to influx")
+					algo.logFilledTrade(newOrder)
 				} else {
 					updatedOrders = append(updatedOrders, newOrder)
 				}
@@ -421,7 +425,7 @@ func updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order) []iex.Order
 		}
 		if !found {
 			if oldOrder.OrdStatus == orderStatus.Cancelled || oldOrder.OrdStatus == orderStatus.Filled || oldOrder.OrdStatus == orderStatus.Rejected {
-				log.Println(oldOrder.OrdStatus, oldOrder.OrderID)
+				logger.Debug(oldOrder.OrdStatus, oldOrder.OrderID)
 			} else {
 				updatedOrders = append(updatedOrders, oldOrder)
 			}
@@ -437,9 +441,9 @@ func updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order) []iex.Order
 		}
 		if !found {
 			if newOrder.OrdStatus == orderStatus.Cancelled || newOrder.OrdStatus == orderStatus.Filled || newOrder.OrdStatus == orderStatus.Rejected {
-				log.Println(newOrder.OrdStatus, newOrder.OrderID)
+				logger.Debug(newOrder.OrdStatus, newOrder.OrderID)
 			} else {
-				log.Println("New Order", newOrder.OrdStatus, newOrder.OrderID)
+				logger.Debug("New Order", newOrder.OrdStatus, newOrder.OrderID)
 				updatedOrders = append(updatedOrders, newOrder)
 			}
 		}

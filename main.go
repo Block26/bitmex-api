@@ -16,6 +16,7 @@ import (
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
@@ -260,13 +261,7 @@ func (algo *Algo) getFillPrice(bar *models.Bar) float64 {
 	return fillPrice
 }
 
-//Log the state of the algo to influx db
-func (algo *Algo) logLiveState(test ...bool) {
-	stateType := "live"
-	if test != nil {
-		stateType = "test"
-	}
-
+func getInfluxClient() client.Client {
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:     "http://ec2-54-219-145-3.us-west-1.compute.amazonaws.com:8086",
 		Username: "russell",
@@ -274,8 +269,47 @@ func (algo *Algo) logLiveState(test ...bool) {
 	})
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("err", err)
 	}
+
+	return influx
+}
+
+func (algo *Algo) logFilledTrade(trade iex.Order) {
+	stateType := "live"
+	influx := getInfluxClient()
+
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+		Database:  "algos",
+		Precision: "us",
+	})
+
+	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash, "state_type": stateType}
+
+	fields := structs.Map(trade)
+	pt, err := client.NewPoint(
+		"market",
+		tags,
+		fields,
+		time.Now(),
+	)
+	bp.AddPoint(pt)
+
+	err = client.Client.Write(influx, bp)
+	if err != nil {
+		fmt.Println("err", err)
+	}
+	influx.Close()
+}
+
+//Log the state of the algo to influx db
+func (algo *Algo) logLiveState(test ...bool) {
+	stateType := "live"
+	if test != nil {
+		stateType = "test"
+	}
+
+	influx := getInfluxClient()
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  "algos",
@@ -389,7 +423,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 
 	err = client.Client.Write(influx, bp)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("err", err)
 	}
 	influx.Close()
 }

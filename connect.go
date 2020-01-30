@@ -73,7 +73,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 
 	var localOrders []iex.Order
 	orders, _ := ex.GetOpenOrders(iex.OpenOrderF{Currency: algo.Market.BaseAsset.Symbol})
-	localOrders = updateLocalOrders(localOrders, orders)
+	localOrders = algo.updateLocalOrders(localOrders, orders)
 	logger.Infof("%v orders found", len(localOrders))
 	// SUBSCRIBE TO WEBSOCKETS
 
@@ -121,7 +121,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			algo.runTest(setupData, rebalance)
 			algo.updateOptionPositions()
 		case newOrders := <-channels.OrderChan:
-			localOrders = updateLocalOrders(localOrders, newOrders)
+			localOrders = algo.updateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
 			algo.updateAlgoBalances(update.Balance)
 		}
