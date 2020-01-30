@@ -1,6 +1,6 @@
 package models
 
 type Secret struct {
-	APIKey    string
-	APISecret string
+	APIKey    string `json:"api_key"`
+	APISecret string `json:"api_secret"`
 }

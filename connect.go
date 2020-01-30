@@ -36,7 +36,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	firstTrade = true
 	firstPositionUpdate = true
 	config := utils.LoadSecret(settingsFile, secret)
-	logger.Infof("Loaded config for %v \n", algo.Market.Exchange)
+	logger.Info("Loaded config for", algo.Market.Exchange, "secret", settingsFile)
 	commitHash = time.Now().String()
 
 	exchangeVars := iex.ExchangeConf{
