@@ -302,7 +302,7 @@ func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 			Quantity: []float64{},
 			Price:    []float64{},
 		}
-		logger.Debugf("Reset buy orders for %v.", option.Symbol)
+		logger.Debugf("Reset buy orders sdfdsf for %v.", option.Symbol)
 	}
 	for i := range option.SellOrders.Quantity {
 		optionPrice := option.SellOrders.Price[i]
@@ -423,9 +423,10 @@ func updateBalance(algo *Algo, currentBaseBalance float64, currentQuantity float
 func updateOptionPositions(algo *Algo) {
 	logger.Debugf("Updating options positions with baq %v\n", algo.Market.BaseAsset.Quantity)
 	// Fill our option orders, update positions and avg costs
-	for _, option := range algo.TheoEngine.PositionOptions {
+	for _, option := range algo.TheoEngine.GetOpenOptions() {
 		algo.updateOptionBalanceFromFill(option)
 	}
+	algo.TheoEngine.UpdateOptionIndexes()
 	algo.TheoEngine.ScanOptions(false, false)
 }
 
