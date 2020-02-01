@@ -103,10 +103,10 @@ func LoadSecret(file string, cloud bool) models.Secret {
 		if err != nil {
 			log.Println(err.Error())
 		}
-		jsonParser := json.NewDecoder(secretFile)
-		jsonParser.Decode(&secret)
-		fmt.Printf("Parsed json: %v\n", jsonParser)
-		return secret
+		jsonParser := json.NewDecoder(configFile)
+		jsonParser.Decode(&config)
+		// fmt.Printf("Parsed json: %v\n", jsonParser)
+		return config
 	}
 }
 
