@@ -8,6 +8,7 @@ var logLevel int = 0
 
 type logLevelOpts struct {
 	Error int
+	Live  int
 	Debug int
 	Info  int
 }
@@ -16,8 +17,9 @@ type logLevelOpts struct {
 func LogLevel() logLevelOpts {
 	r := logLevelOpts{}
 	r.Error = -1
-	r.Info = 0
-	r.Debug = 1
+	r.Live = 0
+	r.Info = 1
+	r.Debug = 2
 	return r
 }
 
@@ -43,6 +45,12 @@ func Info(args ...interface{}) {
 	}
 }
 
+func Live(args ...interface{}) {
+	if logLevel >= LogLevel().Live {
+		fmt.Println(args...)
+	}
+}
+
 func Debugf(template string, args ...interface{}) {
 	if logLevel >= LogLevel().Debug {
 		fmt.Printf(template, args...)
@@ -57,6 +65,12 @@ func Infof(template string, args ...interface{}) {
 
 func Errorf(template string, args ...interface{}) {
 	if logLevel >= LogLevel().Error {
+		fmt.Printf(template, args...)
+	}
+}
+
+func Livef(template string, args ...interface{}) {
+	if logLevel >= LogLevel().Live {
 		fmt.Printf(template, args...)
 	}
 }
