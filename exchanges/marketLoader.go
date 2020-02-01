@@ -174,6 +174,31 @@ func LoadMarket(exchange string, market string) (newMarket models.Market, err er
 				Futures:             true,
 				BulkCancelSupported: true,
 			}, nil
+		case "EOSUSDT":
+			return models.Market{
+				Symbol:   "EOSUSDT",
+				Exchange: "binance",
+				BaseAsset: models.Asset{
+					Symbol:   "EOS",
+					Quantity: 1,
+				},
+				QuoteAsset: models.Asset{
+					Symbol:   "USDT",
+					Quantity: 0,
+				},
+				MaxLeverage:         1,
+				MinimumOrderSize:    0.1,
+				TickSize:            0.01,
+				QuantityTickSize:    1,
+				QuantityPrecision:   0,
+				PricePrecision:      2,
+				MaxOrders:           20,
+				Slippage:            0.0,
+				MakerFee:            -0.00025,
+				TakerFee:            0.00075,
+				Futures:             true,
+				BulkCancelSupported: true,
+			}, nil
 		default:
 			log.Println(m, "is not supported for exchange", exchange)
 		}

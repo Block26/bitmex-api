@@ -87,8 +87,8 @@ func GetHTTrendline(close []float64) []float64 {
 }
 
 // GetRsi calculates the RSI for a given time period. Scales from 0-100 where 70 usually signals overbought market and 30 signal oversold market
-func GetRsi(close []float64, inTimePeriod int) []float64 {
-	return talib.Rsi(close, inTimePeriod)
+func GetRsi(close []float64, index int, inTimePeriod int) []float64 {
+	return talib.Rsi(close[index-inTimePeriod-1:index], inTimePeriod)
 }
 
 // GetUltOsc measures price momentum, similar to RSI, except uses 3 different time signals (7, 14, & 28). Above 70 is overbought, and below 30 is oversold (typically).

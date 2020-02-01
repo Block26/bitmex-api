@@ -23,6 +23,7 @@ var firstTrade bool
 var firstPositionUpdate bool
 var commitHash string
 var lastTest int64
+var lastWalletSync int64
 
 // Connect is called to connect to an exchanges WS api and begin trading.
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
@@ -119,11 +120,26 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			algo.placeOrdersOnBook(ex, localOrders)
 			algo.logState()
 			algo.runTest(setupData, rebalance)
-			algo.updateOptionPositions()
+			// algo.updateOptionPositions()
+			algo.checkWalletHistory(ex)
 		case newOrders := <-channels.OrderChan:
 			localOrders = algo.updateLocalOrders(localOrders, newOrders)
 		case update := <-channels.WalletChan:
 			algo.updateAlgoBalances(update.Balance)
+		}
+	}
+}
+
+func (algo *Algo) checkWalletHistory(ex iex.IExchange) {
+	timeSinceLastSync := data.GetBars()[algo.Index].Timestamp - lastWalletSync
+	if timeSinceLastSync > (60*60*60) {
+		logger.Info("It has been", timeSinceLastSync, "seconds since the last wallet history download, fetching latest deposits and withdrawals.")
+		lastWalletSync = data.GetBars()[algo.Index].Timestamp
+		walletHistory, err := ex.GetWalletHistory(algo.Market.BaseAsset.Symbol)
+		if err != nil {
+			logger.Error("There was an error fetching the wallet history", err)
+		} else {
+			log.Println(walletHistory)
 		}
 	}
 }
