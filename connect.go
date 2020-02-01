@@ -49,24 +49,24 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(Alg
 		AccountID:      "test",
 		OutputResponse: false,
 	}
-
 	ex, err := tradeapi.New(exchangeVars)
 	if err != nil {
 		logger.Error(err)
 	}
-	if algo.Market.Options {
-		// Build theo engine
-		theoEngine := te.NewTheoEngine(&algo.Market, ex, &algo.Timestamp, 60000, 86400000, true, 0, 0)
-		algo.TheoEngine = &theoEngine
-	}
-	orderStatus = ex.GetPotentialOrderStatus()
 
+	orderStatus = ex.GetPotentialOrderStatus()
 	logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
 	localBars := database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
 	// Set initial timestamp for algo
 	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
 	logger.Infof("Got local bars: %v\n", len(localBars))
-	// logger.Infof(len(localBars), "downloaded")
+
+	if algo.Market.Options {
+		// Build theo engine
+		theoEngine := te.NewTheoEngine(&algo.Market, ex, &algo.Timestamp, 60000, 86400000, false, 0, 0)
+		algo.TheoEngine = &theoEngine
+		logger.Infof("Built theo engine.\n")
+	}
 
 	// SETUP ALGO WITH RESTFUL CALLS
 	balances, _ := ex.GetBalances()
@@ -248,7 +248,7 @@ func updateState(algo *Algo, ex iex.IExchange, trade iex.TradeBin, setupData fun
 		firstTrade = false
 	}
 	if algo.Market.Options {
-		// Update active option contracts from API
-		algo.TheoEngine.BuildOptionContracts()
+		algo.TheoEngine.UpdateActiveOptions()
+		algo.TheoEngine.ScanOptions(true, true)
 	}
 }
