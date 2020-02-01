@@ -46,7 +46,6 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 		defer pprof.StopCPUProfile()
 	}
 	// Set a UUID for the run
-	logger.SetLogLevel(algo.BacktestLogLevel)
 	if currentRunUUID.IsZero() {
 		currentRunUUID = time.Now()
 	}
@@ -241,7 +240,6 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 	}
 
 	logBacktest(algo)
-	logger.SetLogLevel(algo.LogLevel)
 
 	if *memprofile != "" {
 		f, err := os.Create(*memprofile)
@@ -302,7 +300,7 @@ func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 			Quantity: []float64{},
 			Price:    []float64{},
 		}
-		logger.Debugf("Reset buy orders sdfdsf for %v.", option.Symbol)
+		logger.Debugf("Reset buy orders for %v.", option.Symbol)
 	}
 	for i := range option.SellOrders.Quantity {
 		optionPrice := option.SellOrders.Price[i]
