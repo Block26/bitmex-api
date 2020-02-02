@@ -31,9 +31,10 @@ const (
 	backupSuffix = "~~"
 )
 
-var dirsToSkip = []string{".git"}
+var dirsToSkip = []string{".git", "compile", "vendor"}
 var currentPair FRPair
 var pairs []FRPair
+var pkgs []string
 
 // fileList if not empty, only these are processed. Each element is a full path
 var fileList = []string{}
@@ -94,7 +95,7 @@ var pWalker = func(pathX string, infoX os.FileInfo, errX error) error {
 			panic("stupid MatchString error 59767")
 		}
 		if x {
-			doFile(pathX)
+			doFile(currentPair.dir + "/" + currentPair.pkgName + ".go")
 		}
 	}
 	return nil
@@ -107,44 +108,29 @@ func main() {
 	}
 
 	os.RemoveAll("./build")
+	os.RemoveAll("./src")
+
 	run("mkdir", "./build")
+	run("mkdir", "./src")
 
 	// build yantra base package (not in a folder)
-	os.RemoveAll("../yantra")
-	run("mkdir", "../yantra")
-	copy("../orderManager.go", "../yantra/orderManager.go")
-	copy("../connect_test.go", "../yantra/connect_test.go")
-	copy("../backtest.go", "../yantra/backtest.go")
-	copy("../connect.go", "../yantra/connect.go")
-	copy("../yantra.go", "../yantra/yantra.go")
 
-	pairs = []FRPair{
-		FRPair{
-			pkgName: "yantra",
-		},
-		FRPair{
-			pkgName: "exchanges",
-		},
-		FRPair{
-			pkgName: "optimize",
-		},
-		FRPair{
-			pkgName: "utils",
-		},
-		FRPair{
-			pkgName: "ta",
-		},
-		FRPair{
-			pkgName: "database",
-		},
+	pkgs = []string{
+		"yantra",
+		"exchanges",
+		"optimize",
+		"utils",
+		"ta",
+		"database",
 	}
 
-	for _, p := range pairs {
-		p.dir = "../" + p.pkgName
-		p.fs = "package " + p.pkgName
-		p.rs = "package main"
-		currentPair = p
-
+	for _, pkg := range pkgs {
+		p := FRPair{
+			pkgName: pkg,
+			dir:     "../yantra",
+			fs:      "package " + pkg,
+			rs:      "package main",
+		}
 		// convert to
 		fmt.Println("converting", p.fs, "to", p.rs)
 		err := filepath.Walk(currentPair.dir, pWalker)
