@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/data"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/options"
 	"github.com/tantralabs/yantra/utils"
 
@@ -29,7 +29,7 @@ var lastWalletSync int64
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
 //
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
-func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) {
+func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*Bar, Algo)) {
 	data.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
@@ -64,17 +64,17 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 
 	// SETUP ALGO WITH RESTFUL CALLS
 	balances, _ := ex.GetBalances()
-	algo.updateAlgoBalances(balances)
+	updateAlgoBalances(&algo, balances)
 
 	//Get Option contracts before updating positions
-	algo.getOptionContracts(ex)
+	getOptionContracts(&algo, ex)
 
 	positions, _ := ex.GetPositions(algo.Market.BaseAsset.Symbol)
-	algo.updatePositions(positions)
+	updatePositions(&algo, positions)
 
 	var localOrders []iex.Order
 	orders, _ := ex.GetOpenOrders(iex.OpenOrderF{Currency: algo.Market.BaseAsset.Symbol})
-	localOrders = algo.updateLocalOrders(localOrders, orders)
+	localOrders = updateLocalOrders(&algo, localOrders, orders)
 	logger.Infof("%v orders found", len(localOrders))
 	// SUBSCRIBE TO WEBSOCKETS
 
@@ -111,28 +111,28 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	for {
 		select {
 		case positions := <-channels.PositionChan:
-			algo.updatePositions(positions)
+			updatePositions(&algo, positions)
 		case trade := <-channels.TradeBinChan:
-			algo.updateBars(ex, trade[0])
-			algo.updateState(ex, trade[0], setupData)
+			updateBars(&algo, ex, trade[0])
+			updateState(&algo, ex, trade[0], setupData)
 			algo = rebalance(algo)
-			algo.setupOrders(trade[0].Close)
-			algo.placeOrdersOnBook(ex, localOrders)
-			algo.logState()
-			algo.runTest(setupData, rebalance)
-			// algo.updateOptionPositions()
-			algo.checkWalletHistory(ex)
+			setupOrders(&algo, trade[0].Close)
+			placeOrdersOnBook(&algo, ex, localOrders)
+			logState(&algo)
+			runTest(&algo, setupData, rebalance)
+			// updateOptionPositions(&algo,  )
+			checkWalletHistory(&algo, ex)
 		case newOrders := <-channels.OrderChan:
-			localOrders = algo.updateLocalOrders(localOrders, newOrders)
+			localOrders = updateLocalOrders(&algo, localOrders, newOrders)
 		case update := <-channels.WalletChan:
-			algo.updateAlgoBalances(update.Balance)
+			updateAlgoBalances(&algo, update.Balance)
 		}
 	}
 }
 
-func (algo *Algo) checkWalletHistory(ex iex.IExchange) {
+func checkWalletHistory(algo *Algo, ex iex.IExchange) {
 	timeSinceLastSync := data.GetBars()[algo.Index].Timestamp - lastWalletSync
-	if timeSinceLastSync > (60*60*60) {
+	if timeSinceLastSync > (60 * 60 * 60) {
 		logger.Info("It has been", timeSinceLastSync, "seconds since the last wallet history download, fetching latest deposits and withdrawals.")
 		lastWalletSync = data.GetBars()[algo.Index].Timestamp
 		walletHistory, err := ex.GetWalletHistory(algo.Market.BaseAsset.Symbol)
@@ -144,7 +144,7 @@ func (algo *Algo) checkWalletHistory(ex iex.IExchange) {
 	}
 }
 
-func (algo *Algo) runTest(setupData func([]*models.Bar, Algo), rebalance func(Algo) Algo) {
+func runTest(algo *Algo, setupData func([]*Bar, Algo), rebalance func(Algo) Algo) {
 	if lastTest != data.GetBars()[algo.Index].Timestamp {
 		lastTest = data.GetBars()[algo.Index].Timestamp
 		testAlgo := Algo{}
@@ -156,12 +156,12 @@ func (algo *Algo) runTest(setupData func([]*models.Bar, Algo), rebalance func(Al
 		testAlgo.Market.Weight = 0
 		// Override logger level to info so that we don't pollute logs with backtest state changes
 		testAlgo = RunBacktest(data.GetBars(), testAlgo, rebalance, setupData)
-		testAlgo.logLiveState(true)
+		logLiveState(&testAlgo, true)
 		//TODO compare the states
 	}
 }
 
-func (algo *Algo) updatePositions(positions []iex.WsPosition) {
+func updatePositions(algo *Algo, positions []iex.WsPosition) {
 	logger.Info("Position Update:", positions)
 	if len(positions) > 0 {
 		for _, position := range positions {
@@ -190,15 +190,15 @@ func (algo *Algo) updatePositions(positions []iex.WsPosition) {
 			}
 		}
 		if firstPositionUpdate {
-			algo.logState()
-			algo.shouldHaveQuantity = algo.Market.QuoteAsset.Quantity
+			logState(algo)
+			algo.ShouldHaveQuantity = algo.Market.QuoteAsset.Quantity
 			firstPositionUpdate = false
 		}
 	}
-	algo.logState()
+	logState(algo)
 }
 
-func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
+func updateAlgoBalances(algo *Algo, balances []iex.WSBalance) {
 	for i := range balances {
 		if balances[i].Asset == algo.Market.BaseAsset.Symbol {
 			walletAmount := float64(balances[i].Balance)
@@ -216,7 +216,7 @@ func (algo *Algo) updateAlgoBalances(balances []iex.WSBalance) {
 	}
 }
 
-func (algo *Algo) updateBars(ex iex.IExchange, trade iex.TradeBin) {
+func updateBars(algo *Algo, ex iex.IExchange, trade iex.TradeBin) {
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
 		diff := trade.Timestamp.Sub(time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0))
 		if diff.Minutes() >= 60 {
@@ -230,21 +230,21 @@ func (algo *Algo) updateBars(ex iex.IExchange, trade iex.TradeBin) {
 	algo.Index = len(data.GetBars()) - 1
 }
 
-func (algo *Algo) updateState(ex iex.IExchange, trade iex.TradeBin, setupData func([]*models.Bar, Algo)) {
+func updateState(algo *Algo, ex iex.IExchange, trade iex.TradeBin, setupData func([]*Bar, Algo)) {
 	logger.Info("Trade Update:", trade)
 	algo.Market.Price = *data.GetBars()[algo.Index]
 	setupData(data.GetBars(), *algo)
 	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
 	logger.Info("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
-		algo.logState()
+		logState(algo)
 		firstTrade = false
 	}
 	// Update active option contracts from API
-	algo.getOptionContracts(ex)
+	getOptionContracts(algo, ex)
 }
 
-func (algo *Algo) getOptionContracts(ex iex.IExchange) {
+func getOptionContracts(algo *Algo, ex iex.IExchange) {
 	if algo.Market.Exchange == "deribit" && algo.Market.Options {
 		// TODO only call this every few hours or once per day.
 		markets, err := ex.GetMarkets(algo.Market.BaseAsset.Symbol, true, "option")
@@ -260,8 +260,8 @@ func (algo *Algo) getOptionContracts(ex iex.IExchange) {
 				if !containsSymbol {
 					// expiry := market.Expiry * 1000
 					expiry := market.Expiry
-					optionTheo := models.NewOptionTheo(market.OptionType, algo.Market.Price.Close, market.Strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1, algo.Market.DenominatedInUnderlying)
-					optionContract := models.OptionContract{
+					optionTheo := NewOptionTheo(market.OptionType, algo.Market.Price.Close, market.Strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, -1, -1, algo.Market.DenominatedInUnderlying)
+					optionContract := OptionContract{
 						Symbol:         market.Symbol,
 						Strike:         market.Strike,
 						Expiry:         expiry,
@@ -280,7 +280,7 @@ func (algo *Algo) getOptionContracts(ex iex.IExchange) {
 		} else {
 			logger.Errorf("Error getting markets: %v\n", err)
 		}
-		var optionContracts []*models.OptionContract
+		var optionContracts []*OptionContract
 		for i := 0; i < len(algo.Market.OptionContracts); i++ {
 			optionContracts = append(optionContracts, &algo.Market.OptionContracts[i])
 		}

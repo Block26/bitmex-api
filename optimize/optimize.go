@@ -5,7 +5,7 @@ import (
 	"log"
 
 	eaopt "github.com/tantralabs/eaopt"
-	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/models"
 )
 
 func OESOptimize(Evaluate func([]float64) float64, sigma []float64) {

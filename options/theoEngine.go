@@ -4,7 +4,7 @@ import (
 	"math"
 
 	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/models"
 	"github.com/tantralabs/yantra/utils"
 )
 

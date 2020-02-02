@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	models "github.com/tantralabs/yantra/models"
+	models "github.com/tantralabs/models"
 )
 
 func Arange(start, stop, step float64) []float64 {

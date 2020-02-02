@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/models"
 )
 
 var barData []*models.Bar

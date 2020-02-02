@@ -15,7 +15,7 @@ import (
 
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/models"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"

@@ -9,7 +9,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/models"
 )
 
 var (

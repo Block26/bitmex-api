@@ -12,62 +12,19 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
+	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/exchanges"
-	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 )
 
-func main() {
-	log.Println("Import this into your algo and use it's features. Yantra is not meant to be run alone.")
-}
-
-// Algo is where you will define your initial state and it will keep track of your state throughout a test and during live execution.
-type Algo struct {
-	Name              string                 // A UUID that tells the live system what algorithm is executing trades
-	Market            models.Market          // The market this Algo is trading. Refer to exchanges.LoadMarket(exchange, symbol)
-	FillType          string                 // The simulation fill type for this Algo. Refer to exchanges.FillType() for options
-	RebalanceInterval string                 // The interval at which rebalance should be called. Refer to exchanges.RebalanceInterval() for options
-	Debug             bool                   // Turn logs on or off
-	Index             int                    // Current index of the Algo in it's data
-	Timestamp         string                 // Current timestamp of the Algo in it's data
-	DataLength        int                    // Datalength tells the Algo when it is safe to start rebalancing, your Datalength should be longer than any TA length
-	History           []models.History       // Used to Store historical states
-	Params            map[string]interface{} // Save the initial Params of the Algo, for logging purposes. This is used to check the params after running a genetic search.
-	Result            map[string]interface{} // The result of your backtest
-	Signals           map[string][]float64   // Log the signals of your test
-	LogBacktestToCSV  bool                   // Exports the backtest history to a balance.csv in your local directory
-	State             map[string]interface{} // State of the algo, useful for logging live ta indicators.
-	LogLevel          int
-	BacktestLogLevel  int
-
-	// AutoOrderPlacement
-	// AutoOrderPlacement is not neccesary and can be false, it is the easiest way to create an algorithm with yantra
-	// using AutoOrderPlacement will allow yantra to automatically leverage and deleverage your account based on Algo.Market.Weight
-	//
-	// Examples
-	// EX) If RebalanceInterval().Hour and EntryOrderSize = 0.1 then when you are entering a position you will order 10% of your LeverageTarget per hour.
-	// EX) If RebalanceInterval().Hour and ExitOrderSize = 0.1 then when you are exiting a position you will order 10% of your LeverageTarget per hour.
-	// EX) If RebalanceInterval().Hour and DeleverageOrderSize = 0.01 then when you are over leveraged you will order 1% of your LeverageTarget per hour until you are no longer over leveraged.
-	// EX) If Market.MaxLeverage is 1 and Algo.LeverageTarget is 1 then your algorithm will be fully leveraged when it enters it's position.
-	AutoOrderPlacement  bool    // AutoOrderPlacement whether yantra should manage your orders / leverage for you.
-	CanBuyBasedOnMax    bool    // If true then yantra will calculate leverage based on Market.MaxLeverage, if false then yantra will calculate leverage based on Algo.LeverageTarget
-	FillPrice			float64 // The price at which the algo thinks it filled in the backtest
-	FillShift           int     // The simulation fill shift for this Algo. 0 = filling at beginning of interval, 1 = filling at end of interval
-	LeverageTarget      float64 // The target leverage for the Algo, 1 would be 100%, 0.5 would be 50% of the MaxLeverage defined by Market.
-	EntryOrderSize      float64 // The speed at which the algo enters positions during the RebalanceInterval
-	ExitOrderSize       float64 // The speed at which the algo exits positions during the RebalanceInterval
-	DeleverageOrderSize float64 // The speed at which the algo exits positions during the RebalanceInterval if it is over leveraged, current leverage is determined by Algo.LeverageTarget or Market.MaxLeverage.
-	shouldHaveQuantity  float64 // Keeps track of the order sizing when live.
-}
-
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
-func (algo *Algo) SetLiquidity(percentage float64, side int) float64 {
+func SetLiquidity(algo *Algo, percentage float64, side int) float64 {
 	if algo.Market.Futures {
 		return percentage * algo.Market.BaseAsset.Quantity
 	} else {
@@ -79,7 +36,7 @@ func (algo *Algo) SetLiquidity(percentage float64, side int) float64 {
 }
 
 // CurrentProfit Calculate the current % profit of the position vs
-func (algo *Algo) CurrentProfit(price float64) float64 {
+func CurrentProfit(algo *Algo, price float64) float64 {
 	//TODO this doesnt work on a spot backtest
 	if algo.Market.QuoteAsset.Quantity == 0 {
 		return 0
@@ -90,27 +47,27 @@ func (algo *Algo) CurrentProfit(price float64) float64 {
 	}
 }
 
-func (algo *Algo) getPositionAbsLoss() float64 {
+func getPositionAbsLoss(algo *Algo) float64 {
 	positionLoss := 0.0
 	if algo.Market.QuoteAsset.Quantity < 0 {
-		positionLoss = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.High) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
+		positionLoss = (algo.Market.BaseAsset.Quantity * (CurrentProfit(algo, algo.Market.Price.High) * algo.Market.Leverage)) + CurrentOptionProfit(algo)
 	} else {
-		positionLoss = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Low) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
+		positionLoss = (algo.Market.BaseAsset.Quantity * (CurrentProfit(algo, algo.Market.Price.Low) * algo.Market.Leverage)) + CurrentOptionProfit(algo)
 	}
 	return positionLoss
 }
 
-func (algo *Algo) getPositionAbsProfit() float64 {
+func getPositionAbsProfit(algo *Algo) float64 {
 	positionProfit := 0.0
 	if algo.Market.QuoteAsset.Quantity > 0 {
-		positionProfit = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.High) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
+		positionProfit = (algo.Market.BaseAsset.Quantity * (CurrentProfit(algo, algo.Market.Price.High) * algo.Market.Leverage)) + CurrentOptionProfit(algo)
 	} else {
-		positionProfit = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Low) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
+		positionProfit = (algo.Market.BaseAsset.Quantity * (CurrentProfit(algo, algo.Market.Price.Low) * algo.Market.Leverage)) + CurrentOptionProfit(algo)
 	}
 	return positionProfit
 }
 
-func (algo *Algo) getExitOrderSize(orderSizeGreaterThanPositionSize bool) float64 {
+func getExitOrderSize(algo *Algo, orderSizeGreaterThanPositionSize bool) float64 {
 	if orderSizeGreaterThanPositionSize {
 		return algo.Market.Leverage
 	} else {
@@ -118,7 +75,7 @@ func (algo *Algo) getExitOrderSize(orderSizeGreaterThanPositionSize bool) float6
 	}
 }
 
-func (algo *Algo) getEntryOrderSize(orderSizeGreaterThanMaxPositionSize bool) float64 {
+func getEntryOrderSize(algo *Algo, orderSizeGreaterThanMaxPositionSize bool) float64 {
 	if orderSizeGreaterThanMaxPositionSize {
 		return algo.LeverageTarget - algo.Market.Leverage //-algo.LeverageTarget
 	} else {
@@ -126,7 +83,7 @@ func (algo *Algo) getEntryOrderSize(orderSizeGreaterThanMaxPositionSize bool) fl
 	}
 }
 
-func (algo *Algo) canBuy() float64 {
+func canBuy(algo *Algo) float64 {
 	if algo.CanBuyBasedOnMax {
 		return (algo.Market.BaseAsset.Quantity * algo.Market.Price.Open) * algo.Market.MaxLeverage
 	} else {
@@ -135,7 +92,7 @@ func (algo *Algo) canBuy() float64 {
 }
 
 //Log the state of the algo and update variables like leverage
-func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
+func logState(algo *Algo, timestamp ...time.Time) (state History) {
 	// algo.History.Timestamp = append(algo.History.Timestamp, timestamp)
 	var balance float64
 	if algo.Market.Futures {
@@ -149,18 +106,18 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 		// TODO need to define an ideal delta if not trading futures ie do you want 0%, 50% or 100% of the quote curreny
 		algo.Market.Leverage = (algo.Market.BaseAsset.Quantity * algo.Market.Price.Close) / balance
 		// log.Println("BaseAsset Quantity", algo.Market.BaseAsset.Quantity, "QuoteAsset Value", algo.Market.QuoteAsset.Quantity/algo.Market.Price)
-		// log.Println("BaseAsset Value", algo.Market.BaseAsset.Quantity*algo.Market.Price, "QuoteAsset Quantity", algo.Market.QuoteAsset.Quantity)
+		// log.Println("BaseAsset Value", algo.Market.BaseAsset.Quantity*Algo.Market.Price, "QuoteAsset Quantity", algo.Market.QuoteAsset.Quantity)
 		// log.Println("Leverage", algo.Market.Leverage)
 	}
 
 	// fmt.Println(algo.Timestamp, "Funds", algo.Market.BaseAsset.Quantity, "Quantity", algo.Market.QuoteAsset.Quantity)
 	// fmt.Println(algo.Timestamp, algo.Market.BaseAsset.Quantity, algo.CurrentProfit(algo.Market.Price))
-	algo.Market.Profit = (algo.Market.BaseAsset.Quantity * (algo.CurrentProfit(algo.Market.Price.Close) * algo.Market.Leverage)) + algo.CurrentOptionProfit()
+	algo.Market.Profit = (algo.Market.BaseAsset.Quantity * (CurrentProfit(algo, algo.Market.Price.Close) * algo.Market.Leverage)) + CurrentOptionProfit(algo)
 	// fmt.Println(algo.Timestamp, algo.Market.Profit)
 
 	if timestamp != nil {
 		algo.Timestamp = timestamp[0].String()
-		state = models.History{
+		state = History{
 			Timestamp:   algo.Timestamp,
 			Balance:     balance,
 			Quantity:    algo.Market.QuoteAsset.Quantity,
@@ -168,8 +125,8 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 			Leverage:    algo.Market.Leverage,
 			Profit:      algo.Market.Profit,
 			Weight:      algo.Market.Weight,
-			MaxLoss:     algo.getPositionAbsLoss(),
-			MaxProfit:   algo.getPositionAbsProfit(),
+			MaxLoss:     getPositionAbsLoss(algo),
+			MaxProfit:   getPositionAbsProfit(algo),
 			Price:       algo.Market.Price.Close,
 		}
 
@@ -184,7 +141,7 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 		}
 
 	} else {
-		algo.logLiveState()
+		logLiveState(algo)
 	}
 	if algo.Debug {
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price.Close+(algo.Market.QuoteAsset.Quantity), 0.0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price.Close, algo.Market.AverageCost))
@@ -192,13 +149,13 @@ func (algo *Algo) logState(timestamp ...time.Time) (state models.History) {
 	return
 }
 
-func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize float64, side float64) {
+func getOrderSize(algo *Algo, currentPrice float64, live ...bool) (orderSize float64, side float64) {
 	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 	if algo.Market.QuoteAsset.Quantity == 0 {
 		currentWeight = float64(algo.Market.Weight)
 	}
 	adding := currentWeight == float64(algo.Market.Weight)
-	// fmt.Printf("CURRENT WEIGHT %v, adding %v, leverage target %v, can buy %v, deleverage order size %v\n", currentWeight, adding, algo.LeverageTarget, algo.canBuy(), algo.DeleverageOrderSize)
+	// fmt.Printf("CURRENT WEIGHT %v, adding %v, leverage target %v, can buy %v, deleverage order size %v\n", currentWeight, adding, algo.LeverageTarget, canBuy(algo), algo.DeleverageOrderSize)
 	// fmt.Printf("Getting order size with quote asset quantity: %v\n", algo.Market.QuoteAsset.Quantity)
 
 	// Change order sizes for live to ensure similar boolen checks
@@ -216,28 +173,28 @@ func (algo *Algo) getOrderSize(currentPrice float64, live ...bool) (orderSize fl
 
 	if (currentWeight == 0 || adding) && algo.Market.Leverage+algo.DeleverageOrderSize <= algo.LeverageTarget && algo.Market.Weight != 0 {
 		// fmt.Printf("Getting entry order with entry order size %v, leverage target %v, leverage %v\n", entryOrderSize, algo.LeverageTarget, algo.Market.Leverage)
-		orderSize = algo.getEntryOrderSize(entryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
+		orderSize = getEntryOrderSize(algo, entryOrderSize > algo.LeverageTarget-algo.Market.Leverage)
 		side = float64(algo.Market.Weight)
 	} else if !adding {
 		// fmt.Printf("Getting exit order size with exit order size %v, leverage %v, weight %v\n", exitOrderSize, algo.Market.Leverage, algo.Market.Weight)
-		orderSize = algo.getExitOrderSize(exitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
+		orderSize = getExitOrderSize(algo, exitOrderSize > algo.Market.Leverage && algo.Market.Weight == 0)
 		side = float64(currentWeight * -1)
-	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > algo.canBuy()*(1+deleverageOrderSize) && adding {
+	} else if math.Abs(algo.Market.QuoteAsset.Quantity) > canBuy(algo)*(1+deleverageOrderSize) && adding {
 		orderSize = algo.DeleverageOrderSize
 		side = float64(currentWeight * -1)
 	} else if algo.Market.Weight == 0 && algo.Market.Leverage > 0 {
-		orderSize = algo.getExitOrderSize(exitOrderSize > algo.Market.Leverage)
+		orderSize = getExitOrderSize(algo, exitOrderSize > algo.Market.Leverage)
 		//side = Opposite of the quantity
 		side = -math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-	} else if algo.canBuy() > math.Abs(algo.Market.QuoteAsset.Quantity) {
+	} else if canBuy(algo) > math.Abs(algo.Market.QuoteAsset.Quantity) {
 		// If I can buy more, place order to fill diff of canBuy and current quantity
-		orderSize = utils.CalculateDifference(algo.canBuy(), math.Abs(algo.Market.QuoteAsset.Quantity))
+		orderSize = utils.CalculateDifference(canBuy(algo), math.Abs(algo.Market.QuoteAsset.Quantity))
 		side = float64(algo.Market.Weight)
 	}
 	return
 }
 
-func (algo *Algo) getFillPrice(bar *models.Bar) float64 {
+func getFillPrice(algo *Algo, bar *Bar) float64 {
 	var fillPrice float64
 	if algo.FillType == exchanges.FillType().Worst {
 		if algo.Market.Weight > 0 && algo.Market.QuoteAsset.Quantity > 0 {
@@ -277,7 +234,7 @@ func getInfluxClient() client.Client {
 	return influx
 }
 
-func (algo *Algo) logTrade(trade iex.Order) {
+func logTrade(algo *Algo, trade iex.Order) {
 	stateType := "live"
 	influx := getInfluxClient()
 
@@ -304,7 +261,7 @@ func (algo *Algo) logTrade(trade iex.Order) {
 	influx.Close()
 }
 
-func (algo *Algo) logFilledTrade(trade iex.Order) {
+func logFilledTrade(algo *Algo, trade iex.Order) {
 	stateType := "live"
 	influx := getInfluxClient()
 
@@ -332,7 +289,7 @@ func (algo *Algo) logFilledTrade(trade iex.Order) {
 }
 
 //Log the state of the algo to influx db
-func (algo *Algo) logLiveState(test ...bool) {
+func logLiveState(algo *Algo, test ...bool) {
 	stateType := "live"
 	if test != nil {
 		stateType = "test"
@@ -374,7 +331,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 		fields["ExitOrderSize"] = algo.ExitOrderSize
 		fields["DeleverageOrderSize"] = algo.DeleverageOrderSize
 		fields["LeverageTarget"] = algo.LeverageTarget
-		fields["ShouldHaveQuantity"] = algo.shouldHaveQuantity
+		fields["ShouldHaveQuantity"] = algo.ShouldHaveQuantity
 		fields["FillPrice"] = algo.FillPrice
 	}
 
@@ -461,7 +418,7 @@ func (algo *Algo) logLiveState(test ...bool) {
 }
 
 // CreateSpread Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
-func (algo *Algo) CreateSpread(weight int32, confidence float64, price float64, spread float64) models.OrderArray {
+func CreateSpread(algo *Algo, weight int32, confidence float64, price float64, spread float64) OrderArray {
 	tickSize := algo.Market.TickSize
 	maxOrders := algo.Market.MaxOrders
 	xStart := 0.0
@@ -501,5 +458,5 @@ func (algo *Algo) CreateSpread(weight int32, confidence float64, price float64, 
 	if weight == 1 {
 		orderArr = utils.ReverseArr(orderArr)
 	}
-	return models.OrderArray{Price: priceArr, Quantity: orderArr}
+	return OrderArray{Price: priceArr, Quantity: orderArr}
 }

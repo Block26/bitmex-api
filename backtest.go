@@ -17,10 +17,10 @@ import (
 	"gonum.org/v1/gonum/stat"
 
 	client "github.com/influxdata/influxdb1-client/v2"
+	. "github.com/tantralabs/models"
 	"github.com/tantralabs/yantra/data"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/options"
 	"github.com/tantralabs/yantra/utils"
 )
@@ -33,7 +33,7 @@ var lastOptionBalance = 0.
 
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
-func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*models.Bar, Algo)) Algo {
+func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*Bar, Algo)) Algo {
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -54,9 +54,9 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 
 	start := time.Now()
 	setupData(bars, algo)
-	var history []models.History
+	var history []History
 	var timestamp time.Time
-	var volData []models.ImpliedVol
+	var volData []ImpliedVol
 	const optionLoadFreq = 7 * 86400000 //ms
 	var lastOptionLoad int
 
@@ -71,7 +71,7 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 		}
 		algo.Market.Price = *bars[0]
 		lastOptionLoad = 0
-		algo.Market.OptionContracts, lastOptionLoad = generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, &algo)
+		algo.Market.OptionContracts, lastOptionLoad = generateActiveOptions(&algo, lastOptionLoad, optionLoadFreq, volData)
 		lastOptionLoad = int(utils.GetNextFriday(utils.ToTimeObject(algo.Timestamp)).UTC().UnixNano() / 1000000)
 		logger.Debugf("Last option load: %v, option load freq: %v\n", lastOptionLoad, optionLoadFreq)
 		logger.Debugf("Len vol data: %v\n", len(volData))
@@ -104,26 +104,26 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 			logger.Debugf("Rebalance took %v ns\n", time.Now().UnixNano()-start)
 			if algo.FillType == exchanges.FillType().Limit {
 				//Check which buys filled
-				pricesFilled, ordersFilled := algo.getFilledBidOrders(bar.Low)
-				fillCost, fillPercentage := algo.getCostAverage(pricesFilled, ordersFilled)
-				algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Buying*fillPercentage, marketType, true)
+				pricesFilled, ordersFilled := getFilledBidOrders(&algo, bar.Low)
+				fillCost, fillPercentage := getCostAverage(&algo, pricesFilled, ordersFilled)
+				updateBalance(&algo, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Buying*fillPercentage, marketType, true)
 				//Check which sells filled
-				pricesFilled, ordersFilled = algo.getFilledAskOrders(bar.High)
-				fillCost, fillPercentage = algo.getCostAverage(pricesFilled, ordersFilled)
-				algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Selling*-fillPercentage, marketType, true)
+				pricesFilled, ordersFilled = getFilledAskOrders(&algo, bar.High)
+				fillCost, fillPercentage = getCostAverage(&algo, pricesFilled, ordersFilled)
+				updateBalance(&algo, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Selling*-fillPercentage, marketType, true)
 			} else {
-				algo.updateBalanceFromFill(marketType, algo.getFillPrice(bars[idx+algo.FillShift]))
+				updateBalanceFromFill(&algo, marketType, getFillPrice(&algo, bars[idx+algo.FillShift]))
 			}
 
 			if algo.Market.Options {
 				start = time.Now().UnixNano()
-				lastOptionLoad = algo.updateActiveOptions(lastOptionLoad, optionLoadFreq, volData)
+				lastOptionLoad = updateActiveOptions(&algo, lastOptionLoad, optionLoadFreq, volData)
 				logger.Debugf("Updating active options took %v ns\n", time.Now().UnixNano()-start)
 				start = time.Now().UnixNano()
-				algo.updateOptionPositions()
+				updateOptionPositions(&algo)
 				logger.Debugf("Updating options positions took %v ns\n", time.Now().UnixNano()-start)
 			}
-			state := algo.logState(timestamp)
+			state := logState(&algo, timestamp)
 			history = append(history, state)
 			if algo.Market.BaseAsset.Quantity <= 0 {
 				logger.Debugf("Ran out of balance, killing...\n")
@@ -273,16 +273,16 @@ func RunBacktest(bars []*models.Bar, algo Algo, rebalance func(Algo) Algo, setup
 }
 
 // Core Backtest functionality
-func (algo *Algo) updateBalanceFromFill(marketType string, fillPrice float64) {
+func updateBalanceFromFill(algo *Algo, marketType string, fillPrice float64) {
 	currentWeight := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
-	orderSize, side := algo.getOrderSize(fillPrice)
-	fillCost, ordersFilled := algo.getCostAverage([]float64{fillPrice}, []float64{orderSize})
+	orderSize, side := getOrderSize(algo, fillPrice)
+	fillCost, ordersFilled := getCostAverage(algo, []float64{fillPrice}, []float64{orderSize})
 	var fillAmount float64
 	if currentWeight != float64(algo.Market.Weight) && (ordersFilled == algo.Market.Leverage || ordersFilled == algo.Market.Leverage*(-1)) {
 		// Leave entire position to have quantity 0
 		fillAmount = ((algo.Market.QuoteAsset.Quantity) * -1)
 	} else {
-		fillAmount = algo.canBuy() * (ordersFilled * side)
+		fillAmount = canBuy(algo) * (ordersFilled * side)
 	}
 
 	orderSide := math.Copysign(1, fillAmount)
@@ -293,11 +293,11 @@ func (algo *Algo) updateBalanceFromFill(marketType string, fillPrice float64) {
 	}
 
 	algo.FillPrice = fillCost
-	algo.updateBalance(algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, fillAmount, marketType, true)
+	updateBalance(algo, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, fillAmount, marketType, true)
 }
 
 // Assume fill price is option theo adjusted for slippage
-func (algo *Algo) updateOptionBalanceFromFill(option *models.OptionContract) {
+func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 	if len(option.BuyOrders.Quantity) > 0 {
 		logger.Debugf("[%v] Buy orders for option %v: %v\n", utils.ToTimeObject(algo.Timestamp), option.Symbol, option.BuyOrders)
 	} else if len(option.SellOrders.Quantity) > 0 {
@@ -318,9 +318,9 @@ func (algo *Algo) updateOptionBalanceFromFill(option *models.OptionContract) {
 			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, side, algo.Market.OptionSlippage)
 		}
 		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
-		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = algo.updateBalance(algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, optionQty, exchanges.MarketType().Option)
+		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = updateBalance(algo, algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, optionQty, exchanges.MarketType().Option)
 		logger.Debugf("Updated buy avgcost for option %v: %v with baq %v\n", option.Symbol, option.AverageCost, algo.Market.BaseAsset.Quantity)
-		option.BuyOrders = models.OrderArray{
+		option.BuyOrders = OrderArray{
 			Quantity: []float64{},
 			Price:    []float64{},
 		}
@@ -341,9 +341,9 @@ func (algo *Algo) updateOptionBalanceFromFill(option *models.OptionContract) {
 			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, side, algo.Market.OptionSlippage)
 		}
 		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
-		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = algo.updateBalance(algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, -optionQty, exchanges.MarketType().Option)
+		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = updateBalance(algo, algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, -optionQty, exchanges.MarketType().Option)
 		logger.Debugf("Updated sell avgcost for option %v: %v with baq %v\n", option.Symbol, option.AverageCost, algo.Market.BaseAsset.Quantity)
-		option.SellOrders = models.OrderArray{
+		option.SellOrders = OrderArray{
 			Quantity: []float64{},
 			Price:    []float64{},
 		}
@@ -351,7 +351,7 @@ func (algo *Algo) updateOptionBalanceFromFill(option *models.OptionContract) {
 	}
 }
 
-func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity float64, averageCost float64, fillPrice float64, fillAmount float64, marketType string, updateAlgo ...bool) (float64, float64, float64) {
+func updateBalance(algo *Algo, currentBaseBalance float64, currentQuantity float64, averageCost float64, fillPrice float64, fillAmount float64, marketType string, updateAlgo ...bool) (float64, float64, float64) {
 	logger.Debugf("Updating balance with curr base bal %v, curr quant %v, avg cost %v, fill pr %v, fill a %v\n", currentBaseBalance, currentQuantity, averageCost, fillPrice, fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		// fee := math.Abs(fillAmount/fillPrice) * algo.Market.MakerFee
@@ -449,16 +449,16 @@ func (algo *Algo) updateBalance(currentBaseBalance float64, currentQuantity floa
 	return currentBaseBalance, currentQuantity, averageCost
 }
 
-func (algo *Algo) updateOptionPositions() {
+func updateOptionPositions(algo *Algo) {
 	logger.Debugf("Updating options positions with baq %v\n", algo.Market.BaseAsset.Quantity)
 	// Fill our option orders, update positions and avg costs
 	for i := range algo.Market.OptionContracts {
 		option := &algo.Market.OptionContracts[i]
-		algo.updateOptionBalanceFromFill(option)
+		updateOptionBalanceFromFill(algo, option)
 	}
 	currentTime := utils.ToTimeObject(algo.Timestamp)
 	currentTimeMillis := int(currentTime.UnixNano() / int64(time.Millisecond))
-	var optionContracts []*models.OptionContract
+	var optionContracts []*OptionContract
 	for i := 0; i < len(algo.Market.OptionContracts); i++ {
 		optionContracts = append(optionContracts, &algo.Market.OptionContracts[i])
 	}
@@ -468,7 +468,7 @@ func (algo *Algo) updateOptionPositions() {
 }
 
 // Delete all expired options without profit values to conserve time and space resources
-func (algo *Algo) removeExpiredOptions() {
+func removeExpiredOptions(algo *Algo) {
 	numOptions := len(algo.Market.OptionContracts)
 	i := 0
 	for _, option := range algo.Market.OptionContracts {
@@ -481,7 +481,7 @@ func (algo *Algo) removeExpiredOptions() {
 	logger.Debugf("Removed %v expired option contracts.\n", numOptions-len(algo.Market.OptionContracts))
 }
 
-func (algo *Algo) CurrentOptionProfit() float64 {
+func CurrentOptionProfit(algo *Algo) float64 {
 	currentProfit := 0.
 	for _, option := range algo.Market.OptionContracts {
 		currentProfit += option.Profit
@@ -491,7 +491,7 @@ func (algo *Algo) CurrentOptionProfit() float64 {
 	return currentProfit
 }
 
-func (algo *Algo) getCostAverage(pricesFilled []float64, ordersFilled []float64) (float64, float64) {
+func getCostAverage(algo *Algo, pricesFilled []float64, ordersFilled []float64) (float64, float64) {
 	// print(len(prices), len(orders), len(timestamp_arr[0]))
 	percentageFilled := utils.SumArr(ordersFilled)
 	if percentageFilled > 0 {
@@ -503,7 +503,7 @@ func (algo *Algo) getCostAverage(pricesFilled []float64, ordersFilled []float64)
 	return 0.0, 0.0
 }
 
-func minMaxStats(history []models.History) (float64, float64, float64, float64, float64) {
+func minMaxStats(history []History) (float64, float64, float64, float64, float64) {
 	var maxProfit float64 = history[0].Profit
 	var minProfit float64 = history[0].Profit
 
@@ -544,7 +544,7 @@ func minMaxStats(history []models.History) (float64, float64, float64, float64, 
 	return maxPositionLoss, maxPositionProfit, minLeverage, maxLeverage, drawdown
 }
 
-func (algo *Algo) getFilledBidOrders(price float64) ([]float64, []float64) {
+func getFilledBidOrders(algo *Algo, price float64) ([]float64, []float64) {
 	var hitPrices []float64
 	var hitQuantities []float64
 
@@ -565,7 +565,7 @@ func (algo *Algo) getFilledBidOrders(price float64) ([]float64, []float64) {
 	return hitPrices, hitQuantities
 }
 
-func (algo *Algo) getFilledAskOrders(price float64) ([]float64, []float64) {
+func getFilledAskOrders(algo *Algo, price float64) ([]float64, []float64) {
 	var hitPrices []float64
 	var hitQuantities []float64
 
@@ -690,11 +690,11 @@ func logBacktest(algo Algo) {
 // 				option.AverageCost = ((option.AverageCost * option.Position) + (avgPrice * netTotal)) / (option.Position + netTotal)
 // 				option.Position += netTotal
 // 			}
-// 			option.BuyOrders = models.OrderArray{
+// 			option.BuyOrders = OrderArray{
 // 				Quantity: []float64{},
 // 				Price:    []float64{},
 // 			}
-// 			option.SellOrders = models.OrderArray{
+// 			option.SellOrders = OrderArray{
 // 				Quantity: []float64{},
 // 				Price:    []float64{},
 // 			}
@@ -703,13 +703,13 @@ func logBacktest(algo Algo) {
 // 	}
 // }
 
-func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []models.ImpliedVol, algo *Algo) ([]models.OptionContract, int) {
+func generateActiveOptions(algo *Algo, lastOptionLoad int, optionLoadFreq int, volData []ImpliedVol) ([]OptionContract, int) {
 	logger.Debugf("Generating active options at %v\n", algo.Timestamp)
 	var expirys []int
 	if utils.ToIntTimestamp(algo.Timestamp)-lastOptionLoad < optionLoadFreq {
 		return algo.Market.OptionContracts, lastOptionLoad
 	}
-	algo.removeExpiredOptions()
+	removeExpiredOptions(algo)
 	// logger.Debugf("Generating active options with last option load %v, current timestamp %v", lastOptionLoad, utils.ToIntTimestamp(algo.Timestamp))
 	//Build expirys
 	currentTime := utils.ToTimeObject(algo.Timestamp)
@@ -735,13 +735,13 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 	maxStrike := utils.RoundToNearest(algo.Market.Price.Close*(1+(algo.Market.OptionMaxStrikePct/100.)), algo.Market.OptionStrikeInterval)
 	strikes := utils.Arange(minStrike, maxStrike, algo.Market.OptionStrikeInterval)
 	// logger.Debugf("Generated strikes with current price %v min strike %v and max strike %v: %v", algo.Market.Price.Close, minStrike, maxStrike, strikes)
-	var optionContracts []models.OptionContract
+	var optionContracts []OptionContract
 	for _, expiry := range expirys {
 		for _, strike := range strikes {
 			for _, optionType := range []string{"call", "put"} {
 				vol := getNearestVol(volData, utils.ToIntTimestamp(algo.Timestamp))
-				optionTheo := models.NewOptionTheo(optionType, algo.Market.Price.Close, strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, vol, -1, algo.Market.DenominatedInUnderlying)
-				optionContract := models.OptionContract{
+				optionTheo := NewOptionTheo(optionType, algo.Market.Price.Close, strike, utils.ToIntTimestamp(algo.Timestamp), expiry, 0, vol, -1, algo.Market.DenominatedInUnderlying)
+				optionContract := OptionContract{
 					Symbol:         utils.GetDeribitOptionSymbol(expiry, strike, algo.Market.QuoteAsset.Symbol, optionType),
 					Strike:         strike,
 					Expiry:         expiry,
@@ -762,10 +762,10 @@ func generateActiveOptions(lastOptionLoad int, optionLoadFreq int, volData []mod
 	return optionContracts, lastOptionLoad
 }
 
-func (algo *Algo) updateActiveOptions(lastOptionLoad, optionLoadFreq int, volData []models.ImpliedVol) int {
+func updateActiveOptions(algo *Algo, lastOptionLoad, optionLoadFreq int, volData []ImpliedVol) int {
 	logger.Debugf("Updating active options at %v\n", algo.Timestamp)
 	start := time.Now().UnixNano()
-	activeOptions, lastOptionLoad := generateActiveOptions(lastOptionLoad, optionLoadFreq, volData, algo)
+	activeOptions, lastOptionLoad := generateActiveOptions(algo, lastOptionLoad, optionLoadFreq, volData)
 	logger.Debugf("Generating active options took %v ns\n", time.Now().UnixNano()-start)
 	start = time.Now().UnixNano()
 
@@ -787,7 +787,7 @@ func (algo *Algo) updateActiveOptions(lastOptionLoad, optionLoadFreq int, volDat
 	return lastOptionLoad
 }
 
-func getNearestVol(volData []models.ImpliedVol, time int) float64 {
+func getNearestVol(volData []ImpliedVol, time int) float64 {
 	vol := -1.
 	for _, data := range volData {
 		timeDiff := time - data.Timestamp

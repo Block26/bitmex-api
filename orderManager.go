@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 )
 
@@ -18,10 +18,10 @@ func deltaFloat(a, b, delta float64) bool {
 	return math.Abs(a-b) <= delta
 }
 
-func (algo *Algo) setupOrders(currentPrice float64) {
+func setupOrders(algo *Algo, currentPrice float64) {
 	price := currentPrice
 	if algo.AutoOrderPlacement {
-		orderSize, side := algo.getOrderSize(algo.Market.Price.Close, true)
+		orderSize, side := getOrderSize(algo, algo.Market.Price.Close, true)
 		if side == 0 {
 			return
 		}
@@ -39,61 +39,61 @@ func (algo *Algo) setupOrders(currentPrice float64) {
 		}
 
 		// Keep track of what we should have so the orders we place will grow and shrink
-		algo.shouldHaveQuantity += quantity * side
+		algo.ShouldHaveQuantity += quantity * side
 
 		// Get the difference of what we have and what we should have, thats what we should order
-		quantityToOrder := algo.shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+		quantityToOrder := algo.ShouldHaveQuantity - algo.Market.QuoteAsset.Quantity
 
 		// Don't over order while adding to the position
 		orderSide := math.Copysign(1, quantityToOrder)
 		quantitySide := math.Copysign(1, algo.Market.QuoteAsset.Quantity)
 
-		if orderSide == quantitySide && math.Abs(algo.shouldHaveQuantity) > algo.canBuy() && algo.Market.Leverage < algo.LeverageTarget {
+		if orderSide == quantitySide && math.Abs(algo.ShouldHaveQuantity) > canBuy(algo) && algo.Market.Leverage < algo.LeverageTarget {
 			log.Println("Don't over order while adding to the position")
-			algo.shouldHaveQuantity = algo.canBuy() * quantitySide
-			quantityToOrder = algo.shouldHaveQuantity - algo.Market.QuoteAsset.Quantity
+			algo.ShouldHaveQuantity = canBuy(algo) * quantitySide
+			quantityToOrder = algo.ShouldHaveQuantity - algo.Market.QuoteAsset.Quantity
 		}
 
 		// When deleveraging to meet canBuy don't go lower than can buy
 		// log.Println("quantityToOrder", quantityToOrder, "math.Abs(quantity+(quantityToOrder*side))", math.Abs(quantity+(quantityToOrder*side)), "side", side, (quantityToOrder * side))
-		// log.Printf("Weight: %v, quantitySide %v algo.shouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, algo.shouldHaveQuantity, algo.canBuy())
-		if (algo.Market.Weight != 0 && algo.Market.Weight == int(quantitySide)) && algo.Market.Leverage > algo.LeverageTarget && math.Abs(algo.Market.QuoteAsset.Quantity+quantityToOrder) < algo.canBuy() {
-			algo.shouldHaveQuantity = algo.canBuy() * quantitySide
-			quantityToOrder = (math.Abs(algo.Market.QuoteAsset.Quantity) - algo.canBuy()) * orderSide
-			// quantityToOrder = (math.Abs(quantity) - algo.canBuy()) * -quantitySide
-			log.Printf("Don't over order when reducing leverage should have qty: %v\n", algo.shouldHaveQuantity)
+		// log.Printf("Weight: %v, quantitySide %v algo.ShouldHaveQuantity %v, canBuy %v\n", algo.Market.Weight, quantitySide, algo.ShouldHaveQuantity, canBuy(algo))
+		if (algo.Market.Weight != 0 && algo.Market.Weight == int(quantitySide)) && algo.Market.Leverage > algo.LeverageTarget && math.Abs(algo.Market.QuoteAsset.Quantity+quantityToOrder) < canBuy(algo) {
+			algo.ShouldHaveQuantity = canBuy(algo) * quantitySide
+			quantityToOrder = (math.Abs(algo.Market.QuoteAsset.Quantity) - canBuy(algo)) * orderSide
+			// quantityToOrder = (math.Abs(quantity) - canBuy(algo)) * -quantitySide
+			log.Printf("Don't over order when reducing leverage should have qty: %v\n", algo.ShouldHaveQuantity)
 		}
 
 		// Don't over order to go neutral
 		if algo.Market.Weight == 0 && math.Abs(quantityToOrder) > math.Abs(algo.Market.QuoteAsset.Quantity) {
 			log.Println("Don't over order to go neutral")
-			algo.shouldHaveQuantity = 0
+			algo.ShouldHaveQuantity = 0
 			quantityToOrder = -algo.Market.QuoteAsset.Quantity
 		}
 
-		log.Println("Can Buy", algo.canBuy(), "shouldHaveQuantity", algo.shouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder, "leverage", algo.Market.Leverage, "leverage target", algo.LeverageTarget)
+		log.Println("Can Buy", canBuy(algo), "ShouldHaveQuantity", algo.ShouldHaveQuantity, "side", side, "quantityToOrder", quantityToOrder, "leverage", algo.Market.Leverage, "leverage target", algo.LeverageTarget)
 
 		if math.Abs(quantityToOrder) > 0 {
 			orderSide = math.Copysign(1, quantityToOrder)
 			if side == 1 && orderSide == 1 {
-				algo.Market.BuyOrders = models.OrderArray{
+				algo.Market.BuyOrders = OrderArray{
 					Quantity: []float64{math.Abs(quantityToOrder)},
 					Price:    []float64{price - algo.Market.TickSize},
 				}
-				algo.Market.SellOrders = models.OrderArray{}
+				algo.Market.SellOrders = OrderArray{}
 			} else if side == -1 && orderSide == -1 {
-				algo.Market.SellOrders = models.OrderArray{
+				algo.Market.SellOrders = OrderArray{
 					Quantity: []float64{math.Abs(quantityToOrder)},
 					Price:    []float64{price + algo.Market.TickSize},
 				}
-				algo.Market.BuyOrders = models.OrderArray{}
+				algo.Market.BuyOrders = OrderArray{}
 			} else {
-				algo.Market.BuyOrders = models.OrderArray{}
-				algo.Market.SellOrders = models.OrderArray{}
+				algo.Market.BuyOrders = OrderArray{}
+				algo.Market.SellOrders = OrderArray{}
 			}
 		} else {
-			algo.Market.BuyOrders = models.OrderArray{}
-			algo.Market.SellOrders = models.OrderArray{}
+			algo.Market.BuyOrders = OrderArray{}
+			algo.Market.SellOrders = OrderArray{}
 		}
 
 	} else {
@@ -107,7 +107,7 @@ func (algo *Algo) setupOrders(currentPrice float64) {
 	}
 }
 
-func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
+func placeOrdersOnBook(algo *Algo, ex iex.IExchange, openOrders []iex.Order) {
 
 	// For now. Should be parameterized
 	qtyTolerance := 1.0
@@ -406,7 +406,7 @@ func (algo *Algo) placeOrdersOnBook(ex iex.IExchange, openOrders []iex.Order) {
 	}
 }
 
-func (algo *Algo) updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order) []iex.Order {
+func updateLocalOrders(algo *Algo, oldOrders []iex.Order, newOrders []iex.Order) []iex.Order {
 	var updatedOrders []iex.Order
 	for _, oldOrder := range oldOrders {
 		found := false
@@ -418,7 +418,7 @@ func (algo *Algo) updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order
 				} else if newOrder.OrdStatus == orderStatus.Filled {
 					newOrder.Rate = oldOrder.Rate
 					newOrder.Side = oldOrder.Side
-					algo.logFilledTrade(newOrder)
+					logFilledTrade(algo, newOrder)
 				} else {
 					updatedOrders = append(updatedOrders, newOrder)
 				}
@@ -445,7 +445,7 @@ func (algo *Algo) updateLocalOrders(oldOrders []iex.Order, newOrders []iex.Order
 				logger.Debug(newOrder.OrdStatus, newOrder.OrderID)
 			} else {
 				logger.Debug("New Order", newOrder.OrdStatus, newOrder.OrderID)
-				algo.logTrade(newOrder)
+				logTrade(algo, newOrder)
 				updatedOrders = append(updatedOrders, newOrder)
 			}
 		}
