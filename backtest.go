@@ -18,7 +18,7 @@ import (
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	. "github.com/tantralabs/models"
-	"github.com/tantralabs/yantra/data"
+	"github.com/tantralabs/yantra/database"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/logger"
 	"github.com/tantralabs/yantra/options"
@@ -65,7 +65,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 		volEnd := int(bars[len(bars)-1].Timestamp)
 		logger.Debugf("Vol data start: %v, end %v\n", volStart, volEnd)
 		algo.Timestamp = utils.TimestampToTime(volStart).String()
-		volData = data.LoadImpliedVols(algo.Market.Symbol, volStart, volEnd)
+		volData = database.LoadImpliedVols(algo.Market.Symbol, volStart, volEnd)
 		if len(volData) == 0 {
 			log.Fatalln("There is no vol data in the database for", algo.Market.Symbol, "from", volStart, "to", volEnd)
 		}

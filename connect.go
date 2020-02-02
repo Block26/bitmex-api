@@ -9,7 +9,7 @@ import (
 	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/yantra/data"
+	"github.com/tantralabs/yantra/database"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/logger"
 	"github.com/tantralabs/yantra/options"
@@ -30,7 +30,7 @@ var lastWalletSync int64
 //
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
 func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*Bar, Algo)) {
-	data.Setup("remote")
+	database.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
 	}
@@ -56,9 +56,9 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	orderStatus = ex.GetPotentialOrderStatus()
 
 	logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
-	localBars := data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
+	localBars := database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
 	// Set initial timestamp for algo
-	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
+	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
 	logger.Infof("Got local bars: %v\n", len(localBars))
 	// logger.Infof(len(localBars), "downloaded")
 
@@ -131,10 +131,10 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 }
 
 func checkWalletHistory(algo *Algo, ex iex.IExchange) {
-	timeSinceLastSync := data.GetBars()[algo.Index].Timestamp - lastWalletSync
+	timeSinceLastSync := database.GetBars()[algo.Index].Timestamp - lastWalletSync
 	if timeSinceLastSync > (60 * 60 * 60) {
 		logger.Info("It has been", timeSinceLastSync, "seconds since the last wallet history download, fetching latest deposits and withdrawals.")
-		lastWalletSync = data.GetBars()[algo.Index].Timestamp
+		lastWalletSync = database.GetBars()[algo.Index].Timestamp
 		walletHistory, err := ex.GetWalletHistory(algo.Market.BaseAsset.Symbol)
 		if err != nil {
 			logger.Error("There was an error fetching the wallet history", err)
@@ -145,8 +145,8 @@ func checkWalletHistory(algo *Algo, ex iex.IExchange) {
 }
 
 func runTest(algo *Algo, setupData func([]*Bar, Algo), rebalance func(Algo) Algo) {
-	if lastTest != data.GetBars()[algo.Index].Timestamp {
-		lastTest = data.GetBars()[algo.Index].Timestamp
+	if lastTest != database.GetBars()[algo.Index].Timestamp {
+		lastTest = database.GetBars()[algo.Index].Timestamp
 		testAlgo := Algo{}
 		copier.Copy(&testAlgo, &algo)
 		logger.Info(testAlgo.Market.BaseAsset.Quantity)
@@ -155,7 +155,7 @@ func runTest(algo *Algo, setupData func([]*Bar, Algo), rebalance func(Algo) Algo
 		testAlgo.Market.Leverage = 0
 		testAlgo.Market.Weight = 0
 		// Override logger level to info so that we don't pollute logs with backtest state changes
-		testAlgo = RunBacktest(data.GetBars(), testAlgo, rebalance, setupData)
+		testAlgo = RunBacktest(database.GetBars(), testAlgo, rebalance, setupData)
 		logLiveState(&testAlgo, true)
 		//TODO compare the states
 	}
@@ -218,23 +218,23 @@ func updateAlgoBalances(algo *Algo, balances []iex.WSBalance) {
 
 func updateBars(algo *Algo, ex iex.IExchange, trade iex.TradeBin) {
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-		diff := trade.Timestamp.Sub(time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0))
+		diff := trade.Timestamp.Sub(time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0))
 		if diff.Minutes() >= 60 {
-			data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
+			database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
 		}
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		data.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
+		database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
 	} else {
 		log.Fatal("This rebalance interval is not supported")
 	}
-	algo.Index = len(data.GetBars()) - 1
+	algo.Index = len(database.GetBars()) - 1
 }
 
 func updateState(algo *Algo, ex iex.IExchange, trade iex.TradeBin, setupData func([]*Bar, Algo)) {
 	logger.Info("Trade Update:", trade)
-	algo.Market.Price = *data.GetBars()[algo.Index]
-	setupData(data.GetBars(), *algo)
-	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
+	algo.Market.Price = *database.GetBars()[algo.Index]
+	setupData(database.GetBars(), *algo)
+	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC().String()
 	logger.Info("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
 		logState(algo)

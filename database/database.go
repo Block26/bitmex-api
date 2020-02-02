@@ -1,5 +1,5 @@
 // Package data handles database connections and data gathering.
-package data
+package database
 
 import (
 	"fmt"

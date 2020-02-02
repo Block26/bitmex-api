@@ -1,11 +1,11 @@
-package data
+package database
 
 import (
 	"log"
 	"sort"
 
-	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/models"
+	"github.com/tantralabs/tradeapi/iex"
 )
 
 var barData []*models.Bar
