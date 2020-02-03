@@ -1,10 +1,10 @@
 package database
 
-import "time"
-
-import "fmt"
-
-import "github.com/tantralabs/yantra/exchanges"
+import (
+	"fmt"
+	"github.com/tantralabs/yantra/exchanges"
+	"time"
+)
 
 func ExampleGetData() {
 	start := time.Date(2018, 06, 01, 0, 0, 0, 0, time.UTC)

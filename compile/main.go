@@ -1,8 +1,3 @@
-// find replace string pairs in a dir
-// no regex
-// version 2019-01-13
-// website: http://xahlee.info/golang/goland_find_replace.html
-
 package main
 
 import (
@@ -49,31 +44,45 @@ func stringMatchAny(x string, y []string) bool {
 	return false
 }
 
-func doFile(path string) error {
-	contentBytes, er := ioutil.ReadFile(path)
+func doFile(path string, fname string) error {
+	contentBytes, er := ioutil.ReadFile(path + fname)
 	if er != nil {
 		panic(er)
 	}
 	var content = string(contentBytes)
 	var changed = false
+	// change the package name
 	var found = strings.Index(content, currentPair.fs)
 	if found != -1 {
+		fmt.Printf("changed package name in %v -〘%v to %v〙\n", fname, currentPair.fs, currentPair.rs)
 		content = strings.Replace(content, currentPair.fs, currentPair.rs, -1)
 		changed = true
-	}
-	if changed {
-		fmt.Printf("〘%v〙\n", path)
-
-		if writeToFile {
-			if doBackup {
-				err := os.Rename(path, path+backupSuffix)
-				if err != nil {
-					panic(err)
-				}
+		// remove references to packages
+		for _, p := range pkgs {
+			usage := p + "."
+			var foundUsage = strings.Index(content, usage)
+			if foundUsage != -1 {
+				content = strings.Replace(content, usage, "", -1)
+				changed = true
 			}
-			err2 := ioutil.WriteFile(path, []byte(content), 0644)
+
+			imp := fmt.Sprintf("\"github.com/tantralabs/yantra/%s\"", p)
+			var foundImport = strings.Index(content, imp)
+			if foundImport != -1 {
+				fmt.Printf("removed import in %v -〘%v〙\n", fname, imp)
+				content = strings.Replace(content, imp, "", -1)
+				changed = true
+			}
+		}
+	}
+
+	if changed {
+		if writeToFile {
+			s := strings.Split(fname, "/")
+			fileName := s[len(s)-1]
+			err2 := ioutil.WriteFile("./src/"+fileName, []byte(content), 0644)
 			if err2 != nil {
-				panic("write file problem")
+				panic("write file problem ./src/tmp/" + fileName)
 			}
 		}
 	}
@@ -95,7 +104,7 @@ var pWalker = func(pathX string, infoX os.FileInfo, errX error) error {
 			panic("stupid MatchString error 59767")
 		}
 		if x {
-			doFile(currentPair.dir + "/" + currentPair.pkgName + ".go")
+			doFile("", pathX)
 		}
 	}
 	return nil
@@ -127,33 +136,26 @@ func main() {
 	for _, pkg := range pkgs {
 		p := FRPair{
 			pkgName: pkg,
-			dir:     "../yantra",
+			dir:     "../",
 			fs:      "package " + pkg,
 			rs:      "package main",
 		}
+		currentPair = p
 		// convert to
-		fmt.Println("converting", p.fs, "to", p.rs)
+		fmt.Println("converting pkg", pkg, p.fs, "to", p.rs)
 		err := filepath.Walk(currentPair.dir, pWalker)
 		if err != nil {
 			fmt.Printf("error walking the path %q: %v\n", currentPair.dir, err)
 		}
 
-		os.Chdir(p.dir)
-		fmt.Println("compiling", p.pkgName, "plugin")
-		out := "../compile/build/" + p.pkgName + ".so"
-		run("go", "build", "-buildmode", "plugin", "-o", out)
-
-		// convert back
-		fmt.Println("converting", p.rs, "to", p.fs)
-		currentPair.rs = p.fs
-		currentPair.fs = p.rs
-		err = filepath.Walk(currentPair.dir, pWalker)
-
-		os.Chdir("./compile")
 		if err != nil {
 			fmt.Printf("error walking the path %q: %v\n", currentPair.dir, err)
 		}
 	}
+	os.Chdir("./src")
+	fmt.Println("compiling yantra")
+	out := "../build/yantra.so"
+	run("go", "build", "-buildmode", "plugin", "-o", out)
 }
 
 func run(app string, args ...string) {

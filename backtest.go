@@ -789,10 +789,10 @@ func updateActiveOptions(algo *Algo, lastOptionLoad, optionLoadFreq int, volData
 
 func getNearestVol(volData []ImpliedVol, time int) float64 {
 	vol := -1.
-	for _, data := range volData {
-		timeDiff := time - data.Timestamp
+	for _, row := range volData {
+		timeDiff := time - row.Timestamp
 		if timeDiff < 0 {
-			vol = data.IV / 100 //Assume volData quotes IV in pct
+			vol = row.IV / 100 //Assume volData quotes IV in pct
 			break
 		}
 	}

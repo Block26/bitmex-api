@@ -7,6 +7,8 @@
 *.csv
 *.DS_Store
 yantra/
+src/
+build/
 
 # Test binary, build with `go test -c`
 *.test
