@@ -14,7 +14,7 @@ require (
 	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70
 	github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441
 	github.com/tantralabs/models v0.0.0-20200203231948-eb968dd6842e
-	github.com/tantralabs/theo-engine v0.0.0-20200203232704-31e4e98182c9
+	github.com/tantralabs/theo-engine v0.0.0-20200203233254-ff332b5af8f4
 	github.com/tantralabs/tradeapi v0.0.0-20200203232623-51c7d08a9113
 	gonum.org/v1/gonum v0.6.2
 )
