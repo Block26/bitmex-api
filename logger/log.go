@@ -17,8 +17,8 @@ type logLevelOpts struct {
 func LogLevel() logLevelOpts {
 	r := logLevelOpts{}
 	r.Error = -1
-	r.Live = 0
-	r.Info = 1
+	r.Info = 0
+	r.Live = 1
 	r.Debug = 2
 	return r
 }
