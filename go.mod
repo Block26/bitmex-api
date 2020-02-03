@@ -13,8 +13,8 @@ require (
 	github.com/lib/pq v1.3.0
 	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70
 	github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441
-	github.com/tantralabs/models v0.0.0-20200203225137-a50e875379ef
-	github.com/tantralabs/theo-engine v0.0.0-20200203203803-d79c0003cac2
+	github.com/tantralabs/models v0.0.0-20200203231948-eb968dd6842e
+	github.com/tantralabs/theo-engine v0.0.0-20200203225710-e7293c4b0e1a
 	github.com/tantralabs/tradeapi v0.0.0-20200203203050-47b24237c8a1
 	gonum.org/v1/gonum v0.6.2
 )

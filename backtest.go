@@ -52,7 +52,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 
 	start := time.Now()
 	setupData(bars, algo)
-	var history []models.History
+	var history []History
 	algo.Timestamp = utils.TimestampToTime(int(bars[0].Timestamp))
 	if algo.Market.Options {
 		// Build theo engine
@@ -101,13 +101,13 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 
 			if algo.Market.Options {
 				start = time.Now().UnixNano()
-				algo.TheoEngine.UpdateActiveContracts()
+				algo.TheoEngine.(*te.TheoEngine).UpdateActiveContracts()
 				logger.Debugf("Updating active options took %v ns\n", time.Now().UnixNano()-start)
 				start = time.Now().UnixNano()
 				updateOptionPositions(&algo)
 				logger.Debugf("Updating options positions took %v ns\n", time.Now().UnixNano()-start)
 			}
-			state := logState(&algo, timestamp)
+			state := logState(&algo, algo.Timestamp)
 			history = append(history, state)
 			if algo.Market.BaseAsset.Quantity <= 0 {
 				logger.Debugf("Ran out of balance, killing...\n")
@@ -421,11 +421,11 @@ func updateBalance(algo *Algo, currentBaseBalance float64, currentQuantity float
 func updateOptionPositions(algo *Algo) {
 	logger.Debugf("Updating options positions with baq %v\n", algo.Market.BaseAsset.Quantity)
 	// Fill our option orders, update positions and avg costs
-	for _, option := range algo.TheoEngine.GetOpenOptions() {
-		algo.updateOptionBalanceFromFill(option)
+	for _, option := range algo.TheoEngine.(*te.TheoEngine).GetOpenOptions() {
+		updateOptionBalanceFromFill(algo, option)
 	}
-	algo.TheoEngine.UpdateOptionIndexes()
-	algo.TheoEngine.ScanOptions(false, false)
+	algo.TheoEngine.(*te.TheoEngine).UpdateOptionIndexes()
+	algo.TheoEngine.(*te.TheoEngine).ScanOptions(false, false)
 }
 
 // Delete all expired options without profit values to conserve time and space resources

@@ -17,7 +17,7 @@ import (
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
-	te "github.com/tantralabs/theo-engine"
+	"github.com/tantralabs/models"
 	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/exchanges"

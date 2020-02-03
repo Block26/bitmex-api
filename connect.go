@@ -13,7 +13,6 @@ import (
 	"github.com/tantralabs/yantra/database"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 
 	"github.com/jinzhu/copier"
@@ -58,7 +57,7 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(Alg
 	logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
 	localBars := database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
 	// Set initial timestamp for algo
-	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
+	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
 	logger.Infof("Got local bars: %v\n", len(localBars))
 
 	if algo.Market.Options {
@@ -163,7 +162,7 @@ func runTest(algo *Algo, setupData func([]*Bar, Algo), rebalance func(Algo) Algo
 		testAlgo.Market.Weight = 0
 		// Override logger level to info so that we don't pollute logs with backtest state changes
 		numOptions := len(algo.Market.OptionContracts)
-		testAlgo = RunBacktest(data.GetBars(), testAlgo, rebalance, setupData)
+		testAlgo = RunBacktest(database.GetBars(), testAlgo, rebalance, setupData)
 		logger.Livef("Backtest added %v options\n", len(algo.Market.OptionContracts)-numOptions)
 		logLiveState(&testAlgo, true)
 		//TODO compare the states
@@ -241,16 +240,16 @@ func updateBars(algo *Algo, ex iex.IExchange, trade iex.TradeBin) {
 
 func updateState(algo *Algo, ex iex.IExchange, trade iex.TradeBin, setupData func([]*Bar, Algo)) {
 	logger.Info("Trade Update:", trade)
-	setupData(data.GetBars(), *algo)
-	algo.Timestamp = time.Unix(data.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
-	algo.Market.Price = *data.GetBars()[algo.Index]
+	setupData(database.GetBars(), *algo)
+	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
+	algo.Market.Price = *database.GetBars()[algo.Index]
 	logger.Info("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
 		logState(algo)
 		firstTrade = false
 	}
 	if algo.Market.Options {
-		algo.TheoEngine.UpdateActiveContracts()
-		algo.TheoEngine.ScanOptions(true, true)
+		algo.TheoEngine.(*te.TheoEngine).UpdateActiveContracts()
+		algo.TheoEngine.(*te.TheoEngine).ScanOptions(true, true)
 	}
 }
