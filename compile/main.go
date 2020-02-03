@@ -162,6 +162,9 @@ func run(app string, args ...string) {
 	cmd := exec.Command(app, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "CGO_ENABLED=0")
+	cmd.Env = append(cmd.Env, "GOOS=linux")
 	err := cmd.Run()
 	if err != nil {
 		log.Fatalf("cmd.Run() failed with %s\n", err)
