@@ -56,7 +56,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 	algo.Timestamp = utils.TimestampToTime(int(bars[0].Timestamp))
 	if algo.Market.Options {
 		// Build theo engine
-		logger.Infof("Building new theo engine at %v\n", algo.Timestamp)
+		logger.Debugf("Building new theo engine at %v\n", algo.Timestamp)
 		theoEngine := te.NewTheoEngine(&algo.Market, nil, &algo.Timestamp, 60000, 86400000, true, int(bars[0].Timestamp), int(bars[len(bars)-1].Timestamp))
 		algo.TheoEngine = &theoEngine
 	}
@@ -101,7 +101,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 
 			if algo.Market.Options {
 				start = time.Now().UnixNano()
-				algo.TheoEngine.UpdateActiveOptions()
+				algo.TheoEngine.UpdateActiveContracts()
 				logger.Debugf("Updating active options took %v ns\n", time.Now().UnixNano()-start)
 				start = time.Now().UnixNano()
 				updateOptionPositions(&algo)

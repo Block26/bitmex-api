@@ -162,7 +162,9 @@ func runTest(algo *Algo, setupData func([]*Bar, Algo), rebalance func(Algo) Algo
 		testAlgo.Market.Leverage = 0
 		testAlgo.Market.Weight = 0
 		// Override logger level to info so that we don't pollute logs with backtest state changes
-		testAlgo = RunBacktest(database.GetBars(), testAlgo, rebalance, setupData)
+		numOptions := len(algo.Market.OptionContracts)
+		testAlgo = RunBacktest(data.GetBars(), testAlgo, rebalance, setupData)
+		logger.Livef("Backtest added %v options\n", len(algo.Market.OptionContracts)-numOptions)
 		logLiveState(&testAlgo, true)
 		//TODO compare the states
 	}
@@ -248,7 +250,7 @@ func updateState(algo *Algo, ex iex.IExchange, trade iex.TradeBin, setupData fun
 		firstTrade = false
 	}
 	if algo.Market.Options {
-		algo.TheoEngine.UpdateActiveOptions()
+		algo.TheoEngine.UpdateActiveContracts()
 		algo.TheoEngine.ScanOptions(true, true)
 	}
 }
