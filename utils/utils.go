@@ -13,9 +13,9 @@ import (
 
 	"encoding/base64"
 
+	"github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/models"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -103,10 +103,10 @@ func LoadSecret(file string, cloud bool) models.Secret {
 		if err != nil {
 			log.Println(err.Error())
 		}
-		jsonParser := json.NewDecoder(configFile)
-		jsonParser.Decode(&config)
+		jsonParser := json.NewDecoder(secretFile)
+		jsonParser.Decode(&secret)
 		// fmt.Printf("Parsed json: %v\n", jsonParser)
-		return config
+		return secret
 	}
 }
 
