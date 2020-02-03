@@ -29,15 +29,15 @@ var lastWalletSync int64
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
 //
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
-func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*Bar, Algo)) {
+func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*Bar, Algo)) {
 	database.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
 	}
 	firstTrade = true
 	firstPositionUpdate = true
-	config := utils.LoadSecret(settingsFile, secret)
-	logger.Info("Loaded config for", algo.Market.Exchange, "secret", settingsFile)
+	config := utils.LoadSecret(settingsFileName, secret)
+	logger.Info("Loaded config for", algo.Market.Exchange, "secret", settingsFileName)
 	commitHash = time.Now().String()
 
 	exchangeVars := iex.ExchangeConf{
@@ -121,7 +121,9 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 			logState(&algo)
 			runTest(&algo, setupData, rebalance)
 			// updateOptionPositions(&algo,  )
-			checkWalletHistory(&algo, ex)
+			if secret {
+				checkWalletHistory(&algo, ex, settingsFileName)
+			}
 		case newOrders := <-channels.OrderChan:
 			localOrders = updateLocalOrders(&algo, localOrders, newOrders)
 		case update := <-channels.WalletChan:
@@ -130,7 +132,7 @@ func Connect(settingsFile string, secret bool, algo Algo, rebalance func(Algo) A
 	}
 }
 
-func checkWalletHistory(algo *Algo, ex iex.IExchange) {
+func checkWalletHistory(algo *Algo, ex iex.IExchange, settingsFileName string) {
 	timeSinceLastSync := database.GetBars()[algo.Index].Timestamp - lastWalletSync
 	if timeSinceLastSync > (60 * 60 * 60) {
 		logger.Info("It has been", timeSinceLastSync, "seconds since the last wallet history download, fetching latest deposits and withdrawals.")
@@ -139,7 +141,9 @@ func checkWalletHistory(algo *Algo, ex iex.IExchange) {
 		if err != nil {
 			logger.Error("There was an error fetching the wallet history", err)
 		} else {
-			log.Println(walletHistory)
+			if len(walletHistory) > 0 {
+				database.LogWalletHistory(algo, settingsFileName, walletHistory)
+			}
 		}
 	}
 }

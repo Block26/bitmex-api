@@ -10,6 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/tantralabs/models"
+	"github.com/tantralabs/tradeapi/iex"
 )
 
 var (
@@ -20,6 +21,8 @@ var (
 	dbname   = "tantra"
 	ENV      = ""
 )
+
+var knownHistory []TransactionRecord = make([]TransactionRecord, 0)
 
 func Setup(env ...string) {
 	if env != nil && env[0] != ENV {
@@ -96,4 +99,63 @@ func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
 	db.Close()
 	sort.Slice(ivs, func(i, j int) bool { return ivs[i].Timestamp < ivs[j].Timestamp })
 	return ivs
+}
+
+// GetData is called to fetch data from your local psql database setup by https://github.com/tantralabs/tantradb
+func LogWalletHistory(algo *models.Algo, accountId string, history []iex.WalletHistoryItem) {
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+
+	db, err := sqlx.Connect("postgres", psqlInfo)
+
+	if err != nil {
+		if host == "localhost" {
+			log.Println("Falied to connect to database, attempting to connect to cloud database. Please setup tantradb locally.")
+			Setup("remote")
+			LogWalletHistory(algo, accountId, history)
+		} else {
+			log.Fatal(err)
+		}
+	}
+
+	newHistory := make([]TransactionRecord, 0)
+	for _, item := range history {
+		known := false
+		for _, record := range knownHistory {
+			if item.TxID == record.TxId {
+				known = true
+				break
+			}
+		}
+		if !known {
+			newRecord := TransactionRecord{
+				Timestamp: item.TimeStamp,
+				Type:      item.TxType,
+				Exchange:  algo.Market.Exchange,
+				AccountId: accountId,
+				AlgoName:  algo.Name,
+				TxId:      item.TxID,
+				Status:    item.Status,
+				Currency:  item.Currency,
+				Amount:    item.Amount,
+			}
+			newHistory = append(newHistory, newRecord)
+			knownHistory = append(knownHistory, newRecord)
+		}
+	}
+
+	tx, err := db.Begin()
+	for _, r := range newHistory {
+		_, err = db.Exec("insert into wallet_history(timestamp, type, account_id, algo_name, tx_id, status, currency, amount) values ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING;", r.Timestamp, r.Type, r.AccountId, r.AlgoName, r.TxId, r.Status, r.Currency, r.Amount)
+		if err != nil {
+			fmt.Println("err", err)
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	db.Close()
 }

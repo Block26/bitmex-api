@@ -65,6 +65,14 @@ github.com/tantralabs/models v0.0.0-20200203185059-b6fff24390f2 h1:T07IboCASMPk/
 github.com/tantralabs/models v0.0.0-20200203185059-b6fff24390f2/go.mod h1:j90tl5Nd/Unbu24VywxgzYljJzyrxZDZOH8DVsVEf2g=
 github.com/tantralabs/tradeapi v0.0.0-20200131195921-4cd300b7164d h1:X3fWiNOh1RkL8EfS86fv0qrcsi9+Yk/9t6BagWhJaaE=
 github.com/tantralabs/tradeapi v0.0.0-20200131195921-4cd300b7164d/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v0.0.0-20200203193837-09b95d5de082 h1:2ilOgSF8eZTCz3wN/UbAqt3oX2zQImXfTblex18HiPg=
+github.com/tantralabs/tradeapi v0.0.0-20200203193837-09b95d5de082/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v0.0.0-20200203202424-5c4bca66d561 h1:PJrZBsvamSoJr0paWlg4/hn9hgXzL5xG+q5Th0liyMA=
+github.com/tantralabs/tradeapi v0.0.0-20200203202424-5c4bca66d561/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v0.0.0-20200203202957-c2aab62b4b60 h1:T6ikQZtGlV8Is+a+xImEzbIHgm6TXVC8bj3CTbDIQEo=
+github.com/tantralabs/tradeapi v0.0.0-20200203202957-c2aab62b4b60/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v0.0.0-20200203203050-47b24237c8a1 h1:bEmel3ardL2kAOKEzoF1QVaRGINH1kLpKax5oQxL7NA=
+github.com/tantralabs/tradeapi v0.0.0-20200203203050-47b24237c8a1/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tidwall/gjson v1.3.2 h1:+7p3qQFaH3fOMXAJSrdZwGKcOO/lYdGS0HqGhPqDdTI=
 github.com/tidwall/gjson v1.3.2/go.mod h1:P256ACg0Mn+j1RXIDXoss50DeIABTYK1PULOJHhxOls=
 github.com/tidwall/match v1.0.1 h1:PnKP62LPNxHKTwvHHZZzdOAOCtsJTjo6dZLCwpKm5xc=
