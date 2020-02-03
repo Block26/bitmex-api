@@ -17,11 +17,11 @@ import (
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
+	te "github.com/tantralabs/theo-engine"
 	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/utils"
-	te "github.com/tantralabs/theo-engine"
 )
 
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
@@ -350,6 +350,9 @@ func logLiveState(algo *Algo, test ...bool) {
 			tmpTags := tags
 			tmpTags["symbol"] = option.Symbol
 			o := structs.Map(option.OptionTheo)
+			// Influxdb seems to interpret pointers as strings, need to dereference here
+			o["CurrentTime"] = utils.TimeToTimestamp(*option.OptionTheo.CurrentTime)
+			o["UnderlyingPrice"] = *option.OptionTheo.UnderlyingPrice
 			pt1, _ := client.NewPoint(
 				"optionTheo",
 				tmpTags,
@@ -359,6 +362,9 @@ func logLiveState(algo *Algo, test ...bool) {
 			bp.AddPoint(pt1)
 
 			o = structs.Map(option)
+			// Influxdb seems to interpret pointers as strings, need to dereference here
+			o["CurrentTime"] = (*option.OptionTheo.CurrentTime).String()
+			o["UnderlyingPrice"] = *option.OptionTheo.UnderlyingPrice
 			delete(o, "OptionTheo")
 			pt2, _ := client.NewPoint(
 				"options",
@@ -410,7 +416,6 @@ func logLiveState(algo *Algo, test ...bool) {
 		}
 		bp.AddPoint(pt)
 	}
-
 	err = client.Client.Write(influx, bp)
 	if err != nil {
 		fmt.Println("err", err)
