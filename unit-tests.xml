@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+	<testsuite tests="6" failures="0" time="0.270000" name="github.com/tantralabs/yantra">
+		<properties>
+			<property name="go.version" value="go1.13.5 darwin/amd64"></property>
+		</properties>
+		<testcase classname="github.com/tantralabs/yantra" name="TestPositionUpdate" time="0.110000"></testcase>
+		<testcase classname="github.com/tantralabs/yantra" name="TestBalanceUpdate" time="0.000000"></testcase>
+		<testcase classname="github.com/tantralabs/yantra" name="TestOrderUpdate" time="0.160000"></testcase>
+		<testcase classname="github.com/tantralabs/yantra" name="TestSetupOrdersAutoOrderPlacement" time="0.000000"></testcase>
+		<testcase classname="github.com/tantralabs/yantra" name="TestDeleverageShort" time="0.000000"></testcase>
+		<testcase classname="github.com/tantralabs/yantra" name="TestDeleverageLong" time="0.000000"></testcase>
+	</testsuite>
+	<testsuite tests="0" failures="0" time="0.000000" name="github.com/tantralabs/yantra/compile">
+		<properties>
+			<property name="go.version" value="go1.13.5 darwin/amd64"></property>
+		</properties>
+	</testsuite>
+	<testsuite tests="0" failures="0" time="0.000000" name="github.com/tantralabs/yantra/interfaces">
+		<properties>
+			<property name="go.version" value="go1.13.5 darwin/amd64"></property>
+		</properties>
+	</testsuite>
+	<testsuite tests="0" failures="0" time="0.000000" name="github.com/tantralabs/yantra/optimize">
+		<properties>
+			<property name="go.version" value="go1.13.5 darwin/amd64"></property>
+		</properties>
+	</testsuite>
+</testsuites>
