@@ -9,9 +9,9 @@ import (
 
 	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/yantra/exchanges"
-	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/utils"
+	"github.com/tantralabs/exchanges"
+	"github.com/tantralabs/logger"
+	"github.com/tantralabs/utils"
 )
 
 func deltaFloat(a, b, delta float64) bool {

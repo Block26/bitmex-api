@@ -20,8 +20,8 @@ import (
 	"github.com/tantralabs/models"
 	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/yantra/exchanges"
-	"github.com/tantralabs/yantra/utils"
+	"github.com/tantralabs/exchanges"
+	"github.com/tantralabs/utils"
 )
 
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.

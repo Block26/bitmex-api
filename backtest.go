@@ -18,10 +18,10 @@ import (
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	te "github.com/tantralabs/theo-engine"
-	"github.com/tantralabs/yantra/exchanges"
-	"github.com/tantralabs/yantra/logger"
+	"github.com/tantralabs/exchanges"
+	"github.com/tantralabs/logger"
 	. "github.com/tantralabs/models"
-	"github.com/tantralabs/yantra/utils"
+	"github.com/tantralabs/utils"
 )
 
 // var MinimumOrderSize = 25

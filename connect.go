@@ -10,10 +10,10 @@ import (
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/yantra/database"
-	"github.com/tantralabs/yantra/exchanges"
-	"github.com/tantralabs/yantra/logger"
-	"github.com/tantralabs/yantra/utils"
+	"github.com/tantralabs/database"
+	"github.com/tantralabs/exchanges"
+	"github.com/tantralabs/logger"
+	"github.com/tantralabs/utils"
 
 	"github.com/jinzhu/copier"
 )

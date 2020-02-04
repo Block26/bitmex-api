@@ -8,7 +8,7 @@ import (
 	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/yantra/exchanges"
+	"github.com/tantralabs/exchanges"
 )
 
 func setupAlgo() Algo {
