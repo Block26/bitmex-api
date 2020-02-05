@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tantralabs/database"
+	"github.com/tantralabs/exchanges"
+	"github.com/tantralabs/logger"
 	. "github.com/tantralabs/models"
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/database"
-	"github.com/tantralabs/exchanges"
-	"github.com/tantralabs/logger"
 	"github.com/tantralabs/utils"
 
 	"github.com/jinzhu/copier"
@@ -29,7 +29,7 @@ var lastWalletSync int64
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
 //
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
-func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(Algo) Algo, setupData func([]*Bar, Algo)) {
+func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar)) {
 	database.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
@@ -117,7 +117,7 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(Alg
 		case trade := <-channels.TradeBinChan:
 			updateBars(&algo, ex, trade[0])
 			updateState(&algo, ex, trade[0], setupData)
-			algo = rebalance(algo)
+			rebalance(&algo)
 			setupOrders(&algo, trade[0].Close)
 			placeOrdersOnBook(&algo, ex, localOrders)
 			logState(&algo)
@@ -150,7 +150,7 @@ func checkWalletHistory(algo *Algo, ex iex.IExchange, settingsFileName string) {
 	}
 }
 
-func runTest(algo *Algo, setupData func([]*Bar, Algo), rebalance func(Algo) Algo) {
+func runTest(algo *Algo, setupData func(*Algo, []*Bar), rebalance func(*Algo)) {
 	if lastTest != database.GetBars()[algo.Index].Timestamp {
 		lastTest = database.GetBars()[algo.Index].Timestamp
 		testAlgo := Algo{}
@@ -238,10 +238,12 @@ func updateBars(algo *Algo, ex iex.IExchange, trade iex.TradeBin) {
 	algo.Index = len(database.GetBars()) - 1
 }
 
-func updateState(algo *Algo, ex iex.IExchange, trade iex.TradeBin, setupData func([]*Bar, Algo)) {
+func updateState(algo *Algo, ex iex.IExchange, trade iex.TradeBin, setupData func(*Algo, []*Bar)) {
 	logger.Info("Trade Update:", trade)
-	setupData(database.GetBars(), *algo)
-	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
+	bars := database.GetBars()
+	algo.OHLCV = utils.GetOHLCV(bars)
+	setupData(algo, bars)
+	algo.Timestamp = time.Unix(bars[algo.Index].Timestamp/1000, 0).UTC()
 	algo.Market.Price = *database.GetBars()[algo.Index]
 	logger.Info("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {

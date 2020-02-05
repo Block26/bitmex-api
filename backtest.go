@@ -17,10 +17,10 @@ import (
 	"gonum.org/v1/gonum/stat"
 
 	client "github.com/influxdata/influxdb1-client/v2"
-	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
 	. "github.com/tantralabs/models"
+	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/utils"
 )
 
@@ -32,7 +32,7 @@ var lastOptionBalance = 0.
 
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
-func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData func([]*Bar, Algo)) Algo {
+func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar)) Algo {
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -51,8 +51,9 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 	}
 
 	start := time.Now()
-	setupData(bars, algo)
-	var history []History
+	algo.OHLCV = utils.GetOHLCV(bars)
+	setupData(&algo, bars)
+	history := make([]History, 0)
 	algo.Timestamp = utils.TimestampToTime(int(bars[0].Timestamp))
 	if algo.Market.Options {
 		// Build theo engine
@@ -84,7 +85,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 			algo.Index = idx
 			algo.Market.Price = *bar
 			start = time.Now().UnixNano()
-			algo = rebalance(algo)
+			rebalance(&algo)
 			logger.Debugf("Rebalance took %v ns\n", time.Now().UnixNano()-start)
 			if algo.FillType == exchanges.FillType().Limit {
 				//Check which buys filled
@@ -123,7 +124,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 	minProfit, maxProfit, _, maxLeverage, drawdown := minMaxStats(history)
 
 	historyLength := len(history)
-	logger.Debug("Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
+	log.Println("historyLength", historyLength, "Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
 	percentReturn := make([]float64, historyLength)
 	last := 0.0
 	for i := range history {
@@ -153,14 +154,9 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 	}
 
 	// logger.Debugf("Last option balance: %v", lastOptionBalance)
-	if algo.AutoOrderPlacement {
-		algo.Params["EntryOrderSize"] = algo.EntryOrderSize
-		algo.Params["ExitOrderSize"] = algo.ExitOrderSize
-		algo.Params["DeleverageOrderSize"] = algo.DeleverageOrderSize
-	}
 
-	kvparams := utils.CreateKeyValuePairs(algo.Params)
-	log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Entry Order Size %0.4f \n Exit Order Size %0.4f \n Sharpe %0.3f \n Params: %s \n",
+	kvparams := utils.CreateKeyValuePairs(algo.Params, true)
+	log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Sharpe %0.3f \n Params: %s",
 		history[historyLength-1].Balance,
 		history[historyLength-1].AverageCost,
 		history[historyLength-1].Quantity,
@@ -168,11 +164,24 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(Algo) Algo, setupData fu
 		drawdown,
 		maxProfit,
 		minProfit,
-		algo.EntryOrderSize,
-		algo.ExitOrderSize,
 		score,
 		kvparams,
 	)
+
+	if algo.AutoOrderPlacement {
+		fmt.Print("AutoOrderPlacement Parameters")
+		algo.Params["EntryOrderSize"] = algo.EntryOrderSize
+		algo.Params["ExitOrderSize"] = algo.ExitOrderSize
+		algo.Params["DeleverageOrderSize"] = algo.DeleverageOrderSize
+
+		kvparams := utils.CreateKeyValuePairs(map[string]interface{}{
+			"EntryOrderSize":      algo.EntryOrderSize,
+			"ExitOrderSize":       algo.ExitOrderSize,
+			"DeleverageOrderSize": algo.DeleverageOrderSize,
+		}, true)
+		fmt.Printf("%s", kvparams)
+	}
+
 	log.Printf("Execution Speed: %v \n", elapsed)
 
 	algo.Result = map[string]interface{}{
