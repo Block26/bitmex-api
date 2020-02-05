@@ -3,7 +3,6 @@ package optimize
 import (
 	"fmt"
 	"log"
-	"math/rand"
 
 	eaopt "github.com/tantralabs/eaopt"
 	"github.com/tantralabs/models"
@@ -32,7 +31,6 @@ func DiffEvoOptimize(Evaluate func([]float64) float64, min, max []float64) {
 		fmt.Println(err)
 		return
 	}
-	ga.GA.RNG = rand.New(rand.NewSource(13))
 	// Run minimization
 	_, y, err := ga.Minimize(Evaluate, uint(len(min)))
 	if err != nil {
