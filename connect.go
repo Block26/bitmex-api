@@ -62,7 +62,7 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 
 	if algo.Market.Options {
 		// Build theo engine
-		theoEngine := te.NewTheoEngine(&algo.Market, ex, &algo.Timestamp, 60000, 86400000, false, 0, 0)
+		theoEngine := te.NewTheoEngine(&algo.Market, ex, &algo.Timestamp, 60000, 86400000, false, 0, 0, algo.LogLevel)
 		algo.TheoEngine = &theoEngine
 		logger.Infof("Built theo engine.\n")
 	}

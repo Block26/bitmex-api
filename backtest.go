@@ -58,7 +58,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*
 	if algo.Market.Options {
 		// Build theo engine
 		logger.Debugf("Building new theo engine at %v\n", algo.Timestamp)
-		theoEngine := te.NewTheoEngine(&algo.Market, nil, &algo.Timestamp, 60000, 86400000, true, int(bars[0].Timestamp), int(bars[len(bars)-1].Timestamp))
+		theoEngine := te.NewTheoEngine(&algo.Market, nil, &algo.Timestamp, 60000, 86400000, true, int(bars[0].Timestamp), int(bars[len(bars)-1].Timestamp), algo.BacktestLogLevel)
 		algo.TheoEngine = &theoEngine
 	}
 	// Set contract types
