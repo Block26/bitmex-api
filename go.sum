@@ -2,6 +2,8 @@ github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3
 github.com/aws/aws-sdk-go v1.28.9/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.28.10 h1:uPaHYQWRXgI9ZrGrM6rkrHxkJOmI9orcvsTRhJXwX4I=
 github.com/aws/aws-sdk-go v1.28.10/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
+github.com/aws/aws-sdk-go v1.28.12 h1:VeTvzq8Wy89P+1YjtsBpB/SlHhec/U9bpY2ux4hZ1I0=
+github.com/aws/aws-sdk-go v1.28.12/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/carterjones/go-cloudflare-scraper v0.1.2 h1:GNmlJEfhIVPVXaEItnPSDtwOpuJo6rFH2SFWuAjeEuM=
 github.com/carterjones/go-cloudflare-scraper v0.1.2/go.mod h1:maO/ygX7QWbdh/TzHqr5uR42b2BW81g/05QRx7fpw38=
 github.com/carterjones/signalr v0.3.5 h1:kJSw+6a9XmsOb/+9HWTnY8SjTrVOdpzCSPV/9IVS2nI=
@@ -56,6 +58,8 @@ github.com/tantralabs/models v0.0.0-20200205081325-d053324d7045 h1:Bkvhw+CHUA0sb
 github.com/tantralabs/models v0.0.0-20200205081325-d053324d7045/go.mod h1:j90tl5Nd/Unbu24VywxgzYljJzyrxZDZOH8DVsVEf2g=
 github.com/tantralabs/theo-engine v0.0.0-20200204205855-f307e1ec18e4 h1:zOF96t/vtz/LBKw8CKdXK163ymH8MuqvGfZPgxjyxWw=
 github.com/tantralabs/theo-engine v0.0.0-20200204205855-f307e1ec18e4/go.mod h1:yF8aA2CM+9I18VsLYL8ifhUG3uriiQ+cwte2NyWAEVM=
+github.com/tantralabs/theo-engine v0.0.0-20200207043732-16fb381acae1 h1:SMgs3VXRfMoneVRhORrp9x88auszJpPrzTpkii/vA1U=
+github.com/tantralabs/theo-engine v0.0.0-20200207043732-16fb381acae1/go.mod h1:yF8aA2CM+9I18VsLYL8ifhUG3uriiQ+cwte2NyWAEVM=
 github.com/tantralabs/tradeapi v0.0.0-20200203232623-51c7d08a9113 h1:O/RLLs78ck57itA7RuE55quVZei2AG03OocWSBUdOSM=
 github.com/tantralabs/tradeapi v0.0.0-20200203232623-51c7d08a9113/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610/go.mod h1:QN0aHde2cmzDJcZklDsH9F8MchJ2hDpDgdQwXA+QnGA=
@@ -63,10 +67,14 @@ github.com/tantralabs/utils v0.0.0-20200205084618-c96405e79c20 h1:CNmEOUY/JVNuYy
 github.com/tantralabs/utils v0.0.0-20200205084618-c96405e79c20/go.mod h1:v/EAKU/lzBdRiBGEZBWVHPz9sMP/xuhLuwX1bw3vKlY=
 github.com/tidwall/gjson v1.3.2 h1:+7p3qQFaH3fOMXAJSrdZwGKcOO/lYdGS0HqGhPqDdTI=
 github.com/tidwall/gjson v1.3.2/go.mod h1:P256ACg0Mn+j1RXIDXoss50DeIABTYK1PULOJHhxOls=
+github.com/tidwall/gjson v1.3.6 h1:5b44I9SGjYH1jl1jIpMA7+nLlqV+HT7tf6qrtWZ04do=
+github.com/tidwall/gjson v1.3.6/go.mod h1:P256ACg0Mn+j1RXIDXoss50DeIABTYK1PULOJHhxOls=
 github.com/tidwall/match v1.0.1 h1:PnKP62LPNxHKTwvHHZZzdOAOCtsJTjo6dZLCwpKm5xc=
 github.com/tidwall/match v1.0.1/go.mod h1:LujAq0jyVjBy028G1WhWfIzbpQfMO8bBZ6Tyb0+pL9E=
 github.com/tidwall/pretty v1.0.0 h1:HsD+QiTn7sK6flMKIvNmpqz1qrpP3Ps6jOKIKMooyg4=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
+github.com/tidwall/pretty v1.0.1 h1:WE4RBSZ1x6McVVC8S/Md+Qse8YUv6HRObAx6ke00NY8=
+github.com/tidwall/pretty v1.0.1/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 golang.org/x/exp v0.0.0-20180321215751-8460e604b9de/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20180807140117-3d87b88a115f/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20190125153040-c74c464bbbf2/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
