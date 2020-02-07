@@ -190,8 +190,8 @@ func updatePositions(algo *Algo, positions []iex.WsPosition) {
 					if option.Symbol == position.Symbol {
 						option.Position = position.CurrentQty
 						option.AverageCost = position.AvgCostPrice
-						option.Profit = (option.MidMarketPrice - position.AvgCostPrice) * math.Abs(position.CurrentQty)
-						logger.Infof("[%v] Updated position %v, average cost %v, profit %v\n", option.Symbol, option.Position, option.AverageCost, option.Profit)
+						option.Profit = (option.MidMarketPrice - position.AvgCostPrice) * position.CurrentQty
+						logger.Infof("[%v] Updated position %v, average cost %v, profit %v, \n", option.Symbol, option.Position, option.AverageCost, option.Profit)
 						break
 					}
 				}
