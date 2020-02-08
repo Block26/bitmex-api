@@ -14,6 +14,7 @@ import (
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/utils"
+	"github.com/tantralabs/yantra/tantra"
 
 	"github.com/jinzhu/copier"
 )
@@ -29,7 +30,7 @@ var lastWalletSync int64
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
 //
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
-func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar)) {
+func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar), test ...bool) {
 	database.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
@@ -48,13 +49,19 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 		AccountID:      "test",
 		OutputResponse: false,
 	}
-	ex, err := tradeapi.New(exchangeVars)
-	if err != nil {
-		logger.Error(err)
+
+	var ex iex.IExchange
+	var err error
+	if test != nil && test[0] == true {
+		ex = tantra.New(exchangeVars, algo.Market)
+	} else {
+		ex, err = tradeapi.New(exchangeVars)
+		if err != nil {
+			logger.Error(err)
+		}
 	}
 
 	orderStatus = ex.GetPotentialOrderStatus()
-	logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+1)
 	localBars := database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
 	// Set initial timestamp for algo
 	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
@@ -77,7 +84,7 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 	var localOrders []iex.Order
 	orders, _ := ex.GetOpenOrders(iex.OpenOrderF{Currency: algo.Market.BaseAsset.Symbol})
 	localOrders = updateLocalOrders(&algo, localOrders, orders)
-	logger.Infof("%v orders found", len(localOrders))
+	logger.Infof("%v orders found\n", len(localOrders))
 	// SUBSCRIBE TO WEBSOCKETS
 
 	// channels to subscribe to
@@ -99,7 +106,8 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 	}
 
 	// Start the websocket.
-	err = ex.StartWS(&iex.WsConfig{Host: algo.Market.WSStream, //"testnet.bitmex.com", //"stream.binance.us:9443",
+	err = ex.StartWS(&iex.WsConfig{
+		Host:      algo.Market.WSStream,
 		Streams:   subscribeInfos,
 		Channels:  channels,
 		ApiSecret: config.APISecret,
@@ -207,6 +215,7 @@ func updatePositions(algo *Algo, positions []iex.WsPosition) {
 }
 
 func updateAlgoBalances(algo *Algo, balances []iex.WSBalance) {
+	logger.Info("updateAlgoBalances")
 	for i := range balances {
 		if balances[i].Asset == algo.Market.BaseAsset.Symbol {
 			walletAmount := float64(balances[i].Balance)
