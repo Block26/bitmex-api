@@ -2,6 +2,7 @@ package tantra
 
 import (
 	"errors"
+	"log"
 	"math"
 	"time"
 
@@ -68,12 +69,12 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// next time interval
 
 			//Check if bids filled
-			pricesFilled, ordersFilled := t.getFilledBidOrders(row.Low)
-			fillCost, fillQuantity := t.getCostAverage(pricesFilled, ordersFilled)
+			bidsFilled := t.getFilledBidOrders(row.Low)
+			fillCost, fillQuantity := t.getCostAverage(bidsFilled)
 			t.updateBalance(t.Account.BaseAsset.Quantity, t.Account.QuoteAsset.Quantity, t.Account.AverageCost, fillCost, fillQuantity, t.marketType, true)
 			//Check if asks filled
-			pricesFilled, ordersFilled = t.getFilledAskOrders(row.High)
-			fillCost, fillQuantity = t.getCostAverage(pricesFilled, ordersFilled)
+			asksFilled := t.getFilledAskOrders(row.High)
+			fillCost, fillQuantity = t.getCostAverage(asksFilled)
 			t.updateBalance(t.Account.BaseAsset.Quantity, t.Account.QuoteAsset.Quantity, t.Account.AverageCost, fillCost, -fillQuantity, t.marketType, true)
 
 			t.respondWithOrderChanges()
@@ -135,6 +136,9 @@ func (t *Tantra) getLastAccountHistory() *models.Market {
 }
 
 func (t *Tantra) respondWithOrderChanges() {
+	for _, order := range t.newOrders {
+		log.Println("o,", order)
+	}
 	if len(t.newOrders) > 0 {
 		t.channels.OrderChan <- t.newOrders
 		<-t.channels.OrderChan
@@ -251,61 +255,65 @@ func (t *Tantra) CurrentOptionProfit() float64 {
 	return currentProfit
 }
 
-func (t *Tantra) getCostAverage(pricesFilled []float64, ordersFilled []float64) (float64, float64) {
+func (t *Tantra) getCostAverage(filledOrders []iex.Order) (averageCost float64, quantity float64) {
 	// print(len(prices), len(orders), len(timestamp_arr[0]))
-	quantityFilled := utils.SumArr(ordersFilled)
-	if quantityFilled > 0 {
-		normalizer := 1 / quantityFilled
-		norm := utils.MulArr(ordersFilled, normalizer)
-		costAverage := utils.SumArr(utils.MulArrs(pricesFilled, norm))
-		return costAverage, quantityFilled
+	totalCost := 0.0
+	for _, order := range filledOrders {
+		totalCost += order.Rate * order.Amount
+		quantity += order.Amount
 	}
+	if quantity > 0 {
+		averageCost = totalCost / quantity
+		log.Println("getCostAverage", averageCost)
+		return
+	}
+
 	return 0.0, 0.0
 }
 
-func (t *Tantra) getFilledBidOrders(price float64) ([]float64, []float64) {
-	var hitPrices []float64
-	var hitQuantities []float64
-
-	var oldPrices []float64
-	var oldQuantities []float64
-	for i := range t.Account.BuyOrders.Price {
-		if t.Account.BuyOrders.Price[i] > price {
-			hitPrices = append(hitPrices, t.Account.BuyOrders.Price[i])
-			hitQuantities = append(hitQuantities, t.Account.BuyOrders.Quantity[i])
-		} else {
-			oldPrices = append(oldPrices, t.Account.BuyOrders.Price[i])
-			oldQuantities = append(oldQuantities, t.Account.BuyOrders.Quantity[i])
+func (t *Tantra) getFilledBidOrders(price float64) (filledOrders []iex.Order) {
+	for _, order := range t.orders {
+		if order.Side == "Buy" {
+			if order.Rate > price {
+				o := order // make a copy so we can delete it
+				// Update Order Status
+				o.OrdStatus = t.GetPotentialOrderStatus().Filled
+				filledOrders = append(filledOrders, o)
+				t.newOrders = append(t.newOrders, o)
+			}
 		}
 	}
 
-	t.Account.BuyOrders.Price = oldPrices
-	t.Account.BuyOrders.Quantity = oldQuantities
-	return hitPrices, hitQuantities
+	// Delete filled orders from orders open
+	for _, order := range filledOrders {
+		delete(t.orders, order.OrderID)
+	}
+
+	return
 }
 
-func (t *Tantra) getFilledAskOrders(price float64) ([]float64, []float64) {
-	var hitPrices []float64
-	var hitQuantities []float64
-
-	var oldPrices []float64
-	var oldQuantities []float64
-	for i := range t.Account.SellOrders.Price {
-		if t.Account.SellOrders.Price[i] < price {
-			hitPrices = append(hitPrices, t.Account.SellOrders.Price[i])
-			hitQuantities = append(hitQuantities, t.Account.SellOrders.Quantity[i])
-		} else {
-			oldPrices = append(oldPrices, t.Account.SellOrders.Price[i])
-			oldQuantities = append(oldQuantities, t.Account.SellOrders.Quantity[i])
+func (t *Tantra) getFilledAskOrders(price float64) (filledOrders []iex.Order) {
+	for _, order := range t.orders {
+		if order.Side == "Sell" {
+			if order.Rate < price {
+				o := order // make a copy so we can delete it
+				// Update Order Status
+				o.OrdStatus = t.GetPotentialOrderStatus().Filled
+				filledOrders = append(filledOrders, o)
+				t.newOrders = append(t.newOrders, o)
+			}
 		}
 	}
 
-	t.Account.SellOrders.Price = oldPrices
-	t.Account.SellOrders.Quantity = oldQuantities
-	return hitPrices, hitQuantities
+	// Delete filled orders from orders open
+	for _, order := range filledOrders {
+		delete(t.orders, order.OrderID)
+	}
+	return
 }
 
 func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
+	log.Println("PlaceOrder", order)
 	// Create uuid for order
 	uuid = time.Now().String() + string(len(t.orders))
 	order.OrderID = uuid
@@ -316,9 +324,12 @@ func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
 }
 
 func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
-	order := t.orders[cancel.Uuid]
-	order.OrdStatus = t.GetPotentialOrderStatus().Cancelled
-	t.newOrders = append(t.newOrders, order)
+	// It wasn't making a copy so I am just reconstructing the order
+	canceledOrder := iex.Order{
+		OrderID:   cancel.Uuid,
+		OrdStatus: t.GetPotentialOrderStatus().Cancelled,
+	}
+	t.newOrders = append(t.newOrders, canceledOrder)
 	delete(t.orders, cancel.Uuid)
 	return
 }
