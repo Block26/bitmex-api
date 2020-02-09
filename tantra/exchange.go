@@ -137,13 +137,10 @@ func (t *Tantra) getLastAccountHistory() *models.Market {
 
 func (t *Tantra) respondWithOrderChanges() {
 	for _, order := range t.newOrders {
-		log.Println("o,", order)
-	}
-	if len(t.newOrders) > 0 {
-		t.channels.OrderChan <- t.newOrders
+		t.channels.OrderChan <- []iex.Order{order}
 		<-t.channels.OrderChan
-		t.newOrders = make([]iex.Order, 0)
 	}
+	t.newOrders = make([]iex.Order, 0)
 }
 
 func (t *Tantra) updateBalance(currentBaseBalance float64, currentQuantity float64, averageCost float64, fillPrice float64, fillAmount float64, marketType string, updateAlgo ...bool) (float64, float64, float64) {
