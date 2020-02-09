@@ -25,12 +25,24 @@ var firstPositionUpdate bool
 var commitHash string
 var lastTest int64
 var lastWalletSync int64
+var startTime time.Time
+
+func RunTest(algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar), test ...bool) {
+	Connect("", false, algo, rebalance, setupData, test...)
+}
 
 // Connect is called to connect to an exchanges WS api and begin trading.
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
 //
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
 func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar), test ...bool) {
+	startTime = time.Now()
+	var isTest bool
+	if test != nil {
+		isTest = test[0]
+	} else {
+		isTest = false
+	}
 	database.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
@@ -52,7 +64,8 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 
 	var ex iex.IExchange
 	var err error
-	if test != nil && test[0] == true {
+
+	if isTest {
 		ex = tantra.New(exchangeVars, algo.Market)
 	} else {
 		ex, err = tradeapi.New(exchangeVars)
@@ -118,26 +131,46 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 		logger.Error(err)
 	}
 
+	if isTest {
+		// Clear local data so test starts with nothing
+	}
+
+	// All of these channels send them selve back so that the test can wait for each individual to complete
 	for {
 		select {
 		case positions := <-channels.PositionChan:
 			updatePositions(&algo, positions)
+			channels.PositionChan <- positions
 		case trade := <-channels.TradeBinChan:
+			// Update your local bars
 			updateBars(&algo, ex, trade[0])
-			updateState(&algo, ex, trade[0], setupData)
-			rebalance(&algo)
-			setupOrders(&algo, trade[0].Close)
-			placeOrdersOnBook(&algo, ex, localOrders)
+			// now fetch the bars
+			bars := database.GetBars()
+			algo.OHLCV = utils.GetOHLCV(bars)
+
+			// Did we get enough data to run this? If we didn't then throw fatal error to notify system
+			if algo.DataLength < len(bars) {
+				updateState(&algo, ex, bars, setupData)
+				rebalance(&algo)
+			} else {
+				log.Fatalln("I do not have enough data to trade. local data length", len(bars), "data length wanted by algo", algo.DataLength)
+			}
+			// setupOrders(&algo, trade[0].Close)
+			// placeOrdersOnBook(&algo, ex, localOrders)
 			logState(&algo)
-			runTest(&algo, setupData, rebalance)
-			// updateOptionPositions(&algo,  )
-			if secret {
+			if !isTest {
+				logLiveState(&algo)
+				runTest(&algo, setupData, rebalance)
 				checkWalletHistory(&algo, ex, settingsFileName)
 			}
+			// updateOptionPositions(&algo,  )
+			channels.TradeBinChan <- trade
 		case newOrders := <-channels.OrderChan:
 			localOrders = updateLocalOrders(&algo, localOrders, newOrders)
+			channels.OrderChan <- newOrders
 		case update := <-channels.WalletChan:
 			updateAlgoBalances(&algo, update.Balance)
+			channels.WalletChan <- update
 		}
 	}
 }
@@ -237,20 +270,18 @@ func updateBars(algo *Algo, ex iex.IExchange, trade iex.TradeBin) {
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
 		diff := trade.Timestamp.Sub(time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0))
 		if diff.Minutes() >= 60 {
-			database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
+			database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 1)
 		}
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 2)
+		database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 1)
 	} else {
 		log.Fatal("This rebalance interval is not supported")
 	}
 	algo.Index = len(database.GetBars()) - 1
+	logger.Info("Time Elapsed", startTime.Sub(time.Now()))
 }
 
-func updateState(algo *Algo, ex iex.IExchange, trade iex.TradeBin, setupData func(*Algo, []*Bar)) {
-	logger.Info("Trade Update:", trade)
-	bars := database.GetBars()
-	algo.OHLCV = utils.GetOHLCV(bars)
+func updateState(algo *Algo, ex iex.IExchange, bars []*Bar, setupData func(*Algo, []*Bar)) {
 	setupData(algo, bars)
 	algo.Timestamp = time.Unix(bars[algo.Index].Timestamp/1000, 0).UTC()
 	algo.Market.Price = *database.GetBars()[algo.Index]
