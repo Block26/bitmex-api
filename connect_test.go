@@ -92,6 +92,7 @@ func TestBalanceUpdate(t *testing.T) {
 }
 
 func TestOrderUpdate(t *testing.T) {
+	isTest := true
 	ex := setupExchange()
 	algo := setupAlgo()
 	orderStatus = ex.GetPotentialOrderStatus()
@@ -107,7 +108,7 @@ func TestOrderUpdate(t *testing.T) {
 			OrdStatus: "new",
 		},
 	}
-	localOrders = updateLocalOrders(&algo, localOrders, newOrders)
+	localOrders = updateLocalOrders(&algo, localOrders, newOrders, isTest)
 	if len(localOrders) != 1 {
 		t.Error("Orders not updating properly")
 	}
@@ -122,7 +123,7 @@ func TestOrderUpdate(t *testing.T) {
 			OrdStatus: "new",
 		},
 	}
-	localOrders = updateLocalOrders(&algo, localOrders, newOrders)
+	localOrders = updateLocalOrders(&algo, localOrders, newOrders, isTest)
 	if len(localOrders) != 2 {
 		t.Error("Orders not updating properly")
 	}
@@ -137,7 +138,7 @@ func TestOrderUpdate(t *testing.T) {
 			OrdStatus: "Canceled",
 		},
 	}
-	localOrders = updateLocalOrders(&algo, localOrders, newOrders)
+	localOrders = updateLocalOrders(&algo, localOrders, newOrders, isTest)
 	if len(localOrders) != 1 {
 		t.Error("Orders not updating properly")
 	}

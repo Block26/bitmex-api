@@ -5,12 +5,11 @@ import (
 	"math"
 	"sort"
 	"strings"
-	"time"
 
-	. "github.com/tantralabs/models"
-	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
+	. "github.com/tantralabs/models"
+	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/utils"
 )
 
@@ -156,16 +155,18 @@ func placeOrdersOnBook(algo *Algo, ex iex.IExchange, openOrders []iex.Order) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		time.Sleep(50 * time.Millisecond)
+		// TODO when live this should be honored as not to spam the api
+		// time.Sleep(50 * time.Millisecond)
 	}
 
 	place := func(order iex.Order) {
-		log.Printf("Trying to place order %v\n", order)
+		log.Println("Trying to place order for", order.Market, "Quantity", order.Amount, "Price", order.Rate)
 		_, err := ex.PlaceOrder(order)
 		if err != nil {
 			log.Fatal(err)
 		}
-		time.Sleep(50 * time.Millisecond)
+		// TODO when live this should be honored as not to spam the api
+		// time.Sleep(50 * time.Millisecond)
 	}
 
 	if len(algo.Market.SellOrders.Price) == 0 && len(algo.Market.BuyOrders.Price) == 0 && len(openOrders) > 0 {
@@ -406,7 +407,7 @@ func placeOrdersOnBook(algo *Algo, ex iex.IExchange, openOrders []iex.Order) {
 	}
 }
 
-func updateLocalOrders(algo *Algo, oldOrders []iex.Order, newOrders []iex.Order) []iex.Order {
+func updateLocalOrders(algo *Algo, oldOrders []iex.Order, newOrders []iex.Order, isTest bool) []iex.Order {
 	var updatedOrders []iex.Order
 	for _, oldOrder := range oldOrders {
 		found := false
@@ -418,7 +419,9 @@ func updateLocalOrders(algo *Algo, oldOrders []iex.Order, newOrders []iex.Order)
 				} else if newOrder.OrdStatus == orderStatus.Filled {
 					newOrder.Rate = oldOrder.Rate
 					newOrder.Side = oldOrder.Side
-					logFilledTrade(algo, newOrder)
+					if !isTest {
+						logFilledTrade(algo, newOrder)
+					}
 				} else {
 					updatedOrders = append(updatedOrders, newOrder)
 				}
@@ -445,7 +448,9 @@ func updateLocalOrders(algo *Algo, oldOrders []iex.Order, newOrders []iex.Order)
 				logger.Debug(newOrder.OrdStatus, newOrder.OrderID)
 			} else {
 				logger.Debug("New Order", newOrder.OrdStatus, newOrder.OrderID)
-				logTrade(algo, newOrder)
+				if !isTest {
+					logTrade(algo, newOrder)
+				}
 				updatedOrders = append(updatedOrders, newOrder)
 			}
 		}

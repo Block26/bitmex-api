@@ -29,6 +29,8 @@ func New(vars iex.ExchangeConf, market models.Market) *Tantra {
 		Account:               market,
 		AccountHistory:        make([]models.Market, 0),
 		marketType:            marketType,
+		orders:                make(map[string]iex.Order),
+		newOrders:             make([]iex.Order, 0),
 	}
 }
 
@@ -41,6 +43,8 @@ type Tantra struct {
 	SimulatedExchangeName string
 	Account               models.Market
 	AccountHistory        []models.Market
+	orders                map[string]iex.Order
+	newOrders             []iex.Order
 	index                 int
 	data                  []iex.TradeBin
 	start                 time.Time
@@ -72,9 +76,11 @@ func (t *Tantra) StartWS(config interface{}) error {
 			fillCost, fillQuantity = t.getCostAverage(pricesFilled, ordersFilled)
 			t.updateBalance(t.Account.BaseAsset.Quantity, t.Account.QuoteAsset.Quantity, t.Account.AverageCost, fillCost, -fillQuantity, t.marketType, true)
 
+			t.respondWithOrderChanges()
+
 			lastAccountState := t.getLastAccountHistory()
 
-			// // Has the balance changed? Send a balance update. No? Do Nothing
+			// Has the balance changed? Send a balance update. No? Do Nothing
 			if lastAccountState.BaseAsset.Quantity != t.Account.BaseAsset.Quantity {
 				wallet := iex.WSWallet{
 					Balance: []iex.WSBalance{
@@ -126,6 +132,14 @@ func (t *Tantra) getLastAccountHistory() *models.Market {
 		return &t.AccountHistory[length-1]
 	}
 	return &t.Account
+}
+
+func (t *Tantra) respondWithOrderChanges() {
+	if len(t.newOrders) > 0 {
+		t.channels.OrderChan <- t.newOrders
+		<-t.channels.OrderChan
+		t.newOrders = make([]iex.Order, 0)
+	}
 }
 
 func (t *Tantra) updateBalance(currentBaseBalance float64, currentQuantity float64, averageCost float64, fillPrice float64, fillAmount float64, marketType string, updateAlgo ...bool) (float64, float64, float64) {
@@ -289,6 +303,24 @@ func (t *Tantra) getFilledAskOrders(price float64) ([]float64, []float64) {
 	t.Account.SellOrders.Price = oldPrices
 	t.Account.SellOrders.Quantity = oldQuantities
 	return hitPrices, hitQuantities
+}
+
+func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
+	// Create uuid for order
+	uuid = time.Now().String() + string(len(t.orders))
+	order.OrderID = uuid
+	order.OrdStatus = "Open"
+	t.orders[uuid] = order
+	t.newOrders = append(t.newOrders, order)
+	return
+}
+
+func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
+	order := t.orders[cancel.Uuid]
+	order.OrdStatus = t.GetPotentialOrderStatus().Cancelled
+	t.newOrders = append(t.newOrders, order)
+	delete(t.orders, cancel.Uuid)
+	return
 }
 
 func (t *Tantra) GetPotentialOrderStatus() iex.OrderStatus {

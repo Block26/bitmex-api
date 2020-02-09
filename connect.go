@@ -96,7 +96,7 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 
 	var localOrders []iex.Order
 	orders, _ := ex.GetOpenOrders(iex.OpenOrderF{Currency: algo.Market.BaseAsset.Symbol})
-	localOrders = updateLocalOrders(&algo, localOrders, orders)
+	localOrders = updateLocalOrders(&algo, localOrders, orders, isTest)
 	logger.Infof("%v orders found\n", len(localOrders))
 	// SUBSCRIBE TO WEBSOCKETS
 
@@ -131,17 +131,15 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 		logger.Error(err)
 	}
 
-	if isTest {
-		// Clear local data so test starts with nothing
-	}
-
 	// All of these channels send them selve back so that the test can wait for each individual to complete
 	for {
 		select {
 		case positions := <-channels.PositionChan:
+			log.Println("channels.PositionChan")
 			updatePositions(&algo, positions)
 			channels.PositionChan <- positions
 		case trade := <-channels.TradeBinChan:
+			log.Println("channels.TradeBinChan")
 			// Update your local bars
 			updateBars(&algo, ex, trade[0])
 			// now fetch the bars
@@ -155,8 +153,8 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 			} else {
 				log.Fatalln("I do not have enough data to trade. local data length", len(bars), "data length wanted by algo", algo.DataLength)
 			}
-			// setupOrders(&algo, trade[0].Close)
-			// placeOrdersOnBook(&algo, ex, localOrders)
+			setupOrders(&algo, trade[0].Close)
+			placeOrdersOnBook(&algo, ex, localOrders)
 			logState(&algo)
 			if !isTest {
 				logLiveState(&algo)
@@ -166,9 +164,11 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 			// updateOptionPositions(&algo,  )
 			channels.TradeBinChan <- trade
 		case newOrders := <-channels.OrderChan:
-			localOrders = updateLocalOrders(&algo, localOrders, newOrders)
+			log.Println("channels.OrderChan")
+			localOrders = updateLocalOrders(&algo, localOrders, newOrders, isTest)
 			channels.OrderChan <- newOrders
 		case update := <-channels.WalletChan:
+			log.Println("channels.WalletChan")
 			updateAlgoBalances(&algo, update.Balance)
 			channels.WalletChan <- update
 		}
@@ -278,14 +278,14 @@ func updateBars(algo *Algo, ex iex.IExchange, trade iex.TradeBin) {
 		log.Fatal("This rebalance interval is not supported")
 	}
 	algo.Index = len(database.GetBars()) - 1
-	logger.Info("Time Elapsed", startTime.Sub(time.Now()))
+	logger.Info("Time Elapsed", startTime.Sub(time.Now()), "Index", algo.Index)
 }
 
 func updateState(algo *Algo, ex iex.IExchange, bars []*Bar, setupData func(*Algo, []*Bar)) {
 	setupData(algo, bars)
 	algo.Timestamp = time.Unix(bars[algo.Index].Timestamp/1000, 0).UTC()
 	algo.Market.Price = *database.GetBars()[algo.Index]
-	logger.Info("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
+	// logger.Info("algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if firstTrade {
 		logState(algo)
 		firstTrade = false
