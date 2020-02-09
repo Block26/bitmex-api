@@ -17,10 +17,10 @@ import (
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/models"
 	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/utils"
 )
 
@@ -142,7 +142,6 @@ func logState(algo *Algo, timestamp ...time.Time) (state History) {
 		}
 
 	} else {
-		logLiveState(algo)
 	}
 	if algo.Debug {
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Market.BaseAsset.Quantity*algo.Market.Price.Close+(algo.Market.QuoteAsset.Quantity), 0.0, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.Price.Close, algo.Market.AverageCost))
