@@ -160,9 +160,12 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 				logLiveState(&algo)
 				runTest(&algo, setupData, rebalance)
 				checkWalletHistory(&algo, ex, settingsFileName)
+			} else if algo.Index == 5555 {
+				// TODO solve for how long the test should be
+				channels.TradeBinChan = nil
+			} else {
+				channels.TradeBinChan <- trade
 			}
-			// updateOptionPositions(&algo,  )
-			channels.TradeBinChan <- trade
 		case newOrders := <-channels.OrderChan:
 			log.Println("channels.OrderChan")
 			localOrders = updateLocalOrders(&algo, localOrders, newOrders, isTest)
@@ -171,6 +174,9 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 			log.Println("channels.WalletChan")
 			updateAlgoBalances(&algo, update.Balance)
 			channels.WalletChan <- update
+		}
+		if channels.TradeBinChan == nil {
+			break
 		}
 	}
 }
