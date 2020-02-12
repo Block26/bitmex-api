@@ -13,7 +13,7 @@ require (
 	github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441
 	github.com/tantralabs/exchanges v0.0.0-20200204190209-ebc589b6dd8e
 	github.com/tantralabs/logger v0.0.0-20200204183402-925e01159ffa
-	github.com/tantralabs/models v0.0.0-20200205081325-d053324d7045
+	github.com/tantralabs/models v0.0.0-20200212212128-34152e4dec3a
 	github.com/tantralabs/theo-engine v0.0.0-20200207043732-16fb381acae1
 	github.com/tantralabs/tradeapi v0.0.0-20200203232623-51c7d08a9113
 	github.com/tantralabs/utils v0.0.0-20200205084618-c96405e79c20
