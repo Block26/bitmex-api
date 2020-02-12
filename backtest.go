@@ -184,7 +184,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*
 	}
 
 	//Log turnover stats
-	if algo.LogStatsToCsv == true {
+	if algo.LogStatsToCSV == true {
 		stats := turnoverStats(history, algo)
 		// statsMap := structs.Map(stats)
 		// kvStats := utils.CreateKeyValuePairs(statsMap, true)
