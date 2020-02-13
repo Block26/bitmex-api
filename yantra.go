@@ -12,15 +12,16 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/models"
 	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/utils"
 )
 
@@ -222,10 +223,18 @@ func getFillPrice(algo *Algo, bar *Bar) float64 {
 }
 
 func getInfluxClient() client.Client {
+	influxURL := os.Getenv("YANTRA_LIVE_DB_URL")
+	if influxURL == "" {
+		log.Fatalln("You need to set the `YANTRA_LIVE_DB_URL` env variable")
+	}
+
+	influxUser := os.Getenv("YANTRA_LIVE_DB_USERNAME")
+	influxPassword := os.Getenv("YANTRA_LIVE_DB_PASSWORD")
+
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     "http://ec2-54-219-145-3.us-west-1.compute.amazonaws.com:8086",
-		Username: "russell",
-		Password: "KNW(12nAS921D",
+		Addr:     influxURL,
+		Username: influxUser,
+		Password: influxPassword,
 	})
 
 	if err != nil {

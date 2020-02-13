@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tantralabs/exchanges"
 	. "github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/exchanges"
 )
 
 func setupAlgo() Algo {
@@ -16,7 +16,8 @@ func setupAlgo() Algo {
 	algo := Algo{
 		Name:                "test",
 		Market:              market,
-		Params:              map[string]interface{}{},
+		Params:              make(map[string]interface{}),
+		Result:              make(map[string]interface{}),
 		RebalanceInterval:   exchanges.RebalanceInterval().Minute,
 		FillType:            exchanges.FillType().Close,
 		EntryOrderSize:      0.2,

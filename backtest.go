@@ -838,8 +838,18 @@ func getFilledAskOrders(algo *Algo, price float64) ([]float64, []float64) {
 }
 
 func logBacktest(algo Algo) {
+	influxURL := os.Getenv("YANTRA_BACKTEST_DB_URL")
+	if influxURL == "" {
+		log.Fatalln("You need to set the `YANTRA_BACKTEST_DB_URL` env variable")
+	}
+
+	influxUser := os.Getenv("YANTRA_BACKTEST_DB_USERNAME")
+	influxPassword := os.Getenv("YANTRA_BACKTEST_DB_PASSWORD")
+
 	influx, _ := client.NewHTTPClient(client.HTTPConfig{
-		Addr: "http://ec2-34-222-170-225.us-west-2.compute.amazonaws.com:8086",
+		Addr:     influxURL,
+		Username: influxUser,
+		Password: influxPassword,
 	})
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
