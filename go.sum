@@ -56,6 +56,8 @@ github.com/tantralabs/models v0.0.0-20200203231948-eb968dd6842e/go.mod h1:j90tl5
 github.com/tantralabs/models v0.0.0-20200205080328-3261c05d27c0/go.mod h1:j90tl5Nd/Unbu24VywxgzYljJzyrxZDZOH8DVsVEf2g=
 github.com/tantralabs/models v0.0.0-20200205081325-d053324d7045 h1:Bkvhw+CHUA0sb9aBrrIlV+5rqjF9EwlPYvDspj7Ad4E=
 github.com/tantralabs/models v0.0.0-20200205081325-d053324d7045/go.mod h1:j90tl5Nd/Unbu24VywxgzYljJzyrxZDZOH8DVsVEf2g=
+github.com/tantralabs/models v0.0.0-20200213170530-f1af8ab61f15 h1:2igzFu7n+r+MCML0ImIiuHtOJntD/7j/9w67ulKKS80=
+github.com/tantralabs/models v0.0.0-20200213170530-f1af8ab61f15/go.mod h1:j90tl5Nd/Unbu24VywxgzYljJzyrxZDZOH8DVsVEf2g=
 github.com/tantralabs/theo-engine v0.0.0-20200204205855-f307e1ec18e4 h1:zOF96t/vtz/LBKw8CKdXK163ymH8MuqvGfZPgxjyxWw=
 github.com/tantralabs/theo-engine v0.0.0-20200204205855-f307e1ec18e4/go.mod h1:yF8aA2CM+9I18VsLYL8ifhUG3uriiQ+cwte2NyWAEVM=
 github.com/tantralabs/theo-engine v0.0.0-20200207043732-16fb381acae1 h1:SMgs3VXRfMoneVRhORrp9x88auszJpPrzTpkii/vA1U=

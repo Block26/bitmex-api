@@ -55,7 +55,6 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*
 	algo.OHLCV = utils.GetOHLCV(bars)
 	setupData(&algo, bars)
 	history := make([]History, 0)
-	testStats := make([]Stats, 0)
 	algo.Timestamp = utils.TimestampToTime(int(bars[0].Timestamp))
 	if algo.Market.Options {
 		// Build theo engine
