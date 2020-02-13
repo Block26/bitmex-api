@@ -11,6 +11,7 @@ import (
 	"runtime/pprof"
 	"time"
 
+	"github.com/fatih/structs"
 	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
 
