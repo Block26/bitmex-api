@@ -184,29 +184,28 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*
 	}
 
 	//Log turnover stats
-	if algo.LogStatsToCSV == true {
+	if algo.LogStats == true {
 		stats := turnoverStats(history, algo)
-		// statsMap := structs.Map(stats)
-		// kvStats := utils.CreateKeyValuePairs(statsMap, true)
+		statsMap := structs.Map(stats)
+		kvStats := utils.CreateKeyValuePairs(statsMap, true)
 
-		// fmt.Print("Backtested Stats")
-		// fmt.Printf("%s", kvStats)
+		fmt.Print("Backtested Stats")
+		fmt.Printf("%s", kvStats)
 
 		// Log stats history
-		os.Remove("stats.csv")
-		statsFile, err := os.OpenFile("stats.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
-		if err != nil {
-			panic(err)
-		}
-		defer statsFile.Close()
+		// os.Remove("stats.csv")
+		// statsFile, err := os.OpenFile("stats.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// defer statsFile.Close()
 
-		testStats = append(testStats, stats)
+		// testStats = append(testStats, stats)
 
-		// log.Println(testStats)
-		err = gocsv.MarshalFile(testStats, statsFile) // Use this to save the CSV back to the file
-		if err != nil {
-			panic(err)
-		}
+		// err = gocsv.MarshalFile(testStats, statsFile) // Use this to save the CSV back to the file
+		// if err != nil {
+		// 	panic(err)
+		// }
 	}
 
 	fmt.Println("-------------------------------")
