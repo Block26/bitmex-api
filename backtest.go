@@ -154,6 +154,14 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*
 		score = -100
 	}
 
+	if algo.AutoOrderPlacement {
+		algo.Params["AutoOrderPlacement"] = map[string]interface{}{
+			"EntryOrderSize":      algo.EntryOrderSize,
+			"ExitOrderSize":       algo.ExitOrderSize,
+			"DeleverageOrderSize": algo.DeleverageOrderSize,
+		}
+	}
+
 	// logger.Debugf("Last option balance: %v", lastOptionBalance)
 	// log.Println("Params1", algo.Params)
 	kvparams := utils.CreateKeyValuePairs(algo.Params, true)
@@ -168,20 +176,6 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*
 		score,
 		kvparams,
 	)
-
-	if algo.AutoOrderPlacement {
-		fmt.Print("AutoOrderPlacement Parameters")
-		algo.Params["EntryOrderSize"] = algo.EntryOrderSize
-		algo.Params["ExitOrderSize"] = algo.ExitOrderSize
-		algo.Params["DeleverageOrderSize"] = algo.DeleverageOrderSize
-
-		kvparams := utils.CreateKeyValuePairs(map[string]interface{}{
-			"EntryOrderSize":      algo.EntryOrderSize,
-			"ExitOrderSize":       algo.ExitOrderSize,
-			"DeleverageOrderSize": algo.DeleverageOrderSize,
-		}, true)
-		fmt.Printf("%s", kvparams)
-	}
 
 	//Log turnover stats
 	if algo.LogStats == true {
