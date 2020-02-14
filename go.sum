@@ -94,6 +94,8 @@ github.com/tantralabs/database v0.0.0-20200204183143-0da0f0e5aa3c h1:RMtWxHq2eIt
 github.com/tantralabs/database v0.0.0-20200204183143-0da0f0e5aa3c/go.mod h1:whSydCr8xhYkq8dPv8s9qFpmb6mN2Osjb1nbHQ2g4FQ=
 github.com/tantralabs/database v0.0.0-20200214221558-d3dc9d9e5fb9 h1:cG3Gkj3twHPRy+itVBV6bMQylF12IBsgLyl0QpySRuk=
 github.com/tantralabs/database v0.0.0-20200214221558-d3dc9d9e5fb9/go.mod h1:whSydCr8xhYkq8dPv8s9qFpmb6mN2Osjb1nbHQ2g4FQ=
+github.com/tantralabs/database v0.0.0-20200214233726-bb44037373af h1:D+M7RSn0XluFTjdQRWuNBdVz7MiXzuI0eIfPksy9kbk=
+github.com/tantralabs/database v0.0.0-20200214233726-bb44037373af/go.mod h1:whSydCr8xhYkq8dPv8s9qFpmb6mN2Osjb1nbHQ2g4FQ=
 github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441 h1:4LLUBP40oa/AcX8gRnYYc34yx9UDDTYtbPFKIMsSDzE=
 github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441/go.mod h1:AJj0mJkQXEOhwdgxglbcSmqipxK7B4GadT5d2jL0AF8=
 github.com/tantralabs/exchanges v0.0.0-20200204190209-ebc589b6dd8e h1:tzcCkOBN5U3yB9Gkq+wL2mfXqGTgUmGudH75rRj7epE=
