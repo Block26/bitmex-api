@@ -27,9 +27,9 @@ var lastWalletSync int64
 
 // Connect is called to connect to an exchanges WS api and begin trading.
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
-//
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
 func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar)) {
+	utils.LoadENV(secret)
 	database.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")

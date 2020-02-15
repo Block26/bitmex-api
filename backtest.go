@@ -34,6 +34,11 @@ var lastOptionBalance = 0.
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
 func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar)) Algo {
+	envSet := os.Getenv("YANTRA_BACKTEST_DB_URL")
+	if envSet == "" {
+		log.Println("`YANTRA_BACKTEST_DB_URL` is not set, attempting to connect to AWS secrets to fetch env variables.")
+		utils.LoadENV(true)
+	}
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -844,6 +849,7 @@ func logBacktest(algo Algo) {
 		Addr:     influxURL,
 		Username: influxUser,
 		Password: influxPassword,
+		Timeout:  (time.Millisecond * 1000 * 10),
 	})
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
