@@ -17,6 +17,7 @@ import (
 	"gonum.org/v1/gonum/stat"
 
 	client "github.com/influxdata/influxdb1-client/v2"
+	backtestDB "github.com/tantralabs/backtest-db"
 	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
 	. "github.com/tantralabs/models"
@@ -28,7 +29,7 @@ import (
 var currentRunUUID time.Time
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
-var lastOptionBalance = 0.
+var db = backtestDB.NewDB()
 
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
@@ -89,13 +90,16 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*
 			logger.Debugf("Rebalance took %v ns\n", time.Now().UnixNano()-start)
 			if algo.FillType == exchanges.FillType().Limit {
 				//Check which buys filled
-				pricesFilled, ordersFilled := getFilledBidOrders(&algo, bar.Low)
+				pricesFilled, ordersFilled := getFilledBidOrders(&algo, bar.Close)
 				fillCost, fillPercentage := getCostAverage(&algo, pricesFilled, ordersFilled)
-				updateBalance(&algo, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Buying*fillPercentage, marketType, true)
+				// updateBalance(&algo, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Buying*fillPercentage, marketType, true)
+				updateBalance(&algo, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, fillPercentage, marketType, true)
 				//Check which sells filled
-				pricesFilled, ordersFilled = getFilledAskOrders(&algo, bar.High)
+				pricesFilled, ordersFilled = getFilledAskOrders(&algo, bar.Close)
 				fillCost, fillPercentage = getCostAverage(&algo, pricesFilled, ordersFilled)
-				updateBalance(&algo, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Selling*-fillPercentage, marketType, true)
+				// TODO what is algo.Market.Selling?
+				// updateBalance(&algo, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, algo.Market.Selling*-fillPercentage, marketType, true)
+				updateBalance(&algo, algo.Market.BaseAsset.Quantity, algo.Market.QuoteAsset.Quantity, algo.Market.AverageCost, fillCost, -fillPercentage, marketType, true)
 			} else {
 				updateBalanceFromFill(&algo, marketType, getFillPrice(&algo, bars[idx+algo.FillShift]))
 			}
@@ -110,7 +114,7 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*
 			}
 			state := logState(&algo, algo.Timestamp)
 			history = append(history, state)
-			if algo.Market.BaseAsset.Quantity <= 0 {
+			if algo.Market.BaseAsset.Quantity+algo.Market.Profit < 0 {
 				logger.Debugf("Ran out of balance, killing...\n")
 				break
 			}
@@ -152,8 +156,6 @@ func RunBacktest(bars []*Bar, algo Algo, rebalance func(*Algo), setupData func(*
 	if history[historyLength-1].Balance < 0 {
 		score = -100
 	}
-
-	// logger.Debugf("Last option balance: %v", lastOptionBalance)
 
 	kvparams := utils.CreateKeyValuePairs(algo.Params, true)
 	log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Sharpe %0.3f \n Params: %s",
@@ -303,8 +305,9 @@ func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "buy", algo.Market.OptionSlippage)
 		}
 		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
-		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = updateBalance(algo, algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, optionQty, exchanges.MarketType().Option)
-		logger.Debugf("Updated buy avgcost for option %v: %v with baq %v\n", option.Symbol, option.AverageCost, algo.Market.BaseAsset.Quantity)
+		option.RealizedProfit, option.Position, option.AverageCost = updateBalance(algo, option.RealizedProfit, option.Position, option.AverageCost, optionPrice, optionQty, exchanges.MarketType().Option)
+		backtestDB.InsertTrade(db, option.Symbol, optionPrice, optionQty, "buy", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+		logger.Debugf("Updated buy avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
 		option.BuyOrders = OrderArray{
 			Quantity: []float64{},
 			Price:    []float64{},
@@ -319,8 +322,9 @@ func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 			optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "sell", algo.Market.OptionSlippage)
 		}
 		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
-		algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost = updateBalance(algo, algo.Market.BaseAsset.Quantity, option.Position, option.AverageCost, optionPrice, -optionQty, exchanges.MarketType().Option)
-		logger.Debugf("Updated sell avgcost for option %v: %v with baq %v\n", option.Symbol, option.AverageCost, algo.Market.BaseAsset.Quantity)
+		option.RealizedProfit, option.Position, option.AverageCost = updateBalance(algo, option.RealizedProfit, option.Position, option.AverageCost, optionPrice, -optionQty, exchanges.MarketType().Option)
+		backtestDB.InsertTrade(db, option.Symbol, optionPrice, optionQty, "sell", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+		logger.Debugf("Updated sell avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
 		option.SellOrders = OrderArray{
 			Quantity: []float64{},
 			Price:    []float64{},
@@ -353,7 +357,7 @@ func updateBalance(algo *Algo, currentBaseBalance float64, currentQuantity float
 				// Only use the remaining position that was filled to calculate cost
 				portionFillQuantity := math.Abs(currentQuantity)
 				logger.Debugf("Updating current base balance w bb %v, portionFillQuantity %v, diff %v, avgcost %v\n", currentBaseBalance, portionFillQuantity, diff, averageCost)
-				currentBaseBalance = currentBaseBalance + ((portionFillQuantity * diff) / averageCost)
+				currentBaseBalance += ((portionFillQuantity * diff) / averageCost)
 				averageCost = fillPrice
 			} else {
 				//Leaving Position
@@ -368,7 +372,7 @@ func updateBalance(algo *Algo, currentBaseBalance float64, currentQuantity float
 					diff = utils.CalculateDifference(fillPrice, averageCost)
 				}
 				logger.Debugf("Updating full fill quantity with baq %v, fillAmount %v, diff %v, avg cost %v\n", currentBaseBalance, fillAmount, diff, averageCost)
-				currentBaseBalance = currentBaseBalance + ((math.Abs(fillAmount) * diff) / averageCost)
+				currentBaseBalance += ((math.Abs(fillAmount) * diff) / averageCost)
 			}
 			currentQuantity = currentQuantity + fillAmount
 			if currentQuantity == 0 {
@@ -385,7 +389,7 @@ func updateBalance(algo *Algo, currentBaseBalance float64, currentQuantity float
 			}
 
 			currentQuantity = currentQuantity - newCost
-			currentBaseBalance = currentBaseBalance + fillAmount
+			currentBaseBalance += fillAmount
 		} else if marketType == exchanges.MarketType().Option {
 			totalQuantity := currentQuantity + fillAmount
 			newCost := fillPrice * fillAmount
@@ -395,27 +399,32 @@ func updateBalance(algo *Algo, currentBaseBalance float64, currentQuantity float
 			} else if ((fillAmount >= 0 && currentQuantity <= 0) || (fillAmount <= 0 && currentQuantity >= 0)) && math.Abs(fillAmount) >= math.Abs(currentQuantity) {
 				//Position changed
 				// Only use the remaining position that was filled to calculate cost
+				// TODO should a portion of the profit here be unrealized?
 				var balanceChange float64
 				if algo.Market.DenominatedInUnderlying {
-					balanceChange = currentQuantity * (fillPrice - averageCost)
+					balanceChange = (-currentQuantity) * (averageCost - fillPrice)
 				} else {
-					balanceChange = currentQuantity * (fillPrice - averageCost) / algo.Market.Price.Close
+					balanceChange = (-currentQuantity) * (averageCost - fillPrice) / algo.Market.Price.Close
 				}
-				logger.Debugf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v", currentBaseBalance, balanceChange, fillPrice, averageCost)
-				currentBaseBalance = currentBaseBalance + balanceChange
+				logger.Infof("Updating partial base balance w bb %v, balancechange %v, fillprice %v, avgcost %v", currentBaseBalance, balanceChange, fillPrice, averageCost)
+				currentBaseBalance += balanceChange
 				averageCost = fillPrice
 			} else {
 				//Leaving Position
 				var balanceChange float64
 				if algo.Market.DenominatedInUnderlying {
-					balanceChange = fillAmount * (fillPrice - averageCost)
+					balanceChange = fillAmount * (averageCost - fillPrice)
 				} else {
-					balanceChange = fillAmount * (fillPrice - averageCost) / algo.Market.Price.Close
+					balanceChange = fillAmount * (averageCost - fillPrice) / algo.Market.Price.Close
 				}
-				logger.Debugf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v\n", currentBaseBalance, balanceChange, fillPrice, averageCost)
-				currentBaseBalance = currentBaseBalance + balanceChange
+				logger.Infof("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v, fill amount %v\n",
+					currentBaseBalance, balanceChange, fillPrice, averageCost, fillAmount)
+				currentBaseBalance += balanceChange
 			}
-			currentQuantity = currentQuantity + fillAmount
+			currentQuantity += fillAmount
+			if currentQuantity == 0 {
+				averageCost = 0
+			}
 		}
 		if updateAlgo != nil && updateAlgo[0] {
 			algo.Market.BaseAsset.Quantity = currentBaseBalance
@@ -517,11 +526,18 @@ func minMaxStats(history []History) (float64, float64, float64, float64, float64
 func getFilledBidOrders(algo *Algo, price float64) ([]float64, []float64) {
 	var hitPrices []float64
 	var hitQuantities []float64
-
 	var oldPrices []float64
 	var oldQuantities []float64
 	for i := range algo.Market.BuyOrders.Price {
-		if algo.Market.BuyOrders.Price[i] > price {
+		if algo.Market.BuyOrders.Price[i] == 0 {
+			// simulate market order
+			// TODO add slippage param here
+			fillPrice := algo.Market.Price.Close
+			logger.Infof("Filling market buy order with price %v and amount %v\n", fillPrice, algo.Market.BuyOrders.Quantity)
+			backtestDB.InsertTrade(db, algo.Market.QuoteAsset.Symbol, fillPrice, algo.Market.BuyOrders.Quantity[i], "buy", algo.Market.Profit, algo.Market.BaseAsset.Quantity, algo.Market.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+			hitPrices = append(hitPrices, fillPrice)
+			hitQuantities = append(hitQuantities, algo.Market.BuyOrders.Quantity[i])
+		} else if algo.Market.BuyOrders.Price[i] > price {
 			hitPrices = append(hitPrices, algo.Market.BuyOrders.Price[i])
 			hitQuantities = append(hitQuantities, algo.Market.BuyOrders.Quantity[i])
 		} else {
@@ -538,11 +554,18 @@ func getFilledBidOrders(algo *Algo, price float64) ([]float64, []float64) {
 func getFilledAskOrders(algo *Algo, price float64) ([]float64, []float64) {
 	var hitPrices []float64
 	var hitQuantities []float64
-
 	var oldPrices []float64
 	var oldQuantities []float64
 	for i := range algo.Market.SellOrders.Price {
-		if algo.Market.SellOrders.Price[i] < price {
+		if algo.Market.SellOrders.Price[i] == 0 {
+			// simulate market order
+			// TODO add slippage param here
+			fillPrice := algo.Market.Price.Close
+			logger.Infof("Filling market sell order with price %v and amount %v\n", fillPrice, algo.Market.SellOrders.Quantity)
+			backtestDB.InsertTrade(db, algo.Market.QuoteAsset.Symbol, fillPrice, algo.Market.SellOrders.Quantity[i], "sell", algo.Market.Profit, algo.Market.BaseAsset.Quantity, algo.Market.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+			hitPrices = append(hitPrices, fillPrice)
+			hitQuantities = append(hitQuantities, algo.Market.SellOrders.Quantity[i])
+		} else if algo.Market.SellOrders.Price[i] < price {
 			hitPrices = append(hitPrices, algo.Market.SellOrders.Price[i])
 			hitQuantities = append(hitQuantities, algo.Market.SellOrders.Quantity[i])
 		} else {
