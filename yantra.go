@@ -228,7 +228,7 @@ func getInfluxClient() client.Client {
 		log.Fatalln("You need to set the `YANTRA_LIVE_DB_URL` env variable")
 	}
 
-	influxUser := os.Getenv("YANTRA_LIVE_DB_USERNAME")
+	influxUser := os.Getenv("YANTRA_LIVE_DB_USER")
 	influxPassword := os.Getenv("YANTRA_LIVE_DB_PASSWORD")
 
 	influx, err := client.NewHTTPClient(client.HTTPConfig{

@@ -842,7 +842,7 @@ func logBacktest(algo Algo) {
 		log.Fatalln("You need to set the `YANTRA_BACKTEST_DB_URL` env variable")
 	}
 
-	influxUser := os.Getenv("YANTRA_BACKTEST_DB_USERNAME")
+	influxUser := os.Getenv("YANTRA_BACKTEST_DB_USER")
 	influxPassword := os.Getenv("YANTRA_BACKTEST_DB_PASSWORD")
 
 	influx, _ := client.NewHTTPClient(client.HTTPConfig{
