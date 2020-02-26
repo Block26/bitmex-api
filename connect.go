@@ -27,15 +27,22 @@ var lastTest int64
 var lastWalletSync int64
 var startTime time.Time
 
-func RunTest(algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar), test ...bool) {
-	Connect("", false, algo, rebalance, setupData, test...)
+func RunTest(algo Algo, start time.Time, end time.Time, rebalance func(*Algo), setupData func(*Algo, []*Bar)) {
+	exchangeVars := iex.ExchangeConf{
+		Exchange:       algo.Market.Exchange,
+		ServerUrl:      algo.Market.ExchangeURL,
+		AccountID:      "test",
+		OutputResponse: false,
+	}
+	algo.Client = tantra.NewTest(exchangeVars, algo.Market, start, end, algo.DataLength)
+	Connect("", false, algo, rebalance, setupData, true)
 }
 
 // Connect is called to connect to an exchanges WS api and begin trading.
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
-//
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
 func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar), test ...bool) {
+	utils.LoadENV(secret)
 	startTime = time.Now()
 	var isTest bool
 	if test != nil {
@@ -49,23 +56,23 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 	}
 	firstTrade = true
 	firstPositionUpdate = true
-	config := utils.LoadSecret(settingsFileName, secret)
-	logger.Info("Loaded config for", algo.Market.Exchange, "secret", settingsFileName)
+
 	commitHash = time.Now().String()
 
-	exchangeVars := iex.ExchangeConf{
-		Exchange:       algo.Market.Exchange,
-		ServerUrl:      algo.Market.ExchangeURL,
-		ApiSecret:      config.APISecret,
-		ApiKey:         config.APIKey,
-		AccountID:      "test",
-		OutputResponse: false,
-	}
 	var err error
+	var config Secret
 
-	if isTest {
-		algo.Client = tantra.New(exchangeVars, algo.Market)
-	} else {
+	if !isTest {
+		config = utils.LoadSecret(settingsFileName, secret)
+		logger.Info("Loaded config for", algo.Market.Exchange, "secret", settingsFileName)
+		exchangeVars := iex.ExchangeConf{
+			Exchange:       algo.Market.Exchange,
+			ServerUrl:      algo.Market.ExchangeURL,
+			ApiSecret:      config.APISecret,
+			ApiKey:         config.APIKey,
+			AccountID:      "test",
+			OutputResponse: false,
+		}
 		algo.Client, err = tradeapi.New(exchangeVars)
 		if err != nil {
 			logger.Error(err)
@@ -133,11 +140,9 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 	for {
 		select {
 		case positions := <-channels.PositionChan:
-			log.Println("channels.PositionChan")
 			updatePositions(&algo, positions)
 			channels.PositionChan <- positions
 		case trade := <-channels.TradeBinChan:
-			log.Println("channels.TradeBinChan")
 			// Update your local bars
 			updateBars(&algo, trade[0])
 			// now fetch the bars
@@ -158,20 +163,19 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 				logLiveState(&algo)
 				runTest(&algo, setupData, rebalance)
 				checkWalletHistory(&algo, settingsFileName)
-			} else if algo.Index == algo.Client.GetDataLength()-1 {
-				// TODO solve for how long the test should be
-				channels.TradeBinChan = nil
 			} else {
-				channels.TradeBinChan <- trade
+				if algo.Timestamp == algo.Client.(*tantra.Tantra).GetLastTimestamp().UTC() {
+					channels.TradeBinChan = nil
+				} else {
+					channels.TradeBinChan <- trade
+				}
 			}
 		case newOrders := <-channels.OrderChan:
-			log.Println("channels.OrderChan")
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
 			localOrders = updateLocalOrders(&algo, localOrders, newOrders, isTest)
 			// TODO callback to order function
 			channels.OrderChan <- newOrders
 		case update := <-channels.WalletChan:
-			log.Println("channels.WalletChan")
 			updateAlgoBalances(&algo, update.Balance)
 			channels.WalletChan <- update
 		}

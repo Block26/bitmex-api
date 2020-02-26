@@ -17,6 +17,7 @@ func setupAlgo() Algo {
 		Name:                "test",
 		Market:              market,
 		Params:              make(map[string]interface{}),
+		Result:              make(map[string]interface{}),
 		RebalanceInterval:   exchanges.RebalanceInterval().Minute,
 		FillType:            exchanges.FillType().Close,
 		EntryOrderSize:      0.2,
@@ -55,8 +56,10 @@ func setupExchange() iex.IExchange {
 
 func TestConnect(t *testing.T) {
 	algo := setupAlgo()
-	algo.RebalanceInterval = exchanges.RebalanceInterval().Hour
-	RunTest(algo, rebalance, setupData, true)
+	algo.RebalanceInterval = exchanges.RebalanceInterval().Minute
+	start := time.Date(2019, 11, 01, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2019, 11, 03, 0, 0, 0, 0, time.UTC)
+	RunTest(algo, start, end, rebalance, setupData)
 }
 
 func TestPositionUpdate(t *testing.T) {

@@ -3,9 +3,9 @@ module github.com/tantralabs/yantra
 go 1.13
 
 require (
-	github.com/aws/aws-sdk-go v1.28.12 // indirect
+	github.com/aws/aws-sdk-go v1.29.11 // indirect
 	github.com/fatih/structs v1.1.0
-	github.com/gocarina/gocsv v0.0.0-20191214001331-e6697589f2e0
+	github.com/gocarina/gocsv v0.0.0-20200212142550-0b7418e775b8
 	github.com/google/uuid v1.1.1
 	github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
@@ -17,8 +17,8 @@ require (
 	github.com/tantralabs/models v0.0.0-20200226211918-9c6a1a904d7f
 	github.com/tantralabs/theo-engine v0.0.0-20200207043732-16fb381acae1
 	github.com/tantralabs/tradeapi v0.0.0-20200203232623-51c7d08a9113
-	github.com/tantralabs/utils v0.0.0-20200205084618-c96405e79c20
-	github.com/tidwall/gjson v1.3.6 // indirect
+	github.com/tantralabs/utils v0.0.0-20200215003416-a5889eecc0ac
+	github.com/tidwall/gjson v1.5.0 // indirect
 	github.com/tidwall/pretty v1.0.1 // indirect
 	gonum.org/v1/gonum v0.6.2
 )

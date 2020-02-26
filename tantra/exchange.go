@@ -15,6 +15,15 @@ import (
 	"github.com/tantralabs/utils"
 )
 
+func NewTest(vars iex.ExchangeConf, market models.Market, start time.Time, end time.Time, dataLength int) *Tantra {
+	tantra := New(vars, market)
+	tantra.warmUpPeriod = dataLength
+	tantra.index = dataLength
+	tantra.start = start
+	tantra.end = end
+	return tantra
+}
+
 // New return a instanciate bittrex struct
 func New(vars iex.ExchangeConf, market models.Market) *Tantra {
 	client := clients.NewClient(vars)
@@ -47,6 +56,7 @@ type Tantra struct {
 	orders                map[string]iex.Order
 	newOrders             []iex.Order
 	index                 int
+	warmUpPeriod          int
 	data                  []iex.TradeBin
 	start                 time.Time
 	end                   time.Time
@@ -59,14 +69,14 @@ func (t *Tantra) StartWS(config interface{}) error {
 	}
 
 	t.channels = conf.Channels
-	t.index = 0
 
 	go func() {
-		for _, row := range t.data {
+		for index := 0; index < len(t.data)-t.warmUpPeriod; index++ {
 			// This is the start of the time step, at this point in time some events have not happened yet
 			// so we will fill the orders that were placed at the end of the last time step first
 			// then we we publish a new trade bin so that the algo connected can make a decision for the
 			// next time interval
+			row := t.data[index+t.warmUpPeriod]
 
 			//Check if bids filled
 			bidsFilled := t.getFilledBidOrders(row.Low)
@@ -121,6 +131,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Wait for channel to complete
 			<-t.channels.TradeBinChan
 		}
+
 	}()
 
 	return nil
@@ -339,15 +350,13 @@ func (t *Tantra) GetPotentialOrderStatus() iex.OrderStatus {
 	}
 }
 
-func (t *Tantra) GetDataLength() int {
-	return len(t.data)
+func (t *Tantra) GetLastTimestamp() time.Time {
+	return t.data[len(t.data)-1].Timestamp
 }
 
 func (t *Tantra) GetData(symbol string, binSize string, amount int) ([]iex.TradeBin, error) {
 	// only fetch data the first time
 	if t.data == nil {
-		t.start = time.Date(2019, 01, 01, 0, 0, 0, 0, time.UTC)
-		t.end = time.Date(2020, 01, 01, 0, 0, 0, 0, time.UTC)
 		bars := database.GetData(symbol, t.SimulatedExchangeName, binSize, t.start, t.end)
 		for i := range bars {
 			tb := iex.TradeBin{

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"strings"
 	"time"
 
@@ -221,10 +222,18 @@ func getFillPrice(algo *Algo, bar *Bar) float64 {
 }
 
 func getInfluxClient() client.Client {
+	influxURL := os.Getenv("YANTRA_LIVE_DB_URL")
+	if influxURL == "" {
+		log.Fatalln("You need to set the `YANTRA_LIVE_DB_URL` env variable")
+	}
+
+	influxUser := os.Getenv("YANTRA_LIVE_DB_USER")
+	influxPassword := os.Getenv("YANTRA_LIVE_DB_PASSWORD")
+
 	influx, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     "http://ec2-54-219-145-3.us-west-1.compute.amazonaws.com:8086",
-		Username: "russell",
-		Password: "KNW(12nAS921D",
+		Addr:     influxURL,
+		Username: influxUser,
+		Password: influxPassword,
 	})
 
 	if err != nil {
