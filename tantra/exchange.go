@@ -339,6 +339,10 @@ func (t *Tantra) GetPotentialOrderStatus() iex.OrderStatus {
 	}
 }
 
+func (t *Tantra) GetDataLength() int {
+	return len(t.data)
+}
+
 func (t *Tantra) GetData(symbol string, binSize string, amount int) ([]iex.TradeBin, error) {
 	// only fetch data the first time
 	if t.data == nil {

@@ -158,7 +158,7 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 				logLiveState(&algo)
 				runTest(&algo, setupData, rebalance)
 				checkWalletHistory(&algo, settingsFileName)
-			} else if algo.Index == 5555 {
+			} else if algo.Index == algo.Client.GetDataLength()-1 {
 				// TODO solve for how long the test should be
 				channels.TradeBinChan = nil
 			} else {
