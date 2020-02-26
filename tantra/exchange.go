@@ -282,7 +282,14 @@ func (t *Tantra) getCostAverage(filledOrders []iex.Order) (averageCost float64, 
 func (t *Tantra) getFilledBidOrders(price float64) (filledOrders []iex.Order) {
 	for _, order := range t.orders {
 		if order.Side == "Buy" {
-			if order.Rate > price {
+			if order.Type == "Market" {
+				o := order // make a copy so we can delete it
+				// Update Order Status
+				// o.Rate :=  //TODO getMarketFillPrice()
+				o.OrdStatus = t.GetPotentialOrderStatus().Filled
+				filledOrders = append(filledOrders, o)
+				t.newOrders = append(t.newOrders, o)
+			} else if order.Rate > price {
 				o := order // make a copy so we can delete it
 				// Update Order Status
 				o.OrdStatus = t.GetPotentialOrderStatus().Filled
@@ -303,7 +310,14 @@ func (t *Tantra) getFilledBidOrders(price float64) (filledOrders []iex.Order) {
 func (t *Tantra) getFilledAskOrders(price float64) (filledOrders []iex.Order) {
 	for _, order := range t.orders {
 		if order.Side == "Sell" {
-			if order.Rate < price {
+			if order.Type == "Market" {
+				o := order // make a copy so we can delete it
+				// Update Order Status
+				// o.Rate :=  //TODO getMarketFillPrice()
+				o.OrdStatus = t.GetPotentialOrderStatus().Filled
+				filledOrders = append(filledOrders, o)
+				t.newOrders = append(t.newOrders, o)
+			} else if order.Rate < price {
 				o := order // make a copy so we can delete it
 				// Update Order Status
 				o.OrdStatus = t.GetPotentialOrderStatus().Filled

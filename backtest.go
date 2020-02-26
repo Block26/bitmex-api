@@ -18,7 +18,6 @@ import (
 	"gonum.org/v1/gonum/stat"
 
 	client "github.com/influxdata/influxdb1-client/v2"
-	backtestDB "github.com/tantralabs/backtest-db"
 	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
 	. "github.com/tantralabs/models"
@@ -30,7 +29,8 @@ import (
 var currentRunUUID time.Time
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
-var db = backtestDB.NewDB()
+
+// var db = backtestDB.NewDB()
 
 // RunBacktest is called by passing the data set you would like to test against the algo you are testing and the current setup and rebalance functions for that algo.
 // setupData will be called at the beginnning of the Backtest and rebalance will be called at every row in your dataset.
@@ -335,7 +335,7 @@ func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 		}
 		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
 		option.RealizedProfit, option.Position, option.AverageCost = updateBalance(algo, option.RealizedProfit, option.Position, option.AverageCost, optionPrice, optionQty, exchanges.MarketType().Option)
-		backtestDB.InsertTrade(db, option.Symbol, optionPrice, optionQty, "buy", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+		// backtestDB.InsertTradeTrade(db, option.Symbol, optionPrice, optionQty, "buy", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
 		logger.Debugf("Updated buy avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
 		option.BuyOrders = OrderArray{
 			Quantity: []float64{},
@@ -352,7 +352,7 @@ func updateOptionBalanceFromFill(algo *Algo, option *OptionContract) {
 		}
 		logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
 		option.RealizedProfit, option.Position, option.AverageCost = updateBalance(algo, option.RealizedProfit, option.Position, option.AverageCost, optionPrice, -optionQty, exchanges.MarketType().Option)
-		backtestDB.InsertTrade(db, option.Symbol, optionPrice, optionQty, "sell", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+		// backtestDB.InsertTradeTrade(db, option.Symbol, optionPrice, optionQty, "sell", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
 		logger.Debugf("Updated sell avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
 		option.SellOrders = OrderArray{
 			Quantity: []float64{},
@@ -563,7 +563,7 @@ func getFilledBidOrders(algo *Algo, price float64) ([]float64, []float64) {
 			// TODO add slippage param here
 			fillPrice := algo.Market.Price.Close
 			logger.Infof("Filling market buy order with price %v and amount %v\n", fillPrice, algo.Market.BuyOrders.Quantity)
-			backtestDB.InsertTrade(db, algo.Market.QuoteAsset.Symbol, fillPrice, algo.Market.BuyOrders.Quantity[i], "buy", algo.Market.Profit, algo.Market.BaseAsset.Quantity, algo.Market.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+			// backtestDB.InsertTradeTrade(db, algo.Market.QuoteAsset.Symbol, fillPrice, algo.Market.BuyOrders.Quantity[i], "buy", algo.Market.Profit, algo.Market.BaseAsset.Quantity, algo.Market.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
 			hitPrices = append(hitPrices, fillPrice)
 			hitQuantities = append(hitQuantities, algo.Market.BuyOrders.Quantity[i])
 		} else if algo.Market.BuyOrders.Price[i] > price {
@@ -844,7 +844,7 @@ func getFilledAskOrders(algo *Algo, price float64) ([]float64, []float64) {
 			// TODO add slippage param here
 			fillPrice := algo.Market.Price.Close
 			logger.Infof("Filling market sell order with price %v and amount %v\n", fillPrice, algo.Market.SellOrders.Quantity)
-			backtestDB.InsertTrade(db, algo.Market.QuoteAsset.Symbol, fillPrice, algo.Market.SellOrders.Quantity[i], "sell", algo.Market.Profit, algo.Market.BaseAsset.Quantity, algo.Market.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+			// backtestDB.InsertTradeTrade(db, algo.Market.QuoteAsset.Symbol, fillPrice, algo.Market.SellOrders.Quantity[i], "sell", algo.Market.Profit, algo.Market.BaseAsset.Quantity, algo.Market.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
 			hitPrices = append(hitPrices, fillPrice)
 			hitQuantities = append(hitQuantities, algo.Market.SellOrders.Quantity[i])
 		} else if algo.Market.SellOrders.Price[i] < price {

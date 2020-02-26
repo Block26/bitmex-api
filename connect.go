@@ -47,10 +47,11 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 	var isTest bool
 	if test != nil {
 		isTest = test[0]
+		database.Setup()
 	} else {
 		isTest = false
+		database.Setup("remote")
 	}
-	database.Setup("remote")
 	if algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
 	}
