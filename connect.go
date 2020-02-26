@@ -61,41 +61,39 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 		AccountID:      "test",
 		OutputResponse: false,
 	}
-
-	var ex iex.IExchange
 	var err error
 
 	if isTest {
-		ex = tantra.New(exchangeVars, algo.Market)
+		algo.Client = tantra.New(exchangeVars, algo.Market)
 	} else {
-		ex, err = tradeapi.New(exchangeVars)
+		algo.Client, err = tradeapi.New(exchangeVars)
 		if err != nil {
 			logger.Error(err)
 		}
 	}
 
-	orderStatus = ex.GetPotentialOrderStatus()
-	localBars := database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
+	orderStatus = algo.Client.GetPotentialOrderStatus()
+	localBars := database.UpdateBars(algo.Client, algo.Market.Symbol, algo.RebalanceInterval, algo.DataLength+100)
 	// Set initial timestamp for algo
 	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
 	logger.Infof("Got local bars: %v\n", len(localBars))
 
 	if algo.Market.Options {
 		// Build theo engine
-		theoEngine := te.NewTheoEngine(&algo.Market, ex, &algo.Timestamp, 60000, 86400000, false, 0, 0, algo.LogLevel)
+		theoEngine := te.NewTheoEngine(&algo.Market, algo.Client, &algo.Timestamp, 60000, 86400000, false, 0, 0, algo.LogLevel)
 		algo.TheoEngine = &theoEngine
 		logger.Infof("Built theo engine.\n")
 	}
 
 	// SETUP ALGO WITH RESTFUL CALLS
-	balances, _ := ex.GetBalances()
+	balances, _ := algo.Client.GetBalances()
 	updateAlgoBalances(&algo, balances)
 
-	positions, _ := ex.GetPositions(algo.Market.BaseAsset.Symbol)
+	positions, _ := algo.Client.GetPositions(algo.Market.BaseAsset.Symbol)
 	updatePositions(&algo, positions)
 
 	var localOrders []iex.Order
-	orders, _ := ex.GetOpenOrders(iex.OpenOrderF{Currency: algo.Market.BaseAsset.Symbol})
+	orders, _ := algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: algo.Market.BaseAsset.Symbol})
 	localOrders = updateLocalOrders(&algo, localOrders, orders, isTest)
 	logger.Infof("%v orders found\n", len(localOrders))
 	// SUBSCRIBE TO WEBSOCKETS
@@ -119,7 +117,7 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 	}
 
 	// Start the websocket.
-	err = ex.StartWS(&iex.WsConfig{
+	err = algo.Client.StartWS(&iex.WsConfig{
 		Host:      algo.Market.WSStream,
 		Streams:   subscribeInfos,
 		Channels:  channels,
@@ -141,25 +139,25 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 		case trade := <-channels.TradeBinChan:
 			log.Println("channels.TradeBinChan")
 			// Update your local bars
-			updateBars(&algo, ex, trade[0])
+			updateBars(&algo, trade[0])
 			// now fetch the bars
 			bars := database.GetBars()
 			algo.OHLCV = utils.GetOHLCV(bars)
 
 			// Did we get enough data to run this? If we didn't then throw fatal error to notify system
 			if algo.DataLength < len(bars) {
-				updateState(&algo, ex, bars, setupData)
+				updateState(&algo, bars, setupData)
 				rebalance(&algo)
 			} else {
 				log.Fatalln("I do not have enough data to trade. local data length", len(bars), "data length wanted by algo", algo.DataLength)
 			}
 			setupOrders(&algo, trade[0].Close)
-			placeOrdersOnBook(&algo, ex, localOrders)
+			placeOrdersOnBook(&algo, localOrders)
 			logState(&algo)
 			if !isTest {
 				logLiveState(&algo)
 				runTest(&algo, setupData, rebalance)
-				checkWalletHistory(&algo, ex, settingsFileName)
+				checkWalletHistory(&algo, settingsFileName)
 			} else if algo.Index == 5555 {
 				// TODO solve for how long the test should be
 				channels.TradeBinChan = nil
@@ -168,7 +166,9 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 			}
 		case newOrders := <-channels.OrderChan:
 			log.Println("channels.OrderChan")
+			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
 			localOrders = updateLocalOrders(&algo, localOrders, newOrders, isTest)
+			// TODO callback to order function
 			channels.OrderChan <- newOrders
 		case update := <-channels.WalletChan:
 			log.Println("channels.WalletChan")
@@ -181,12 +181,12 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 	}
 }
 
-func checkWalletHistory(algo *Algo, ex iex.IExchange, settingsFileName string) {
+func checkWalletHistory(algo *Algo, settingsFileName string) {
 	timeSinceLastSync := database.GetBars()[algo.Index].Timestamp - lastWalletSync
 	if timeSinceLastSync > (60 * 60 * 60) {
 		logger.Info("It has been", timeSinceLastSync, "seconds since the last wallet history download, fetching latest deposits and withdrawals.")
 		lastWalletSync = database.GetBars()[algo.Index].Timestamp
-		walletHistory, err := ex.GetWalletHistory(algo.Market.BaseAsset.Symbol)
+		walletHistory, err := algo.Client.GetWalletHistory(algo.Market.BaseAsset.Symbol)
 		if err != nil {
 			logger.Error("There was an error fetching the wallet history", err)
 		} else {
@@ -272,14 +272,14 @@ func updateAlgoBalances(algo *Algo, balances []iex.WSBalance) {
 	}
 }
 
-func updateBars(algo *Algo, ex iex.IExchange, trade iex.TradeBin) {
+func updateBars(algo *Algo, trade iex.TradeBin) {
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
 		diff := trade.Timestamp.Sub(time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0))
 		if diff.Minutes() >= 60 {
-			database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 1)
+			database.UpdateBars(algo.Client, algo.Market.Symbol, algo.RebalanceInterval, 1)
 		}
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		database.UpdateBars(ex, algo.Market.Symbol, algo.RebalanceInterval, 1)
+		database.UpdateBars(algo.Client, algo.Market.Symbol, algo.RebalanceInterval, 1)
 	} else {
 		log.Fatal("This rebalance interval is not supported")
 	}
@@ -287,7 +287,7 @@ func updateBars(algo *Algo, ex iex.IExchange, trade iex.TradeBin) {
 	logger.Info("Time Elapsed", startTime.Sub(time.Now()), "Index", algo.Index)
 }
 
-func updateState(algo *Algo, ex iex.IExchange, bars []*Bar, setupData func(*Algo, []*Bar)) {
+func updateState(algo *Algo, bars []*Bar, setupData func(*Algo, []*Bar)) {
 	setupData(algo, bars)
 	algo.Timestamp = time.Unix(bars[algo.Index].Timestamp/1000, 0).UTC()
 	algo.Market.Price = *database.GetBars()[algo.Index]

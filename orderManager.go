@@ -106,7 +106,7 @@ func setupOrders(algo *Algo, currentPrice float64) {
 	}
 }
 
-func placeOrdersOnBook(algo *Algo, ex iex.IExchange, openOrders []iex.Order) {
+func placeOrdersOnBook(algo *Algo, openOrders []iex.Order) {
 
 	// For now. Should be parameterized
 	qtyTolerance := 1.0
@@ -148,7 +148,7 @@ func placeOrdersOnBook(algo *Algo, ex iex.IExchange, openOrders []iex.Order) {
 	cancel := func(order iex.Order) {
 		// log.Println("Trying to cancel", order.OrderID)
 		log.Printf("Trying to cancel order %v\n", order.OrderID)
-		err := ex.CancelOrder(iex.CancelOrderF{
+		err := algo.Client.CancelOrder(iex.CancelOrderF{
 			Market: order.Symbol,
 			Uuid:   order.OrderID,
 		})
@@ -161,7 +161,7 @@ func placeOrdersOnBook(algo *Algo, ex iex.IExchange, openOrders []iex.Order) {
 
 	place := func(order iex.Order) {
 		log.Println("Trying to place order for", order.Market, "Quantity", order.Amount, "Price", order.Rate)
-		_, err := ex.PlaceOrder(order)
+		_, err := algo.Client.PlaceOrder(order)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -373,7 +373,7 @@ func placeOrdersOnBook(algo *Algo, ex iex.IExchange, openOrders []iex.Order) {
 
 				cancelStr = strings.TrimSuffix(cancelStr, ",")
 				if len(cancelStr) > 0 {
-					err := ex.CancelOrder(iex.CancelOrderF{
+					err := algo.Client.CancelOrder(iex.CancelOrderF{
 						Market: algo.Market.Symbol,
 						Uuid:   cancelStr,
 					})
@@ -408,6 +408,7 @@ func placeOrdersOnBook(algo *Algo, ex iex.IExchange, openOrders []iex.Order) {
 }
 
 func updateLocalOrders(algo *Algo, oldOrders []iex.Order, newOrders []iex.Order, isTest bool) []iex.Order {
+	//TODO use a map and compare spped
 	var updatedOrders []iex.Order
 	for _, oldOrder := range oldOrders {
 		found := false
