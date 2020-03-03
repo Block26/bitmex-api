@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jinzhu/copier"
 	"github.com/tantralabs/database"
 	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
@@ -15,8 +16,6 @@ import (
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/utils"
 	"github.com/tantralabs/yantra/tantra"
-
-	"github.com/jinzhu/copier"
 )
 
 var orderStatus iex.OrderStatus
@@ -34,11 +33,11 @@ func RunTest(algo Algo, start time.Time, end time.Time, rebalance func(*Algo), s
 		AccountID:      "test",
 		OutputResponse: false,
 	}
-	algo.Client = tantra.NewTest(exchangeVars, algo.Market, start, end, algo.DataLength)
+	algo.Client = tantra.NewTest(exchangeVars, &algo.Market, start, end, algo.DataLength)
 	Connect("", false, algo, rebalance, setupData, true)
 }
 
-// Connect is called to connect to an exchanges WS api and begin trading.
+// Connect is called to connect to an exchange's WS api and begin trading.
 // The current implementation will execute rebalance every 1 minute regardless of Algo.RebalanceInterval
 // This is intentional, look at Algo.AutoOrderPlacement to understand this paradigm.
 func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Algo), setupData func(*Algo, []*Bar), test ...bool) {
@@ -85,11 +84,20 @@ func Connect(settingsFileName string, secret bool, algo Algo, rebalance func(*Al
 	// Set initial timestamp for algo
 	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
 	logger.Infof("Got local bars: %v\n", len(localBars))
+	algo.Client.(*tantra.Tantra).SetCurrentTime(algo.Timestamp)
+	algo.Market.Price = *database.GetBars()[0]
+	logger.Infof("Init algo timestamp %v and price close %v\n", algo.Timestamp, algo.Market.Price.Close)
 
 	if algo.Market.Options {
 		// Build theo engine
 		theoEngine := te.NewTheoEngine(&algo.Market, algo.Client, &algo.Timestamp, 60000, 86400000, false, 0, 0, algo.LogLevel)
 		algo.TheoEngine = &theoEngine
+		if isTest {
+			theoEngine.CurrentTime = &algo.Client.(*tantra.Tantra).CurrentTime
+			algo.Client.(*tantra.Tantra).SetTheoEngine(&theoEngine)
+			// theoEngine.UpdateActiveContracts()
+			// theoEngine.ApplyVolSurface()
+		}
 		logger.Infof("Built theo engine.\n")
 	}
 

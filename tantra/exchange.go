@@ -10,13 +10,15 @@ import (
 	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
 	"github.com/tantralabs/models"
+	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi/global/clients"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/utils"
 )
 
-func NewTest(vars iex.ExchangeConf, market models.Market, start time.Time, end time.Time, dataLength int) *Tantra {
-	tantra := New(vars, market)
+func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, end time.Time, dataLength int) *Tantra {
+	logger.Infof("Init new test with start %v and end %v\n", start, end)
+	tantra := New(vars, account)
 	tantra.warmUpPeriod = dataLength
 	tantra.index = dataLength
 	tantra.start = start
@@ -24,42 +26,38 @@ func NewTest(vars iex.ExchangeConf, market models.Market, start time.Time, end t
 	return tantra
 }
 
-// New return a instanciate bittrex struct
-func New(vars iex.ExchangeConf, market models.Market) *Tantra {
+// Mock exchange constructor
+func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 	client := clients.NewClient(vars)
-	var marketType string
-	if market.Futures {
-		marketType = exchanges.MarketType().Future
-	} else {
-		marketType = exchanges.MarketType().Spot
-	}
 	return &Tantra{
 		client:                client,
 		SimulatedExchangeName: vars.Exchange,
-		Account:               market,
-		AccountHistory:        make([]models.Market, 0),
-		marketType:            marketType,
+		Account:               account,
+		AccountHistory:        make([]models.Account, 0),
 		orders:                make(map[string]iex.Order),
 		newOrders:             make([]iex.Order, 0),
 	}
 }
 
-// Tantra represent a Tantra client
+// Tantra represents a mock exchange client
 type Tantra struct {
 	client *clients.Client
 	iex.IExchange
 	marketType            string
 	channels              *iex.WSChannels
 	SimulatedExchangeName string
-	Account               models.Market
-	AccountHistory        []models.Market
+	MarketInfos           map[string]models.MarketInfo
+	Account               *models.Account
+	AccountHistory        []models.Account
+	CurrentTime           time.Time
 	orders                map[string]iex.Order
 	newOrders             []iex.Order
 	index                 int
 	warmUpPeriod          int
-	data                  []iex.TradeBin
+	candleData            []iex.TradeBin
 	start                 time.Time
 	end                   time.Time
+	theoEngine            *te.TheoEngine
 }
 
 func (t *Tantra) StartWS(config interface{}) error {
@@ -71,12 +69,14 @@ func (t *Tantra) StartWS(config interface{}) error {
 	t.channels = conf.Channels
 
 	go func() {
-		for index := 0; index < len(t.data)-t.warmUpPeriod; index++ {
+		for index := 0; index < len(t.candleData)-t.warmUpPeriod; index++ {
 			// This is the start of the time step, at this point in time some events have not happened yet
 			// so we will fill the orders that were placed at the end of the last time step first
 			// then we we publish a new trade bin so that the algo connected can make a decision for the
 			// next time interval
-			row := t.data[index+t.warmUpPeriod]
+			row := t.candleData[index+t.warmUpPeriod]
+			t.CurrentTime = row.Timestamp
+			logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 
 			//Check if bids filled
 			bidsFilled := t.getFilledBidOrders(row.Low)
@@ -122,7 +122,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 				<-t.channels.PositionChan
 			}
 
-			t.AccountHistory = append(t.AccountHistory, t.Account)
+			t.AccountHistory = append(t.AccountHistory, *t.Account)
 
 			// Now send the latest trade bin
 			tradeUpdate := []iex.TradeBin{row}
@@ -137,13 +137,27 @@ func (t *Tantra) StartWS(config interface{}) error {
 	return nil
 }
 
+func (t *Tantra) SetTheoEngine(theoEngine *te.TheoEngine) {
+	t.theoEngine = theoEngine
+	logger.Infof("Set theo engine for mock exchange.\n")
+	volDataStart := utils.TimeToTimestamp(t.start)
+	volDataEnd := utils.TimeToTimestamp(t.end)
+	t.theoEngine.InsertVolData(volDataStart, volDataEnd)
+	logger.Infof("Inserted vol data with start %v and end %v.\n", volDataStart, volDataEnd)
+}
+
+func (t *Tantra) SetCurrentTime(currentTime time.Time) {
+	t.CurrentTime = currentTime
+	logger.Infof("Set current timestamp: %v\n", t.CurrentTime)
+}
+
 // Get the last account history, the first time should just return
 func (t *Tantra) getLastAccountHistory() *models.Market {
 	length := len(t.AccountHistory)
 	if length > 0 {
 		return &t.AccountHistory[length-1]
 	}
-	return &t.Account
+	return t.Account
 }
 
 func (t *Tantra) respondWithOrderChanges() {
@@ -155,7 +169,7 @@ func (t *Tantra) respondWithOrderChanges() {
 }
 
 func (t *Tantra) updateBalance(currentBaseBalance float64, currentQuantity float64, averageCost float64, fillPrice float64, fillAmount float64, marketType string, updateAlgo ...bool) (float64, float64, float64) {
-	logger.Debugf("Updating balance with curr base bal %v, curr quant %v, avg cost %v, fill pr %v, fill a %v\n", currentBaseBalance, currentQuantity, averageCost, fillPrice, fillAmount)
+	logger.Infof("Updating balance with curr base bal %v, curr quant %v, avg cost %v, fill pr %v, fill a %v\n", currentBaseBalance, currentQuantity, averageCost, fillPrice, fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		// fee := math.Abs(fillAmount/fillPrice) * t.Account.MakerFee
 		// logger.Printf("fillPrice %.2f -> fillAmount %.2f", fillPrice, fillAmount)
@@ -253,6 +267,181 @@ func (t *Tantra) updateBalance(currentBaseBalance float64, currentQuantity float
 	return currentBaseBalance, currentQuantity, averageCost
 }
 
+func (t *Tantra) getExpirys() map[int]bool {
+	expirys := make(map[int]bool)
+	for _, option := range t.optionContracts {
+		expirys[option.Expiry] = true
+	}
+	return expirys
+}
+
+func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...string) ([]*iex.Contract, error) {
+	getOptions := false
+	getFutures := false
+	if marketType == nil {
+		getOptions = true
+		getFutures = true
+	} else {
+		for _, m := range marketType {
+			if m == "option" {
+				getOptions = true
+			} else if m == "future" {
+				getFutures = true
+			}
+		}
+	}
+	var contracts []*iex.Contract
+	var err error
+	if getFutures {
+		baseContract := iex.Contract{
+			BaseCurrency:      t.Account.BaseAsset.Symbol,
+			ContractSize:      t.Account.MinimumOrderSize,
+			CreationTimestamp: utils.TimeToTimestamp(t.start),
+			Expiry:            0,
+			Symbol:            t.Account.Symbol,
+			IsActive:          true,
+			Kind:              "future",
+			Leverage:          int(t.Account.MaxLeverage),
+			MakerCommission:   t.Account.MakerFee,
+			MinTradeAmount:    t.Account.MinimumOrderSize,
+			OptionType:        "",
+			Currency:          t.Account.BaseAsset.Symbol,
+			SettlementPeriod:  "",
+			Strike:            -1,
+			TakerCommission:   t.Account.TakerFee,
+			TickSize:          t.Account.TickSize,
+			MidMarketPrice:    t.Account.Price.Close,
+		}
+		contracts = append(contracts, &baseContract)
+	}
+	if getOptions {
+		logger.Infof("Getting markets at %v\n", t.CurrentTime)
+		currentExpirys := t.getExpirys()
+		logger.Debugf("Current expirys: %v\n", currentExpirys)
+		newExpirys := make(map[int]bool)
+		currentTime := t.CurrentTime
+		for i := 0; i < t.Account.NumWeeklyOptions; i++ {
+			expiry := utils.TimeToTimestamp(utils.GetNextFriday(currentTime))
+			if !currentExpirys[expiry] {
+				newExpirys[expiry] = true
+			}
+			currentTime = currentTime.Add(time.Hour * 24 * 7)
+		}
+		currentTime = t.CurrentTime
+		for i := 0; i < t.Account.NumMonthlyOptions; i++ {
+			expiry := utils.TimeToTimestamp(utils.GetLastFridayOfMonth(currentTime))
+			if !currentExpirys[expiry] {
+				newExpirys[expiry] = true
+			}
+			currentTime = currentTime.Add(time.Hour * 24 * 28)
+		}
+		if len(newExpirys) == 0 {
+			logger.Debugf("No new expirys to generate.\n")
+			return contracts, err
+		}
+		logger.Infof("Generated expirys with currentTime %v: %v\n", currentTime, newExpirys)
+		if t.Account.OptionStrikeInterval == 0 {
+			log.Fatalln("OptionStrikeInterval cannot be 0, does this exchange support options?")
+		}
+		currentPrice := *t.theoEngine.UnderlyingPrice
+		minStrike := utils.RoundToNearest(currentPrice*(1+(t.Account.OptionMinStrikePct/100.)), t.Account.OptionStrikeInterval)
+		maxStrike := utils.RoundToNearest(currentPrice*(1+(t.Account.OptionMaxStrikePct/100.)), t.Account.OptionStrikeInterval)
+		strikes := utils.Arange(minStrike, maxStrike, t.Account.OptionStrikeInterval)
+		logger.Infof("Generated strikes with current price %v, min strike %v, max strike %v, strike interval %v: %v", currentPrice, minStrike, maxStrike, t.Account.OptionStrikeInterval, strikes)
+		for expiry := range newExpirys {
+			for _, strike := range strikes {
+				for _, optionType := range []string{"call", "put"} {
+					contract := iex.Contract{
+						BaseCurrency:      currency,
+						ContractSize:      t.Account.OptionMinOrderSize,
+						CreationTimestamp: utils.TimeToTimestamp(t.start),
+						Expiry:            expiry,
+						Symbol:            utils.GetDeribitOptionSymbol(expiry, strike, t.Account.BaseAsset.Symbol, optionType),
+						IsActive:          true,
+						Kind:              "option",
+						Leverage:          1,
+						MakerCommission:   t.Account.OptionSlippage,
+						MinTradeAmount:    t.Account.OptionMinOrderSize,
+						OptionType:        optionType,
+						Currency:          currency,
+						SettlementPeriod:  "",
+						Strike:            strike,
+						TakerCommission:   t.Account.OptionSlippage,
+						TickSize:          t.Account.TickSize,
+						MidMarketPrice:    -1,
+					}
+					contracts = append(contracts, &contract)
+				}
+			}
+		}
+	}
+	logger.Debugf("Generated contracts (%v).\n", len(contracts))
+	t.parseOptionContracts(contracts)
+	return contracts, err
+}
+
+func (t *Tantra) GetMarketPricesByCurrency(currency string) (priceMap map[string]float64, err error) {
+	priceMap = make(map[string]float64)
+	if t.theoEngine == nil {
+		logger.Errorf("Cannot get market prices without a theo engine.")
+		return
+	}
+	if t.Account.BaseAsset.Symbol != currency {
+		logger.Errorf("Cannot get market prices for currency %v with account currency %v.\n", currency, t.Account.BaseAsset.Symbol)
+		return
+	}
+	for _, option := range t.theoEngine.Options {
+		option.OptionTheo.CalcTheo(false)
+		priceMap[option.Symbol] = option.OptionTheo.Theo
+	}
+	return
+}
+
+func (t *Tantra) removeExpiredOptions() {
+	currentTimestamp := utils.TimeToTimestamp(t.CurrentTime)
+	for symbol, option := range t.optionContracts {
+		if option.Expiry >= currentTimestamp {
+			delete(t.optionContracts, symbol)
+			logger.Infof("Removed expired option %v with expiry %v, currentTimestamp %v\n", option.Symbol, option.Expiry, currentTimestamp)
+		}
+	}
+}
+
+func (t *Tantra) parseOptionContracts(contracts []*iex.Contract) {
+	currentPrice := t.Account.Price.Close
+	for _, contract := range contracts {
+		if contract.Kind == "option" {
+			_, ok := t.optionContracts[contract.Symbol]
+			if !ok {
+				optionTheo := models.NewOptionTheo(
+					contract.Strike,
+					&currentPrice,
+					contract.Expiry,
+					contract.OptionType,
+					t.Account.DenominatedInUnderlying,
+					&t.CurrentTime,
+				)
+				optionTheo.CalcTheo(false)
+				optionContract := models.OptionContract{
+					Symbol:         contract.Symbol,
+					Strike:         contract.Strike,
+					Expiry:         contract.Expiry,
+					OptionType:     contract.OptionType,
+					AverageCost:    0,
+					Profit:         0,
+					Position:       0,
+					OptionTheo:     &optionTheo,
+					Status:         "open",
+					MidMarketPrice: optionTheo.Theo,
+				}
+				logger.Debugf("Set mid market price for %v: %v\n", contract.Symbol, contract.MidMarketPrice)
+				t.optionContracts[optionContract.Symbol] = optionContract
+			}
+		}
+	}
+	logger.Infof("Parsed %v contracts.\n", len(contracts))
+}
+
 func (t *Tantra) CurrentOptionProfit() float64 {
 	currentProfit := 0.
 	for _, option := range t.Account.OptionContracts {
@@ -281,7 +470,12 @@ func (t *Tantra) getCostAverage(filledOrders []iex.Order) (averageCost float64, 
 
 func (t *Tantra) getFilledBidOrders(price float64) (filledOrders []iex.Order) {
 	for _, order := range t.orders {
-		if order.Side == "Buy" {
+		marketInfo, ok := t.MarketInfos[order.Market]
+		if !ok {
+			logger.Errorf("Order %v market is not in market infos for mock exchange.\n", order)
+			continue
+		}
+		if marketInfo.MarketType != "option" && order.Side == "Buy" {
 			if order.Type == "Market" {
 				o := order // make a copy so we can delete it
 				// Update Order Status
@@ -309,7 +503,12 @@ func (t *Tantra) getFilledBidOrders(price float64) (filledOrders []iex.Order) {
 
 func (t *Tantra) getFilledAskOrders(price float64) (filledOrders []iex.Order) {
 	for _, order := range t.orders {
-		if order.Side == "Sell" {
+		marketInfo, ok := t.MarketInfos[order.Market]
+		if !ok {
+			logger.Errorf("Order %v market is not in market infos for mock exchange.\n", order)
+			continue
+		}
+		if marketInfo.MarketType != "option" && order.Side == "Sell" {
 			if order.Type == "Market" {
 				o := order // make a copy so we can delete it
 				// Update Order Status
@@ -334,7 +533,43 @@ func (t *Tantra) getFilledAskOrders(price float64) (filledOrders []iex.Order) {
 	return
 }
 
+func (t *Tantra) updateOptionPositions() {
+	logger.Debugf("Updating options positions with baq %v\n", t.Account.BaseAsset.Quantity)
+	var optionPrice float64
+	var optionQty float64
+	for _, option := range t.Account.MarketStates {
+		if option.MarketInfo.MarketType == "option" && option.MarketInfo.Status == "open" {
+			for orderID, order := range option.Orders {
+				optionPrice = order.Rate
+				optionQty = order.Amount
+				if order.Side == "Buy" {
+					if optionPrice == 0 {
+						// Simulate market order, assume theo is updated
+						optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "buy", t.Account.OptionSlippage)
+					}
+					logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
+					option.RealizedProfit, option.Position, option.AverageCost = t.updateBalance(option.RealizedProfit, option.Position, option.AverageCost, optionPrice, optionQty, exchanges.MarketType().Option)
+					// backtestDB.InsertTradeTrade(db, option.Symbol, optionPrice, optionQty, "buy", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+					logger.Debugf("Updated buy avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
+				} else if order.Side == "Sell" {
+					if optionPrice == 0 {
+						// Simulate market order, assume theo is updated
+						optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "sell", t.Account.OptionSlippage)
+					}
+					logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
+					option.RealizedProfit, option.Position, option.AverageCost = t.updateBalance(option.RealizedProfit, option.Position, option.AverageCost, optionPrice, optionQty, exchanges.MarketType().Option)
+					// backtestDB.InsertTradeTrade(db, option.Symbol, optionPrice, optionQty, "buy", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(algo.Timestamp))
+					logger.Debugf("Updated sell avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
+				}
+				delete(option.Orders, orderID)
+				logger.Debugf("Removed option order with id %v.", orderID)
+			}
+		}
+	}
+}
+
 func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
+	order.TransactTime = t.CurrentTime
 	log.Println("PlaceOrder", order)
 	// Create uuid for order
 	uuid = time.Now().String() + string(len(t.orders))
@@ -342,6 +577,12 @@ func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
 	order.OrdStatus = "Open"
 	t.orders[uuid] = order
 	t.newOrders = append(t.newOrders, order)
+	state, ok := t.Account.MarketStates[order.Market]
+	if ok {
+		state.Orders[uuid] = order
+	} else {
+		logger.Errorf("Got order %v for unknown market: %v\n", uuid, order.Market)
+	}
 	return
 }
 
@@ -353,6 +594,12 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 	}
 	t.newOrders = append(t.newOrders, canceledOrder)
 	delete(t.orders, cancel.Uuid)
+	state, ok := t.Account.MarketStates
+	if ok {
+		delete(state.Orders, cancel.Uuid)
+	} else {
+		logger.Infof("Cancel for order %v has unknown market %v\n", cancel.Uuid, cancel.Market)
+	}
 	return
 }
 
@@ -365,12 +612,12 @@ func (t *Tantra) GetPotentialOrderStatus() iex.OrderStatus {
 }
 
 func (t *Tantra) GetLastTimestamp() time.Time {
-	return t.data[len(t.data)-1].Timestamp
+	return t.candleData[len(t.candleData)-1].Timestamp
 }
 
 func (t *Tantra) GetData(symbol string, binSize string, amount int) ([]iex.TradeBin, error) {
 	// only fetch data the first time
-	if t.data == nil {
+	if t.candleData == nil {
 		bars := database.GetData(symbol, t.SimulatedExchangeName, binSize, t.start, t.end)
 		for i := range bars {
 			tb := iex.TradeBin{
@@ -381,7 +628,7 @@ func (t *Tantra) GetData(symbol string, binSize string, amount int) ([]iex.Trade
 				Volume:    bars[i].Volume,
 				Timestamp: time.Unix(bars[i].Timestamp/1000, 0),
 			}
-			t.data = append(t.data, tb)
+			t.candleData = append(t.candleData, tb)
 		}
 	}
 	// after data is fetched for the first time, keep track of how many times this is called,
@@ -390,9 +637,9 @@ func (t *Tantra) GetData(symbol string, binSize string, amount int) ([]iex.Trade
 	t.index += amount
 
 	if t.index > amount {
-		return t.data[t.index-amount-1 : t.index], nil
+		return t.candleData[t.index-amount-1 : t.index], nil
 	} else {
-		return t.data[t.index-amount : t.index], nil
+		return t.candleData[t.index-amount : t.index], nil
 	}
 }
 
