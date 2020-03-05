@@ -8,7 +8,7 @@ import (
 
 	"github.com/tantralabs/database"
 	"github.com/tantralabs/logger"
-	"github.com/tantralabs/models"
+	"github.com/tantralabs/yantra/models"
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi/global/clients"
 	"github.com/tantralabs/tradeapi/iex"

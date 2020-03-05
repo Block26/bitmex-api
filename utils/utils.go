@@ -1,4 +1,4 @@
-package yantra
+package utils
 
 import (
 	"bytes"
@@ -16,14 +16,26 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/tantralabs/logger"
-	"github.com/tantralabs/models"
 	"github.com/tantralabs/tradeapi/iex"
+	"github.com/tantralabs/yantra/models"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
+
+func LoadENV(isSecret bool) {
+	if isSecret {
+		secretFile := getSecret("ENVIRONMENT_VARIABLES")
+		secret := make(map[string]interface{})
+		json.Unmarshal([]byte(secretFile), &secret)
+		for key, value := range secret {
+			log.Println("Setting ENV:", key)
+			os.Setenv(key, value.(string))
+		}
+	}
+}
 
 func getSecret(secretName string) string {
 	// region := "us-west-1"

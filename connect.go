@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/jinzhu/copier"
-	"github.com/tantralabs/database"
 	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
-	"github.com/tantralabs/models"
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/utils"
+	"github.com/tantralabs/yantra/database"
+	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/tantra"
+	"github.com/tantralabs/yantra/utils"
 )
 
 var orderStatus iex.OrderStatus

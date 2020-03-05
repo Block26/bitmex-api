@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	"github.com/tantralabs/models"
+	"github.com/tantralabs/yantra/models"
 )
 
 type Module interface {

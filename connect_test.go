@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/tantralabs/exchanges"
-	. "github.com/tantralabs/models"
+	. "github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 )
