@@ -3,12 +3,15 @@ module github.com/tantralabs/yantra
 go 1.13
 
 require (
-	github.com/aws/aws-sdk-go v1.29.11 // indirect
+	github.com/aws/aws-sdk-go v1.29.11
+	github.com/chobie/go-gaussian v0.0.0-20150107165016-53c09d90eeaf
 	github.com/fatih/structs v1.1.0
 	github.com/gocarina/gocsv v0.0.0-20200212142550-0b7418e775b8
 	github.com/google/uuid v1.1.1
 	github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
+	github.com/jmoiron/sqlx v1.2.0
+	github.com/lib/pq v1.3.0
 	github.com/tantralabs/backtest-db v0.0.0-20200224230724-e8cb46f0292a
 	github.com/tantralabs/database v0.0.0-20200214233726-bb44037373af
 	github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441
