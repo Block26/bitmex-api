@@ -25,6 +25,7 @@ var commitHash string
 var lastTest int64
 var lastWalletSync int64
 var startTime time.Time
+var barData = make(map[string][]*models.Bar)
 
 func RunTest(algo models.Algo, start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
 	exchangeVars := iex.ExchangeConf{
@@ -80,20 +81,21 @@ func Connect(settingsFileName string, secret bool, algo models.Algo, rebalance f
 	}
 
 	orderStatus = algo.Client.GetPotentialOrderStatus()
+	var timeSymbol string
+	for symbol, marketState := range algo.Account.MarketStates {
+		logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
+		barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
+		marketState.Bar = *barData[symbol][len(barData[symbol])-1]
+		marketState.LastPrice = marketState.Bar.Close
+		logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
+		timeSymbol = symbol
+	}
 	// Set initial timestamp for algo
-	algo.Timestamp = time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0).UTC()
+	if timeSymbol == "" {
+		log.Fatal("No bar data.\n")
+	}
+	algo.Timestamp = time.Unix(barData[timeSymbol][algo.Index].Timestamp/1000, 0).UTC()
 	algo.Client.(*tantra.Tantra).SetCurrentTime(algo.Timestamp)
-
-	//TODO initialize price data from db
-	// var bars []*models.Bar
-	// for symbol, marketState := range algo.Account.MarketStates {
-	// 	if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
-	// 		bars = database.GetData(symbol, marketState.Info.Exchange, algo.DecisionInterval)
-	// 		marketState.Bar = bars[len(bars)-1]
-	// 		marketState.LastPrice = marketState.Bar.Close
-	// 	}
-	// }
-	// logger.Infof("Init algo timestamp %v and price close %v\n", algo.Timestamp, algo.Market.Price.Close)
 
 	if algo.Account.ExchangeInfo.Options {
 		// Build theo engine
