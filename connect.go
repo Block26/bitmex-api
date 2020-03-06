@@ -1,6 +1,7 @@
 package yantra
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"strings"
@@ -25,17 +26,34 @@ var commitHash string
 var lastTest int64
 var lastWalletSync int64
 var startTime time.Time
-var barData = make(map[string][]*models.Bar)
 
-func RunTest(algo models.Algo, start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
+func RunTest(algo *models.Algo, start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
 	exchangeVars := iex.ExchangeConf{
 		Exchange:       algo.Account.ExchangeInfo.Exchange,
 		ServerUrl:      algo.Account.ExchangeInfo.ExchangeURL,
 		AccountID:      "test",
 		OutputResponse: false,
 	}
-	algo.Client = tantra.NewTest(exchangeVars, &algo.Account, start, end, algo.DataLength)
-	Connect("", false, algo, rebalance, setupData, true)
+	mockExchange := tantra.NewTest(exchangeVars, &algo.Account, start, end, algo.DataLength)
+	barData := LoadBarData(algo, start, end)
+	mockExchange.SetCandleData(barData)
+	mockExchange.SetCurrentTime(start)
+	algo.Client = mockExchange
+	algo.Timestamp = start
+
+	Connect("", false, *algo, rebalance, setupData, true)
+}
+
+func LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {
+	barData := make(map[string][]*models.Bar)
+	for symbol, marketState := range algo.Account.MarketStates {
+		logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
+		barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
+		marketState.Bar = *barData[symbol][len(barData[symbol])-1]
+		marketState.LastPrice = marketState.Bar.Close
+		logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
+	}
+	return barData
 }
 
 // Connect is called to connect to an exchange's WS api and begin trading.
@@ -81,21 +99,6 @@ func Connect(settingsFileName string, secret bool, algo models.Algo, rebalance f
 	}
 
 	orderStatus = algo.Client.GetPotentialOrderStatus()
-	var timeSymbol string
-	for symbol, marketState := range algo.Account.MarketStates {
-		logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
-		barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
-		marketState.Bar = *barData[symbol][len(barData[symbol])-1]
-		marketState.LastPrice = marketState.Bar.Close
-		logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
-		timeSymbol = symbol
-	}
-	// Set initial timestamp for algo
-	if timeSymbol == "" {
-		log.Fatal("No bar data.\n")
-	}
-	algo.Timestamp = time.Unix(barData[timeSymbol][algo.Index].Timestamp/1000, 0).UTC()
-	algo.Client.(*tantra.Tantra).SetCurrentTime(algo.Timestamp)
 
 	if algo.Account.ExchangeInfo.Options {
 		// Build theo engine
@@ -151,6 +154,8 @@ func Connect(settingsFileName string, secret bool, algo models.Algo, rebalance f
 		}
 	}
 
+	logger.Infof("Subscribing to %v channels.\n", len(subscribeInfos))
+
 	// Channels for recieving websocket response.
 	channels := &iex.WSChannels{
 		PositionChan: make(chan []iex.WsPosition, 2),
@@ -169,7 +174,8 @@ func Connect(settingsFileName string, secret bool, algo models.Algo, rebalance f
 	})
 
 	if err != nil {
-		logger.Error(err)
+		msg := fmt.Sprintf("Error starting websockets: %v\n", err)
+		log.Fatal(msg)
 	}
 
 	// All of these channels send themselves back so that the test can wait for each individual to complete
@@ -178,34 +184,34 @@ func Connect(settingsFileName string, secret bool, algo models.Algo, rebalance f
 		case positions := <-channels.PositionChan:
 			updatePositions(&algo, positions)
 			channels.PositionChan <- positions
-		case trade := <-channels.TradeBinChan:
+		case trades := <-channels.TradeBinChan:
 			// Update your local bars
-			updateBars(&algo, trade[0])
-			// now fetch the bars
-			bars := database.GetBars()
-			algo.OHLCV = utils.GetOHLCV(bars)
-			symbol := trade[0].Symbol
-
-			// Did we get enough data to run this? If we didn't then throw fatal error to notify system
-			if algo.DataLength < len(bars) {
-				updateState(&algo, symbol, bars, setupData)
-				rebalance(&algo)
-			} else {
-				log.Fatalln("I do not have enough data to trade. local data length", len(bars), "data length wanted by algo", algo.DataLength)
-			}
-			// setupOrders(&algo, trade[0].Close)
-			// placeOrdersOnBook(&algo, localOrders)
-			marketState, _ := algo.Account.MarketStates[symbol]
-			logState(&algo, marketState)
-			if !isTest {
-				logLiveState(&algo, marketState)
-				runTest(&algo, setupData, rebalance)
-				checkWalletHistory(&algo, settingsFileName)
-			} else {
-				if algo.Timestamp == algo.Client.(*tantra.Tantra).GetLastTimestamp().UTC() {
-					channels.TradeBinChan = nil
+			for _, trade := range trades {
+				updateBars(&algo, trade)
+				// now fetch the bars
+				bars := database.GetData(trade.Symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
+				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
+				if algo.DataLength < len(bars) {
+					updateState(&algo, trade.Symbol, bars, setupData)
+					rebalance(&algo)
 				} else {
-					channels.TradeBinChan <- trade
+					log.Fatalln("Not enough trade data. (local data length", len(bars), "data length wanted by algo", algo.DataLength, ")")
+				}
+				// setupOrders(&algo, trade[0].Close)
+				// placeOrdersOnBook(&algo, localOrders)
+			}
+			for _, marketState := range algo.Account.MarketStates {
+				logState(&algo, marketState)
+				if !isTest {
+					logLiveState(&algo, marketState)
+					runTest(&algo, setupData, rebalance)
+					checkWalletHistory(&algo, settingsFileName)
+				} else {
+					if algo.Timestamp == algo.Client.(*tantra.Tantra).GetLastTimestamp().UTC() {
+						channels.TradeBinChan = nil
+					} else {
+						channels.TradeBinChan <- trades
+					}
 				}
 			}
 		case newOrders := <-channels.OrderChan:
@@ -328,8 +334,6 @@ func updatePositions(algo *models.Algo, positions []iex.WsPosition) {
 }
 
 func updateAlgoBalances(algo *models.Algo, balances []iex.WSBalance) {
-	logger.Info("updateAlgoBalances")
-
 	for _, updatedBalance := range balances {
 		balance, ok := algo.Account.Balances[updatedBalance.Asset]
 		if ok {

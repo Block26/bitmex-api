@@ -8,11 +8,11 @@ import (
 
 	"github.com/tantralabs/database"
 	"github.com/tantralabs/logger"
-	"github.com/tantralabs/yantra/models"
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi/global/clients"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/utils"
+	"github.com/tantralabs/yantra/models"
 )
 
 func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, end time.Time, dataLength int) *Tantra {
@@ -60,7 +60,31 @@ type Tantra struct {
 	theoEngine            *te.TheoEngine
 }
 
+func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
+	t.candleData = make(map[string][]iex.TradeBin)
+	// Convert from bar model to iex.TradeBin format
+	for symbol, barData := range data {
+		var candleData []iex.TradeBin
+		var bar iex.TradeBin
+		for i := range barData {
+			bar = iex.TradeBin{
+				Timestamp: utils.TimestampToTime(int(barData[i].Timestamp)),
+				Symbol:    symbol,
+				Open:      barData[i].Open,
+				High:      barData[i].High,
+				Low:       barData[i].Low,
+				Close:     barData[i].Close,
+				Volume:    barData[i].Volume,
+			}
+			candleData = append(candleData, bar)
+		}
+		t.candleData[symbol] = candleData
+	}
+	logger.Info("Set candle data for %v symbols.\n", len(t.candleData))
+}
+
 func (t *Tantra) StartWS(config interface{}) error {
+	logger.Infof("Starting mock exchange websockets...\n")
 	conf, ok := config.(*iex.WsConfig)
 	if !ok {
 		return errors.New("Assertion failed: config")
@@ -68,8 +92,15 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 	t.channels = conf.Channels
 
+	var numIndexes int
+	for _, candleData := range t.candleData {
+		numIndexes = len(candleData)
+		break
+	}
+	logger.Infof("Number of indexes found: %v\n", numIndexes)
+
 	go func() {
-		for index := 0; index < len(t.candleData)-t.warmUpPeriod; index++ {
+		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
 			// This is the start of the time step, at this point in time some events have not happened yet
 			// so we will fill the orders that were placed at the end of the last time step first
 			// then we we publish a new trade bin so that the algo connected can make a decision for the
@@ -77,6 +108,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 			// Iterate through all symbols for the respective account
 			// TODO should this all happen synchronously, or in parallel?
+			logger.Infof("New index: %v\n", index)
 			var low float64
 			var high float64
 			var row iex.TradeBin

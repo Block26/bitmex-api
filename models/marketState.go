@@ -35,7 +35,8 @@ type MarketState struct {
 	MidMarketPrice   float64
 	BestBid          float64
 	BestAsk          float64
-	Bar              Bar // The last bar of data for this market
+	Bar              Bar   // The last bar of data for this market
+	OHLCV            OHLCV // Open, High, Low, Close, Volume Data
 	Status           MarketStatus
 
 	// Only for options
