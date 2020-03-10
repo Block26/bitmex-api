@@ -48,7 +48,9 @@ func LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][
 	barData := make(map[string][]*models.Bar)
 	for symbol, marketState := range algo.Account.MarketStates {
 		logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
-		barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
+		// TODO handle extra bars to account for dataLength here
+		// barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
+		barData[symbol] = database.GetDataByTime(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end)
 		marketState.Bar = *barData[symbol][len(barData[symbol])-1]
 		marketState.LastPrice = marketState.Bar.Close
 		logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)

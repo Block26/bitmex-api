@@ -1,6 +1,8 @@
 package models
 
 import (
+	"log"
+
 	"github.com/tantralabs/tradeapi/iex"
 )
 
@@ -74,9 +76,22 @@ func NewMarketState(marketInfo MarketInfo, balance *float64) MarketState {
 }
 
 func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balance *float64) MarketState {
+	marketInfo, err := LoadMarketInfo(exchangeInfo.Exchange, symbol)
+	if err != nil {
+		log.Fatal("Error loading market info for %v: %v\n", symbol, err)
+	}
 	return MarketState{
 		Symbol:  symbol,
-		Info:    NewMarketInfo(symbol, exchangeInfo),
+		Info:    marketInfo,
+		Balance: balance,
+		Orders:  make(map[string]*iex.Order),
+	}
+}
+
+func NewMarketStateFromInfo(marketInfo MarketInfo, balance *float64) MarketState {
+	return MarketState{
+		Symbol:  marketInfo.Symbol,
+		Info:    marketInfo,
 		Balance: balance,
 		Orders:  make(map[string]*iex.Order),
 	}

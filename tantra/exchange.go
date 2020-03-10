@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"math"
+	"net/http"
 	"time"
 
 	"github.com/tantralabs/database"
@@ -97,7 +98,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 		numIndexes = len(candleData)
 		break
 	}
-	logger.Infof("Number of indexes found: %v\n", numIndexes)
+	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes, t.warmUpPeriod)
 
 	go func() {
 		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
@@ -194,14 +195,13 @@ func (t *Tantra) StartWS(config interface{}) error {
 			}
 
 		}
-
 	}()
-
 	return nil
 }
 
 func (t *Tantra) SetTheoEngine(theoEngine *te.TheoEngine) {
 	t.theoEngine = theoEngine
+	t.theoEngine.SetExchangeClient(*t)
 	logger.Infof("Set theo engine for mock exchange.\n")
 	volDataStart := utils.TimeToTimestamp(t.start)
 	volDataEnd := utils.TimeToTimestamp(t.end)
@@ -436,7 +436,7 @@ func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...st
 			}
 		}
 	}
-	logger.Debugf("Generated contracts (%v).\n", len(contracts))
+	logger.Infof("Generated contracts (%v).\n", len(contracts))
 	t.parseOptionContracts(contracts)
 	return contracts, err
 }
@@ -717,6 +717,10 @@ func (t *Tantra) GetBalances() (balance []iex.WSBalance, err error) {
 	return
 }
 
+func (t *Tantra) GetBalance(currency string) (balance Balance, err error) {
+	return
+}
+
 func (t *Tantra) GetPositions(currency string) (positions []iex.WsPosition, err error) {
 	var pos iex.WsPosition
 
@@ -733,6 +737,22 @@ func (t *Tantra) GetPositions(currency string) (positions []iex.WsPosition, err 
 	return
 }
 
+func (t *Tantra) GetMarketSummary(market, currency string) (Market, err error) {
+	return
+}
+
+func (t *Tantra) GetMarketSummaryByCurrency(currency string) (markets []Market, err error) {
+	return
+}
+
+func (t *Tantra) GetOrderBook(market, currency string) (OrderBook, err error) {
+	return
+}
+
+func (t *Tantra) Withdraw(address, currency string, quantity float64, additionInfo ...string) (res iex.WithdrawResponse, err error) {
+	return
+}
+
 func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err error) {
 	// TODO this should return currently open orders
 	orders = make([]iex.Order, 0)
@@ -742,5 +762,17 @@ func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err err
 //WalletHistory not available for this exchange
 func (b *Tantra) GetWalletHistory(currency string) (res []iex.WalletHistoryItem, err error) {
 	err = errors.New(":error: WalletHistory not available for this exchange yet")
+	return
+}
+
+func (t *Tantra) OpenOrders(f iex.OpenOrderF) (orders iex.OpenOrders, err error) {
+	return
+}
+
+func (t *Tantra) FormatMarketPair(pair iex.MarketPair) (res string, err error) {
+	return
+}
+
+func (t *Tantra) PrepareRequest(r *http.Request) (err error) {
 	return
 }

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"log"
 	"strconv"
 	"time"
 
@@ -17,10 +18,14 @@ type Account struct {
 	MarketStates map[string]*MarketState
 }
 
-func NewAccount(exchange, baseSymbol string, exchangeInfo ExchangeInfo, balance float64) Account {
-	accountID := exchange + "_" + strconv.Itoa(int(time.Now().UTC().UnixNano()/1000000))
+func NewAccount(baseSymbol string, exchangeInfo ExchangeInfo, balance float64) Account {
+	accountID := exchangeInfo.Exchange + "_" + strconv.Itoa(int(time.Now().UTC().UnixNano()/1000000))
+	baseMarketInfo, err := LoadMarketInfo(exchangeInfo.Exchange, baseSymbol)
+	if err != nil {
+		log.Fatal("Error loading market info for %v: %v\n", baseSymbol, err)
+	}
 	baseAsset := Asset{
-		Symbol:   baseSymbol,
+		Symbol:   baseMarketInfo.BaseSymbol,
 		Quantity: balance,
 	}
 	account := Account{
@@ -33,7 +38,8 @@ func NewAccount(exchange, baseSymbol string, exchangeInfo ExchangeInfo, balance 
 		Orders:       make(map[string]*iex.Order),
 		MarketStates: make(map[string]*MarketState),
 	}
-	baseMarketState := NewMarketStateFromExchange(baseSymbol, exchangeInfo, &account.BaseAsset.Quantity)
+	baseMarketState := NewMarketStateFromInfo(baseMarketInfo, &account.BaseAsset.Quantity)
+
 	account.MarketStates[baseSymbol] = &baseMarketState
 	return account
 }
