@@ -201,7 +201,6 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 func (t *Tantra) SetTheoEngine(theoEngine *te.TheoEngine) {
 	t.theoEngine = theoEngine
-	t.theoEngine.SetExchangeClient(*t)
 	logger.Infof("Set theo engine for mock exchange.\n")
 	volDataStart := utils.TimeToTimestamp(t.start)
 	volDataEnd := utils.TimeToTimestamp(t.end)
@@ -717,7 +716,7 @@ func (t *Tantra) GetBalances() (balance []iex.WSBalance, err error) {
 	return
 }
 
-func (t *Tantra) GetBalance(currency string) (balance Balance, err error) {
+func (t *Tantra) GetBalance(currency string) (balance iex.Balance, err error) {
 	return
 }
 
@@ -737,15 +736,15 @@ func (t *Tantra) GetPositions(currency string) (positions []iex.WsPosition, err 
 	return
 }
 
-func (t *Tantra) GetMarketSummary(market, currency string) (Market, err error) {
+func (t *Tantra) GetMarketSummary(symbol string, currency string) (market iex.Market, err error) {
 	return
 }
 
-func (t *Tantra) GetMarketSummaryByCurrency(currency string) (markets []Market, err error) {
+func (t *Tantra) GetMarketSummaryByCurrency(currency string) (markets []iex.Market, err error) {
 	return
 }
 
-func (t *Tantra) GetOrderBook(market, currency string) (OrderBook, err error) {
+func (t *Tantra) GetOrderBook(symbol string, currency string) (orderbook iex.OrderBook, err error) {
 	return
 }
 
@@ -760,7 +759,7 @@ func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err err
 }
 
 //WalletHistory not available for this exchange
-func (b *Tantra) GetWalletHistory(currency string) (res []iex.WalletHistoryItem, err error) {
+func (t *Tantra) GetWalletHistory(currency string) (res []iex.WalletHistoryItem, err error) {
 	err = errors.New(":error: WalletHistory not available for this exchange yet")
 	return
 }

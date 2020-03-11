@@ -13,16 +13,13 @@ import (
 	"log"
 	"math"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/exchanges"
+	"github.com/tantralabs/utils"
 	"github.com/tantralabs/yantra/models"
 	. "github.com/tantralabs/yantra/models"
-	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/utils"
 )
 
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
@@ -241,182 +238,6 @@ func getInfluxClient() client.Client {
 	}
 
 	return influx
-}
-
-func logTrade(algo *Algo, trade iex.Order) {
-	stateType := "live"
-	influx := getInfluxClient()
-
-	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "algos",
-		Precision: "us",
-	})
-
-	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash, "state_type": stateType, "side": strings.ToLower(trade.Side)}
-
-	fields := structs.Map(trade)
-	pt, err := client.NewPoint(
-		"trades",
-		tags,
-		fields,
-		time.Now(),
-	)
-	bp.AddPoint(pt)
-
-	err = client.Client.Write(influx, bp)
-	if err != nil {
-		fmt.Println("err", err)
-	}
-	influx.Close()
-}
-
-func logFilledTrade(algo *Algo, trade iex.Order) {
-	stateType := "live"
-	influx := getInfluxClient()
-
-	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "algos",
-		Precision: "us",
-	})
-
-	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash, "state_type": stateType, "side": strings.ToLower(trade.Side)}
-
-	fields := structs.Map(trade)
-	pt, err := client.NewPoint(
-		"filled_trades",
-		tags,
-		fields,
-		time.Now(),
-	)
-	bp.AddPoint(pt)
-
-	err = client.Client.Write(influx, bp)
-	if err != nil {
-		fmt.Println("err", err)
-	}
-	influx.Close()
-}
-
-//Log the state of the algo to influx db
-func logLiveState(algo *Algo, marketState *MarketState, test ...bool) {
-	stateType := "live"
-	if test != nil {
-		stateType = "test"
-	}
-
-	influx := getInfluxClient()
-
-	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "algos",
-		Precision: "us",
-	})
-
-	tags := map[string]string{"algo_name": algo.Name, "commit_hash": commitHash, "state_type": stateType}
-
-	fields := structs.Map(marketState)
-
-	//TODO: shouldn't have to manually delete Options param here
-	_, ok := fields["Options"]
-	if ok {
-		delete(fields, "Options")
-	}
-
-	fields["Price"] = marketState.Bar.Close
-	fields["Balance"] = algo.Account.BaseAsset.Quantity
-	fields["Quantity"] = marketState.Position
-
-	pt, err := client.NewPoint(
-		"market",
-		tags,
-		fields,
-		time.Now(),
-	)
-	bp.AddPoint(pt)
-
-	fields = algo.Params
-
-	if marketState.AutoOrderPlacement {
-		fields["EntryOrderSize"] = marketState.EntryOrderSize
-		fields["ExitOrderSize"] = marketState.ExitOrderSize
-		fields["DeleverageOrderSize"] = marketState.DeleverageOrderSize
-		fields["LeverageTarget"] = marketState.LeverageTarget
-		fields["ShouldHaveQuantity"] = marketState.ShouldHaveQuantity
-		fields["FillPrice"] = marketState.FillPrice
-	}
-
-	pt, err = client.NewPoint(
-		"params",
-		tags,
-		fields,
-		time.Now(),
-	)
-	bp.AddPoint(pt)
-
-	// LOG Options
-	for symbol, option := range algo.Account.MarketStates {
-		if option.Info.MarketType == Option && option.Position != 0 {
-			tmpTags := tags
-			tmpTags["symbol"] = symbol
-			o := structs.Map(option.OptionTheo)
-			// Influxdb seems to interpret pointers as strings, need to dereference here
-			o["CurrentTime"] = utils.TimeToTimestamp(*option.OptionTheo.CurrentTime)
-			o["UnderlyingPrice"] = *option.OptionTheo.UnderlyingPrice
-			pt1, _ := client.NewPoint(
-				"optionTheo",
-				tmpTags,
-				o,
-				time.Now(),
-			)
-			bp.AddPoint(pt1)
-
-			o = structs.Map(option)
-			// Influxdb seems to interpret pointers as strings, need to dereference here
-			o["CurrentTime"] = (*option.OptionTheo.CurrentTime).String()
-			o["UnderlyingPrice"] = *option.OptionTheo.UnderlyingPrice
-			delete(o, "OptionTheo")
-			pt2, _ := client.NewPoint(
-				"options",
-				tmpTags,
-				o,
-				time.Now(),
-			)
-			bp.AddPoint(pt2)
-		}
-	}
-
-	// LOG orders placed
-
-	for _, order := range marketState.Orders {
-		fields = map[string]interface{}{
-			fmt.Sprintf("%0.2f", order.Rate): order.Amount,
-		}
-
-		pt, err = client.NewPoint(
-			"order",
-			tags,
-			fields,
-			time.Now(),
-		)
-		bp.AddPoint(pt)
-	}
-
-	if algo.State != nil {
-		pt, err := client.NewPoint(
-			"state",
-			tags,
-			algo.State,
-			time.Now(),
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-		bp.AddPoint(pt)
-	}
-	err = client.Client.Write(influx, bp)
-	if err != nil {
-		fmt.Println("err", err)
-	}
-	influx.Close()
 }
 
 // CreateSpread Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
