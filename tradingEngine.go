@@ -47,7 +47,7 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int) TradingEngine
 		lastWalletSync:       0,
 		startTime:            time.Now(),
 		theoEngine:           nil,
-		lastContractUpdate:   utils.TimeToTimestamp(time.Now().UTC()),
+		lastContractUpdate:   0,
 		contractUpdatePeriod: contractUpdatePeriod,
 	}
 }
@@ -61,12 +61,42 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	}
 	mockExchange := tantra.NewTest(exchangeVars, &t.algo.Account, start, end, t.algo.DataLength)
 	barData := t.LoadBarData(t.algo, start, end)
+	for symbol, data := range barData {
+		logger.Infof("Loaded %v instances of bar data for %v with start %v and end %v.\n", len(data), symbol, start, end)
+	}
+	t.SetAlgoCandleData(barData)
 	mockExchange.SetCandleData(barData)
 	mockExchange.SetCurrentTime(start)
 	t.algo.Client = mockExchange
 	t.algo.Timestamp = start
+	t.Connect("", false, rebalance, setupData, true)
+}
 
-	t.Connect("", false, *t.algo, rebalance, setupData, true)
+func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
+	for symbol, data := range candleData {
+		marketState, ok := t.algo.Account.MarketStates[symbol]
+		if !ok {
+			logger.Errorf("Cannot set bar data for market state %v.\n", symbol)
+		}
+		logger.Infof("Setting candle data for %v with %v bars.\n", symbol, len(data))
+		var ohlcv models.OHLCV
+		numBars := len(data)
+		ohlcv.Timestamp = make([]int64, numBars)
+		ohlcv.Open = make([]float64, numBars)
+		ohlcv.Low = make([]float64, numBars)
+		ohlcv.High = make([]float64, numBars)
+		ohlcv.Close = make([]float64, numBars)
+		ohlcv.Volume = make([]float64, numBars)
+		for i, candle := range data {
+			ohlcv.Timestamp[i] = candle.Timestamp
+			ohlcv.Open[i] = candle.Open
+			ohlcv.High[i] = candle.High
+			ohlcv.Low[i] = candle.Low
+			ohlcv.Close[i] = candle.Close
+			ohlcv.Volume[i] = candle.Volume
+		}
+		marketState.OHLCV = ohlcv
+	}
 }
 
 func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {
@@ -75,7 +105,8 @@ func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time
 		logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
 		// TODO handle extra bars to account for dataLength here
 		// barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
-		barData[symbol] = database.GetDataByTime(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end)
+		barData[symbol] = database.GetCandlesByTime(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
+		algo.Index = algo.DataLength
 		marketState.Bar = *barData[symbol][len(barData[symbol])-1]
 		marketState.LastPrice = marketState.Bar.Close
 		logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
@@ -86,7 +117,7 @@ func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time
 // Connect is called to connect to an exchange's WS api and begin trading.
 // The current implementation will execute rebalance every 1 minute regardless of models.Algo.RebalanceInterval
 // This is intentional, look at models.Algo.AutoOrderPlacement to understand this paradigm.
-func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo models.Algo, rebalance func(*models.Algo), setupData func(*models.Algo), test ...bool) {
+func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance func(*models.Algo), setupData func(*models.Algo), test ...bool) {
 	utils.LoadENV(secret)
 	var isTest bool
 	if test != nil {
@@ -96,7 +127,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 		isTest = false
 		database.Setup("remote")
 	}
-	if algo.RebalanceInterval == "" {
+	if t.algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
 	}
 
@@ -105,16 +136,16 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 
 	if !isTest {
 		config = utils.LoadSecret(settingsFileName, secret)
-		logger.Info("Loaded config for", algo.Account.ExchangeInfo.Exchange, "secret", settingsFileName)
+		logger.Info("Loaded config for", t.algo.Account.ExchangeInfo.Exchange, "secret", settingsFileName)
 		exchangeVars := iex.ExchangeConf{
-			Exchange:       algo.Account.ExchangeInfo.Exchange,
-			ServerUrl:      algo.Account.ExchangeInfo.ExchangeURL,
+			Exchange:       t.algo.Account.ExchangeInfo.Exchange,
+			ServerUrl:      t.algo.Account.ExchangeInfo.ExchangeURL,
 			ApiSecret:      config.APISecret,
 			ApiKey:         config.APIKey,
 			AccountID:      "test",
 			OutputResponse: false,
 		}
-		algo.Client, err = tradeapi.New(exchangeVars)
+		t.algo.Client, err = tradeapi.New(exchangeVars)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -123,11 +154,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 	//TODO do we need this order status?
 	// t.orderStatus = algo.Client.GetPotentialOrderStatus()
 
-	if algo.Account.ExchangeInfo.Options {
+	if t.algo.Account.ExchangeInfo.Options {
 		// Build theo engine
 		// Assume the first futures market we find is the underlying market
 		var underlyingMarket *models.MarketState
-		for symbol, marketState := range algo.Account.MarketStates {
+		for symbol, marketState := range t.algo.Account.MarketStates {
 			if marketState.Info.MarketType == models.Future {
 				underlyingMarket = marketState
 				logger.Infof("Found underlying market: %v\n", symbol)
@@ -135,10 +166,12 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 			}
 		}
 		if underlyingMarket == nil {
-			log.Fatal("Could not find underlying market for options exchange %v\n", algo.Account.ExchangeInfo.Exchange)
+			log.Fatal("Could not find underlying market for options exchange %v\n", t.algo.Account.ExchangeInfo.Exchange)
 		}
-		theoEngine := te.NewTheoEngine(underlyingMarket, &algo.Timestamp, 60000, 86400000, 0, 0, t.algo.LogLevel)
-		algo.TheoEngine = &theoEngine
+		theoEngine := te.NewTheoEngine(underlyingMarket, &t.algo.Timestamp, 60000, 86400000, 0, 0, t.algo.LogLevel)
+		t.algo.TheoEngine = &theoEngine
+		t.theoEngine = &theoEngine
+		logger.Infof("Built new theo engine.\n")
 		if isTest {
 			theoEngine.CurrentTime = &t.algo.Client.(*tantra.Tantra).CurrentTime
 			t.algo.Client.(*tantra.Tantra).SetTheoEngine(&theoEngine)
@@ -146,16 +179,18 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 			// theoEngine.ApplyVolSurface()
 		}
 		logger.Infof("Built theo engine.\n")
+	} else {
+		logger.Infof("Not building theo engine (no options)\n")
 	}
 
 	// SETUP ALGO WITH RESTFUL CALLS
-	balances, _ := algo.Client.GetBalances()
-	t.updateAlgoBalances(&algo, balances)
+	balances, _ := t.algo.Client.GetBalances()
+	t.updateAlgoBalances(t.algo, balances)
 
-	positions, _ := algo.Client.GetPositions(algo.Account.BaseAsset.Symbol)
-	t.updatePositions(&algo, positions)
+	positions, _ := t.algo.Client.GetPositions(t.algo.Account.BaseAsset.Symbol)
+	t.updatePositions(t.algo, positions)
 
-	orders, err := algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: algo.Account.BaseAsset.Symbol})
+	orders, err := t.algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: t.algo.Account.BaseAsset.Symbol})
 	if err != nil {
 		logger.Errorf("Error getting open orders: %v\n", err)
 	} else {
@@ -166,7 +201,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 	// SUBSCRIBE TO WEBSOCKETS
 	// channels to subscribe to (only futures and spot for now)
 	var subscribeInfos []iex.WSSubscribeInfo
-	for marketSymbol, marketState := range algo.Account.MarketStates {
+	for marketSymbol, marketState := range t.algo.Account.MarketStates {
 		if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
 			symbol := strings.ToLower(marketSymbol)
 			//Ordering is important, get wallet and position first then market info
@@ -188,8 +223,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 	}
 
 	// Start the websocket.
-	err = algo.Client.StartWS(&iex.WsConfig{
-		Host:      algo.Account.ExchangeInfo.WSStream,
+	err = t.algo.Client.StartWS(&iex.WsConfig{
+		Host:      t.algo.Account.ExchangeInfo.WSStream,
 		Streams:   subscribeInfos,
 		Channels:  channels,
 		ApiSecret: config.APISecret,
@@ -205,7 +240,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 	for {
 		select {
 		case positions := <-channels.PositionChan:
-			t.updatePositions(&algo, positions)
+			t.updatePositions(t.algo, positions)
 			channels.PositionChan <- positions
 		case trades := <-channels.TradeBinChan:
 			// Update active contracts if we are trading options
@@ -213,30 +248,30 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 				t.UpdateActiveContracts()
 				t.UpdateMidMarketPrices()
 				t.theoEngine.ScanOptions(true, true)
+			} else {
+				logger.Infof("Cannot update active contracts, theo engine is nil\n")
 			}
 			// Update your local bars
 			for _, trade := range trades {
-				t.updateBars(&algo, trade)
+				t.updateBars(t.algo, trade)
 				// now fetch the bars
-				bars := database.GetData(trade.Symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
+				bars := database.GetData(trade.Symbol, t.algo.Account.ExchangeInfo.Exchange, t.algo.RebalanceInterval, t.algo.DataLength+100)
 				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
-				if algo.DataLength < len(bars) {
-					t.updateState(&algo, trade.Symbol, bars, setupData)
-					rebalance(&algo)
+				if t.algo.DataLength < len(bars) {
+					t.updateState(t.algo, trade.Symbol, bars, setupData)
+					rebalance(t.algo)
 				} else {
-					log.Fatalln("Not enough trade data. (local data length", len(bars), "data length wanted by algo", algo.DataLength, ")")
+					log.Fatalln("Not enough trade data. (local data length", len(bars), "data length wanted by algo", t.algo.DataLength, ")")
 				}
-				// setupOrders(&algo, trade[0].Close)
-				// placeOrdersOnBook(&algo, localOrders)
 			}
-			for _, marketState := range algo.Account.MarketStates {
-				logState(&algo, marketState)
+			for _, marketState := range t.algo.Account.MarketStates {
+				logState(t.algo, marketState)
 				if !isTest {
 					t.logLiveState(marketState)
-					t.runTest(&algo, setupData, rebalance)
-					t.checkWalletHistory(&algo, settingsFileName)
+					t.runTest(t.algo, setupData, rebalance)
+					t.checkWalletHistory(t.algo, settingsFileName)
 				} else {
-					if algo.Timestamp == t.algo.Client.(*tantra.Tantra).GetLastTimestamp().UTC() {
+					if t.algo.Timestamp == t.algo.Client.(*tantra.Tantra).GetLastTimestamp().UTC() {
 						channels.TradeBinChan = nil
 					} else {
 						channels.TradeBinChan <- trades
@@ -245,11 +280,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, algo model
 			}
 		case newOrders := <-channels.OrderChan:
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
-			t.updateOrders(&algo, newOrders, true)
+			t.updateOrders(t.algo, newOrders, true)
 			// TODO callback to order function
 			channels.OrderChan <- newOrders
 		case update := <-channels.WalletChan:
-			t.updateAlgoBalances(&algo, update.Balance)
+			t.updateAlgoBalances(t.algo, update.Balance)
 			channels.WalletChan <- update
 		}
 		if channels.TradeBinChan == nil {
@@ -424,15 +459,15 @@ func (t *TradingEngine) updateState(algo *models.Algo, symbol string, bars []*mo
 }
 
 func (t *TradingEngine) UpdateActiveContracts() {
-	logger.Debugf("Updating active contracts at %v\n", t.algo.Timestamp)
+	logger.Infof("Updating active contracts at %v\n", t.algo.Timestamp)
 	updateTime := t.lastContractUpdate + t.contractUpdatePeriod
 	currentTimestamp := utils.TimeToTimestamp(t.algo.Timestamp)
 	if updateTime > currentTimestamp {
-		logger.Debugf("Skipping contract update. (next update at %v, current time %v)\n", updateTime, currentTimestamp)
+		logger.Infof("Skipping contract update. (next update at %v, current time %v)\n", updateTime, currentTimestamp)
 		return
 	}
 	activeOptions := t.GetActiveContracts()
-	logger.Livef("Found %v new active options.\n", len(activeOptions))
+	logger.Infof("Found %v new active options.\n", len(activeOptions))
 	for symbol, marketState := range activeOptions {
 		// TODO is this check necessary? may already happen in GetActiveContracts()
 		_, ok := t.theoEngine.Options[symbol]
@@ -445,7 +480,7 @@ func (t *TradingEngine) UpdateActiveContracts() {
 }
 
 func (t *TradingEngine) GetActiveContracts() map[string]models.MarketState {
-	logger.Debugf("Generating live options at %v\n", t.algo.Timestamp)
+	logger.Infof("Generating active contracts at %v\n", t.algo.Timestamp)
 	liveContracts := make(map[string]models.MarketState)
 	var optionTheo models.OptionTheo
 	var marketInfo models.MarketInfo
@@ -453,6 +488,7 @@ func (t *TradingEngine) GetActiveContracts() map[string]models.MarketState {
 	var optionType models.OptionType
 	if t.algo.Account.ExchangeInfo.Exchange == "deribit" {
 		markets, err := t.algo.Client.GetMarkets(t.algo.Account.BaseAsset.Symbol, true, "option")
+		logger.Infof("Got %v markets.\n", len(markets))
 		if err == nil {
 			for _, market := range markets {
 				_, ok := t.theoEngine.Options[market.Symbol]
@@ -496,6 +532,7 @@ func (t *TradingEngine) GetActiveContracts() map[string]models.MarketState {
 	} else {
 		logger.Errorf("GetOptionsContracts() not implemented for exchange %v\n", t.algo.Account.ExchangeInfo.Exchange)
 	}
+	logger.Infof("Found %v live contracts.\n", len(liveContracts))
 	return liveContracts
 }
 
@@ -608,7 +645,7 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 	)
 	bp.AddPoint(pt)
 
-	fields = t.algo.Params
+	fields = t.algo.Params[marketState.Symbol]
 
 	if marketState.AutoOrderPlacement {
 		fields["EntryOrderSize"] = marketState.EntryOrderSize
@@ -810,8 +847,6 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 		} else {
 			state.UBalance = (algo.Account.BaseAsset.Quantity * marketState.Bar.Close) + marketState.Position
 		}
-
-	} else {
 	}
 	if algo.Debug {
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Account.BaseAsset.Quantity*marketState.Bar.Close+(marketState.Position), 0.0, algo.Account.BaseAsset.Quantity, marketState.Position, marketState.Bar.Close, marketState.AverageCost))
