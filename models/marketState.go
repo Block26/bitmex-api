@@ -30,7 +30,7 @@ type MarketState struct {
 	RealizedProfit   float64
 	Profit           float64
 	Leverage         float64
-	Weight           float64
+	Weight           int
 	Balance          *float64              // We want this balance to track the account balance automatically
 	Orders           map[string]*iex.Order // [orderId]Order
 	LastPrice        float64
