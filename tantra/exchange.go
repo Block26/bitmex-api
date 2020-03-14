@@ -230,20 +230,21 @@ func (t *Tantra) respondWithOrderChanges() {
 	t.newOrders = make([]iex.Order, 0)
 }
 
-func (t *Tantra) updateBalance(currentBaseBalance *float64, currentQuantity *float64, averageCost *float64, fillPrice float64, fillAmount float64, marketState *models.MarketState) {
-	logger.Infof("Updating balance with curr base bal %v, curr quant %v, avg cost %v, fill pr %v, fill a %v\n", currentBaseBalance, currentQuantity, averageCost, fillPrice, fillAmount)
+func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *float64, averageCost *float64, fillPrice float64, fillAmount float64, marketState *models.MarketState) {
+	logger.Infof("Updating balance with current base balance %v, current position %v, avg cost %v, fill price %v, fill amount %v\n",
+		*currentBaseBalance, *currentPosition, *averageCost, fillPrice, fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		// fee := math.Abs(fillAmount/fillPrice) * t.Account.MakerFee
 		// logger.Printf("fillPrice %.2f -> fillAmount %.2f", fillPrice, fillAmount)
-		// logger.Debugf("Updating balance with fill cost %v, fill amount %v, qaq %v, baq %v", fillPrice, fillAmount, currentQuantity, currentBaseBalance)
-		currentCost := (*currentQuantity * *averageCost)
+		// logger.Debugf("Updating balance with fill cost %v, fill amount %v, qaq %v, baq %v", fillPrice, fillAmount, currentPosition, currentBaseBalance)
+		currentCost := (*currentPosition * *averageCost)
 		if marketState.Info.MarketType == models.Future {
-			totalQuantity := *currentQuantity + fillAmount
+			totalQuantity := *currentPosition + fillAmount
 			newCost := fillPrice * fillAmount
-			if (fillAmount >= 0 && *currentQuantity >= 0) || (fillAmount <= 0 && *currentQuantity <= 0) {
+			if (fillAmount >= 0 && *currentPosition >= 0) || (fillAmount <= 0 && *currentPosition <= 0) {
 				//Adding to position
 				*averageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
-			} else if ((fillAmount >= 0 && *currentQuantity <= 0) || (fillAmount <= 0 && *currentQuantity >= 0)) && math.Abs(fillAmount) >= math.Abs(*currentQuantity) {
+			} else if ((fillAmount >= 0 && *currentPosition <= 0) || (fillAmount <= 0 && *currentPosition >= 0)) && math.Abs(fillAmount) >= math.Abs(*currentPosition) {
 				//Position changed
 				var diff float64
 				if fillAmount > 0 {
@@ -252,7 +253,7 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentQuantity *flo
 					diff = utils.CalculateDifference(fillPrice, *averageCost)
 				}
 				// Only use the remaining position that was filled to calculate cost
-				portionFillQuantity := math.Abs(*currentQuantity)
+				portionFillQuantity := math.Abs(*currentPosition)
 				logger.Debugf("Updating current base balance w bb %v, portionFillQuantity %v, diff %v, avgcost %v\n", currentBaseBalance, portionFillQuantity, diff, averageCost)
 				*currentBaseBalance = *currentBaseBalance + ((portionFillQuantity * diff) / *averageCost)
 				*averageCost = fillPrice
@@ -272,36 +273,36 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentQuantity *flo
 				logger.Debugf("Updating full fill quantity with baq %v, fillAmount %v, diff %v, avg cost %v\n", currentBaseBalance, fillAmount, diff, averageCost)
 				*currentBaseBalance += ((math.Abs(fillAmount) * diff) / *averageCost)
 			}
-			*currentQuantity += fillAmount
-			if *currentQuantity == 0 {
+			*currentPosition += fillAmount
+			if *currentPosition == 0 {
 				*averageCost = 0
 			}
 		} else if marketState.Info.MarketType == models.Spot {
 			fillAmount = fillAmount / fillPrice
-			totalQuantity := *currentQuantity + fillAmount
+			totalQuantity := *currentPosition + fillAmount
 			newCost := fillPrice * fillAmount
 
-			if fillAmount >= 0 && *currentQuantity >= 0 {
+			if fillAmount >= 0 && *currentPosition >= 0 {
 				//Adding to position
 				*averageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
 			}
 
-			*currentQuantity -= newCost
+			*currentPosition -= newCost
 			*currentBaseBalance += fillAmount
 		} else if marketState.Info.MarketType == models.Option {
-			totalQuantity := *currentQuantity + fillAmount
+			totalQuantity := *currentPosition + fillAmount
 			newCost := fillPrice * fillAmount
-			if (fillAmount >= 0 && *currentQuantity >= 0) || (fillAmount <= 0 && *currentQuantity <= 0) {
+			if (fillAmount >= 0 && *currentPosition >= 0) || (fillAmount <= 0 && *currentPosition <= 0) {
 				//Adding to position
 				*averageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
-			} else if ((fillAmount >= 0 && *currentQuantity <= 0) || (fillAmount <= 0 && *currentQuantity >= 0)) && math.Abs(fillAmount) >= math.Abs(*currentQuantity) {
+			} else if ((fillAmount >= 0 && *currentPosition <= 0) || (fillAmount <= 0 && *currentPosition >= 0)) && math.Abs(fillAmount) >= math.Abs(*currentPosition) {
 				//Position changed
 				// Only use the remaining position that was filled to calculate cost
 				var balanceChange float64
 				if marketState.Info.DenominatedInUnderlying {
-					balanceChange = *currentQuantity * (fillPrice - *averageCost)
+					balanceChange = *currentPosition * (fillPrice - *averageCost)
 				} else {
-					balanceChange = *currentQuantity * (fillPrice - *averageCost) / marketState.Bar.Close
+					balanceChange = *currentPosition * (fillPrice - *averageCost) / marketState.Bar.Close
 				}
 				logger.Debugf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v", currentBaseBalance, balanceChange, fillPrice, averageCost)
 				*currentBaseBalance += +balanceChange
@@ -317,7 +318,7 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentQuantity *flo
 				logger.Debugf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v\n", currentBaseBalance, balanceChange, fillPrice, averageCost)
 				*currentBaseBalance += balanceChange
 			}
-			*currentQuantity += fillAmount
+			*currentPosition += fillAmount
 		}
 	}
 }
@@ -331,6 +332,7 @@ func (t *Tantra) getExpirys() map[int]bool {
 }
 
 func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...string) ([]*iex.Contract, error) {
+	logger.Infof("[Tantra] Getting markets for %v\n", currency)
 	getOptions := false
 	getFutures := false
 	if marketType == nil {
@@ -375,9 +377,10 @@ func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...st
 		}
 	}
 	if getOptions {
-		logger.Infof("Getting markets at %v\n", t.CurrentTime)
+		logger.Infof("Getting option markets at %v with num weeklys %v, num monthlys %v\n",
+			t.CurrentTime, t.Account.ExchangeInfo.NumWeeklyOptions, t.Account.ExchangeInfo.NumMonthlyOptions)
 		currentExpirys := t.getExpirys()
-		logger.Debugf("Current expirys: %v\n", currentExpirys)
+		logger.Infof("Current expirys: %v\n", currentExpirys)
 		newExpirys := make(map[int]bool)
 		currentTime := t.CurrentTime
 		for i := 0; i < t.Account.ExchangeInfo.NumWeeklyOptions; i++ {
@@ -631,7 +634,7 @@ func (t *Tantra) updateOptionPositions() {
 
 func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
 	order.TransactTime = t.CurrentTime
-	log.Println("PlaceOrder", order)
+	log.Println("Placing order with price", order.Rate, "amount", order.Amount, "side", order.Side, "symbol", order.Symbol)
 	// Create uuid for order
 	uuid = time.Now().String() + string(len(t.orders))
 	order.OrderID = uuid
