@@ -80,8 +80,9 @@ func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
 			candleData = append(candleData, bar)
 		}
 		t.candleData[symbol] = candleData
+		logger.Infof("Set %v candles for %v.\n", len(candleData), symbol)
 	}
-	logger.Info("Set candle data for %v symbols.\n", len(t.candleData))
+	logger.Infof("Set candle data for %v symbols.\n", len(t.candleData))
 }
 
 func (t *Tantra) StartWS(config interface{}) error {
@@ -188,12 +189,12 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 				// Now send the latest trade bin
 				tradeUpdate := []iex.TradeBin{row}
+				logger.Infof("New trade update: %v\n", tradeUpdate)
 				t.channels.TradeBinChan <- tradeUpdate
 
 				// Wait for channel to complete
 				<-t.channels.TradeBinChan
 			}
-
 		}
 	}()
 	return nil
@@ -231,7 +232,7 @@ func (t *Tantra) respondWithOrderChanges() {
 }
 
 func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *float64, averageCost *float64, fillPrice float64, fillAmount float64, marketState *models.MarketState) {
-	logger.Infof("Updating balance with current base balance %v, current position %v, avg cost %v, fill price %v, fill amount %v\n",
+	logger.Debugf("Updating balance with current base balance %v, current position %v, avg cost %v, fill price %v, fill amount %v\n",
 		*currentBaseBalance, *currentPosition, *averageCost, fillPrice, fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		// fee := math.Abs(fillAmount/fillPrice) * t.Account.MakerFee
