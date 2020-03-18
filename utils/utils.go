@@ -201,7 +201,7 @@ func TimestampToTime(timestamp int) time.Time {
 	if err != nil {
 		panic(err)
 	}
-	return time.Unix(timeInt, 0)
+	return time.Unix(timeInt, 0).UTC()
 }
 
 func TimeToTimestamp(timeObject time.Time) int {
@@ -396,6 +396,7 @@ func GetNextFriday(currentTime time.Time) time.Time {
 }
 
 func GetLastFridayOfMonth(currentTime time.Time) time.Time {
+	startTime := currentTime
 	year, month, _ := currentTime.Date()
 	firstOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 	lastOfMonth := firstOfMonth.AddDate(0, 1, -1).Day()
@@ -406,6 +407,7 @@ func GetLastFridayOfMonth(currentTime time.Time) time.Time {
 		}
 		currentTime = currentTime.Add(-time.Hour * time.Duration(24))
 	}
+	logger.Infof("Last fri: %v, start time %v\n", currentTime, startTime)
 	return currentTime
 }
 

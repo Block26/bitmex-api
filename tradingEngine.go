@@ -102,7 +102,8 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 	marketState, ok := t.algo.Account.MarketStates[candle.Symbol]
 	if !ok {
-		logger.Errorf("Cannot insert new candle for symbol %v\n", candle.Symbol)
+		logger.Errorf("Cannot insert new candle for symbol %v (candle=%v)\n", candle.Symbol, candle)
+		return
 	}
 	ohlcv := marketState.OHLCV
 	ohlcv.Timestamp = append(ohlcv.Timestamp, int64(utils.TimeToTimestamp(candle.Timestamp)))
@@ -247,6 +248,9 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		ApiKey:    config.APIKey,
 	})
 
+	logger.Infof("Started client order channel: %v\n", channels.OrderChan)
+	logger.Infof("Started client trade channel: %v\n", channels.TradeBinChan)
+
 	if err != nil {
 		msg := fmt.Sprintf("Error starting websockets: %v\n", err)
 		log.Fatal(msg)
@@ -259,6 +263,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			t.updatePositions(t.algo, positions)
 			channels.PositionChan <- positions
 		case trades := <-channels.TradeBinChan:
+			logger.Infof("Recieved %v new trade updates: %v\n", len(trades), trades)
 			// Update active contracts if we are trading options
 			if t.theoEngine != nil {
 				t.UpdateActiveContracts()
@@ -293,10 +298,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 					// if t.algo.Timestamp == t.algo.Client.(*tantra.Tantra).GetLastTimestamp().UTC() {
 					// 	channels.TradeBinChan = nil
 					// }
-					channels.TradeBinChan <- trades
+					// channels.TradeBinChan <- trades
 				}
 			}
 		case newOrders := <-channels.OrderChan:
+			logger.Infof("Recieved %v new order updates\n", len(newOrders))
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
 			t.updateOrders(t.algo, newOrders, true)
 			// TODO callback to order function
@@ -331,6 +337,7 @@ func (t *TradingEngine) checkWalletHistory(algo *models.Algo, settingsFileName s
 
 // Inject orders directly into market state upon update
 func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUpdate bool) {
+	logger.Infof("Processing %v order updates.\n", len(orders))
 	if isUpdate {
 		// Add to existing order state
 		for _, newOrder := range orders {
@@ -497,13 +504,21 @@ func (t *TradingEngine) UpdateActiveContracts() {
 	}
 	activeOptions := t.GetActiveContracts()
 	logger.Infof("Found %v new active options.\n", len(activeOptions))
+	var ok bool
 	for symbol, marketState := range activeOptions {
 		// TODO is this check necessary? may already happen in GetActiveContracts()
-		_, ok := t.theoEngine.Options[symbol]
+		marketStateCopy := marketState
+		_, ok = t.theoEngine.Options[symbol]
 		if !ok {
-			t.theoEngine.Options[symbol] = &marketState
+			t.theoEngine.Options[symbol] = &marketStateCopy
+			logger.Infof("New option found for symbol %v: %p\n", symbol, t.theoEngine.Options[symbol])
+		}
+		_, ok = t.algo.Account.MarketStates[symbol]
+		if !ok {
+			t.algo.Account.MarketStates[symbol] = &marketStateCopy
 		}
 	}
+	t.RemoveExpiredOptions()
 	t.theoEngine.UpdateOptionIndexes()
 	t.lastContractUpdate = currentTimestamp
 }
@@ -511,7 +526,6 @@ func (t *TradingEngine) UpdateActiveContracts() {
 func (t *TradingEngine) GetActiveContracts() map[string]models.MarketState {
 	logger.Infof("Generating active contracts at %v\n", t.algo.Timestamp)
 	liveContracts := make(map[string]models.MarketState)
-	var optionTheo models.OptionTheo
 	var marketInfo models.MarketInfo
 	var marketState models.MarketState
 	var optionType models.OptionType
@@ -522,7 +536,7 @@ func (t *TradingEngine) GetActiveContracts() map[string]models.MarketState {
 			for _, market := range markets {
 				_, ok := t.theoEngine.Options[market.Symbol]
 				if !ok {
-					optionTheo = models.NewOptionTheo(
+					optionTheo := models.NewOptionTheo(
 						market.Strike,
 						t.theoEngine.UnderlyingPrice,
 						market.Expiry,
@@ -544,13 +558,11 @@ func (t *TradingEngine) GetActiveContracts() map[string]models.MarketState {
 					marketInfo.Expiry = market.Expiry
 					marketInfo.Strike = market.Strike
 					marketInfo.OptionType = optionType
-					marketState = models.MarketState{
-						Symbol:         marketInfo.Symbol,
-						Info:           marketInfo,
-						Orders:         make(map[string]*iex.Order),
-						OptionTheo:     &optionTheo,
-						MidMarketPrice: market.MidMarketPrice,
-					}
+					marketInfo.MarketType = models.Option
+					marketState = models.NewMarketStateFromInfo(marketInfo, &t.algo.Account.BaseAsset.Quantity)
+					marketState.MidMarketPrice = market.MidMarketPrice
+					marketState.OptionTheo = &optionTheo
+					marketState.Info.MinimumOrderSize = t.algo.Account.ExchangeInfo.MinimumOrderSize
 					liveContracts[marketState.Symbol] = marketState
 					logger.Debugf("Set mid market price for %v: %v\n", market.Symbol, market.MidMarketPrice)
 				}
@@ -582,6 +594,23 @@ func (t *TradingEngine) UpdateMidMarketPrices() {
 	} else {
 		logger.Infof("Exchange does not support options, no need to update mid market prices.\n")
 	}
+}
+
+// Delete all expired options without profit values to conserve time and space resources
+func (t *TradingEngine) RemoveExpiredOptions() {
+	numOptions := len(t.theoEngine.Options)
+	for symbol, option := range t.theoEngine.Options {
+		if option.Info.Expiry <= t.theoEngine.GetCurrentTimestamp() {
+			option.Status = models.Expired
+		}
+		if option.Status == models.Expired && option.Profit == 0. {
+			delete(t.theoEngine.Options, symbol)
+			//TODO delete from algo.Accounts here or keep for history?
+			logger.Infof("Removed expired option: %v\n", symbol)
+		}
+	}
+	logger.Infof("Removed %v expired option contracts; %v contracts remain.\n", numOptions-len(t.theoEngine.Options), len(t.theoEngine.Options))
+	t.theoEngine.UpdateOptionIndexes()
 }
 
 func (t *TradingEngine) logTrade(trade iex.Order) {
