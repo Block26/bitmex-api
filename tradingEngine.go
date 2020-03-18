@@ -298,7 +298,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 					// if t.algo.Timestamp == t.algo.Client.(*tantra.Tantra).GetLastTimestamp().UTC() {
 					// 	channels.TradeBinChan = nil
 					// }
-					// channels.TradeBinChan <- trades
+					channels.TradeBinChan <- trades
 				}
 			}
 		case newOrders := <-channels.OrderChan:
