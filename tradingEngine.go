@@ -271,7 +271,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			if t.theoEngine != nil {
 				t.UpdateActiveContracts()
 				t.UpdateMidMarketPrices()
-				t.theoEngine.ScanOptions(true, true)
+				t.theoEngine.ScanOptions(false, true)
 			} else {
 				logger.Infof("Cannot update active contracts, theo engine is nil\n")
 			}
