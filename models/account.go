@@ -22,7 +22,7 @@ func NewAccount(baseSymbol string, exchangeInfo ExchangeInfo, balance float64) A
 	accountID := exchangeInfo.Exchange + "_" + strconv.Itoa(int(time.Now().UTC().UnixNano()/1000000))
 	baseMarketInfo, err := LoadMarketInfo(exchangeInfo.Exchange, baseSymbol)
 	if err != nil {
-		log.Fatal("Error loading market info for %v: %v\n", baseSymbol, err)
+		log.Fatal("Error loading market info")
 	}
 	baseAsset := Asset{
 		Symbol:   baseMarketInfo.BaseSymbol,

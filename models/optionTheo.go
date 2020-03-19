@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/chobie/go-gaussian"
+	"github.com/tantralabs/logger"
 )
 
 const PI float64 = 3.14159265359
@@ -125,6 +126,7 @@ func (o *OptionTheo) CalcBlackScholesTheo(calcGreeks bool) {
 		// logger.Debugf("Set volatility for %v to default volatility %v\n", o.String(), o.Volatility)
 	}
 	if o.Volatility < 0 || math.IsNaN(o.Volatility) {
+		logger.Debugf("Vol is negative for %v, calcing vol instead of theo.\n", o.String())
 		o.CalcVol(o.Theo)
 	} else {
 		norm := gaussian.NewGaussian(0, 1)

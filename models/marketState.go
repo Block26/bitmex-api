@@ -78,7 +78,7 @@ func NewMarketState(marketInfo MarketInfo, balance *float64) MarketState {
 func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balance *float64) MarketState {
 	marketInfo, err := LoadMarketInfo(exchangeInfo.Exchange, symbol)
 	if err != nil {
-		log.Fatal("Error loading market info for %v: %v\n", symbol, err)
+		log.Fatal("Error loading market info")
 	}
 	return MarketState{
 		Symbol:  symbol,
