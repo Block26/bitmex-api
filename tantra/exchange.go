@@ -185,7 +185,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Publish trade updates
 			logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
-			<-t.channels.TradeBinChan
+			// <-t.channels.TradeBinChan
 		}
 	}()
 	return nil

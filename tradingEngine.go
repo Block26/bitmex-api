@@ -31,6 +31,7 @@ type TradingEngine struct {
 	lastTest             int64
 	lastWalletSync       int64
 	startTime            time.Time
+	endTime              time.Time
 	theoEngine           *te.TheoEngine
 	lastContractUpdate   int
 	contractUpdatePeriod int
@@ -69,6 +70,7 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	mockExchange.SetCurrentTime(start)
 	t.algo.Client = mockExchange
 	t.algo.Timestamp = start
+	t.endTime = end
 	t.Connect("", false, rebalance, setupData, true)
 }
 
@@ -263,6 +265,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			t.updatePositions(t.algo, positions)
 			channels.PositionChan <- positions
 		case trades := <-channels.TradeBinChan:
+			startTimestamp := time.Now().UnixNano()
 			logger.Infof("Recieved %v new trade updates: %v\n", len(trades), trades)
 			// Update active contracts if we are trading options
 			if t.theoEngine != nil {
@@ -298,15 +301,22 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 					// if t.algo.Timestamp == t.algo.Client.(*tantra.Tantra).GetLastTimestamp().UTC() {
 					// 	channels.TradeBinChan = nil
 					// }
-					channels.TradeBinChan <- trades
+					// channels.TradeBinChan <- trades
 				}
 			}
+			logger.Infof("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
+			if !t.algo.Timestamp.Before(t.endTime) {
+				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.algo.Timestamp, t.endTime)
+				return
+			}
 		case newOrders := <-channels.OrderChan:
+			startTimestamp := time.Now().UnixNano()
 			logger.Infof("Recieved %v new order updates\n", len(newOrders))
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
 			t.updateOrders(t.algo, newOrders, true)
 			// TODO callback to order function
-			channels.OrderChan <- newOrders
+			// channels.OrderChan <- newOrders
+			logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 		case update := <-channels.WalletChan:
 			t.updateAlgoBalances(t.algo, update.Balance)
 			channels.WalletChan <- update
