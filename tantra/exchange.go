@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -40,6 +41,7 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		orders:                make(map[string]iex.Order),
 		newOrders:             make([]iex.Order, 0),
 		db:                    backtestDB.NewDB(),
+		locks:                 make(map[string]*sync.RWMutex),
 	}
 }
 
@@ -65,6 +67,7 @@ type Tantra struct {
 	end                   time.Time
 	theoEngine            *te.TheoEngine
 	db                    *sqlx.DB
+	locks                 map[string]*sync.RWMutex
 }
 
 func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
@@ -221,6 +224,14 @@ func (t *Tantra) updateCandle(index int, symbol string) (low, high float64) {
 }
 
 func (t *Tantra) processFills(marketState *models.MarketState, low, high float64) {
+	lock, ok := t.locks[marketState.Symbol]
+	if !ok {
+		lock = &sync.RWMutex{}
+		t.locks[marketState.Symbol] = lock
+	}
+	// logger.Infof("Locking fill lock for %v\n", marketState.Symbol)
+	// lock.Lock()
+	// logger.Infof("Locked. [%v fill]\n", marketState.Symbol)
 	logger.Infof("Processing fills for %v with low %v and high %v\n", marketState.Symbol, low, high)
 	if marketState.Info.MarketType == models.Option {
 		t.getOptionFills(marketState)
@@ -239,6 +250,8 @@ func (t *Tantra) processFills(marketState *models.MarketState, low, high float64
 	if len(t.newOrders) > 0 {
 		t.publishOrderUpdates()
 	}
+	// lock.Unlock()
+	// logger.Infof("Unlocked [%v fill].\n", marketState.Symbol)
 }
 
 // Get the last account history, the first time should just return
@@ -499,6 +512,7 @@ func (t *Tantra) removeExpiredOptions() {
 		if option.Info.Expiry >= currentTimestamp {
 			delete(t.theoEngine.Options, symbol)
 			delete(t.MarketInfos, symbol)
+			delete(t.locks, symbol)
 			logger.Infof("Removed expired option %v with expiry %v, currentTimestamp %v\n", option.Symbol, option.Info.Expiry, currentTimestamp)
 		}
 	}
@@ -511,6 +525,7 @@ func (t *Tantra) parseOptionContracts(contracts []*iex.Contract) {
 		if contract.Kind == "option" {
 			_, ok := t.MarketInfos[contract.Symbol]
 			if !ok {
+				t.locks[contract.Symbol] = &sync.RWMutex{}
 				if contract.OptionType == "call" {
 					optionType = models.Call
 				} else if contract.OptionType == "put" {
@@ -647,6 +662,8 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 	var optionQty float64
 	if option.Status == models.Open {
 		for orderID, order := range option.Orders {
+			logger.Infof("Found order %v for option %v with market %v, price %v, qty %v\n",
+				order.OrderID, option.Symbol, order.Market, order.Rate, order.Amount)
 			optionPrice = order.Rate
 			optionQty = order.Amount
 			if order.Side == "buy" {
@@ -656,7 +673,7 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 				}
 				logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
 				t.updateBalance(&option.RealizedProfit, &option.Position, &option.AverageCost, optionPrice, optionQty, option)
-				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
+				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
 				backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, "buy", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
 				logger.Debugf("Updated buy avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
 				t.prepareOrderUpdate(*order, t.GetPotentialOrderStatus().Filled)
@@ -667,7 +684,7 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 				}
 				logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
 				t.updateBalance(&option.RealizedProfit, &option.Position, &option.AverageCost, optionPrice, optionQty, option)
-				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
+				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
 				backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, "buy", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
 				logger.Debugf("Updated sell avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
 				t.prepareOrderUpdate(*order, t.GetPotentialOrderStatus().Filled)
@@ -679,6 +696,15 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 }
 
 func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
+	logger.Infof("Placing order for %v\n", order.Market)
+	lock, ok := t.locks[order.Market]
+	if !ok {
+		lock = &sync.RWMutex{}
+		t.locks[order.Market] = lock
+	}
+	logger.Infof("Locking place order lock\n")
+	lock.Lock()
+	logger.Infof("Locked [%v placeorder].\n", order.Market)
 	//TODO order side to lower case
 	order.Side = strings.ToLower(order.Side)
 	order.TransactTime = t.CurrentTime
@@ -690,6 +716,8 @@ func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
 	order.OrdStatus = "Open"
 	t.orders[uuid] = order
 	t.newOrders = append(t.newOrders, order)
+	lock.Unlock()
+	logger.Infof("Unlocked [%v placeorder].\n", order.Market)
 	state, ok := t.Account.MarketStates[order.Market]
 	if ok {
 		state.Orders[uuid] = &order
