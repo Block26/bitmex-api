@@ -641,11 +641,11 @@ func (t *TradingEngine) logTrade(trade iex.Order) {
 	influx := getInfluxClient()
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "Algos",
+		Database:  "algos",
 		Precision: "us",
 	})
 
-	tags := map[string]string{"Algo_name": t.Algo.Name, "commit_hash": t.commitHash, "state_type": stateType, "side": strings.ToLower(trade.Side)}
+	tags := map[string]string{"algo_name": t.Algo.Name, "commit_hash": t.commitHash, "state_type": stateType, "side": strings.ToLower(trade.Side)}
 
 	fields := structs.Map(trade)
 	pt, err := client.NewPoint(
@@ -668,11 +668,11 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 	influx := getInfluxClient()
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "Algos",
+		Database:  "algos",
 		Precision: "us",
 	})
 
-	tags := map[string]string{"Algo_name": t.Algo.Name, "commit_hash": t.commitHash, "state_type": stateType, "side": strings.ToLower(trade.Side)}
+	tags := map[string]string{"algo_name": t.Algo.Name, "commit_hash": t.commitHash, "state_type": stateType, "side": strings.ToLower(trade.Side)}
 
 	fields := structs.Map(trade)
 	pt, err := client.NewPoint(
@@ -700,11 +700,11 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 	influx := getInfluxClient()
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "Algos",
+		Database:  "algos",
 		Precision: "us",
 	})
 
-	tags := map[string]string{"Algo_name": t.Algo.Name, "commit_hash": t.commitHash, "state_type": stateType}
+	tags := map[string]string{"algo_name": t.Algo.Name, "commit_hash": t.commitHash, "state_type": stateType}
 
 	fields := structs.Map(marketState)
 
@@ -726,16 +726,7 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 	)
 	bp.AddPoint(pt)
 
-	fields = t.Algo.Params[marketState.Symbol]
-
-	if marketState.AutoOrderPlacement {
-		fields["EntryOrderSize"] = marketState.EntryOrderSize
-		fields["ExitOrderSize"] = marketState.ExitOrderSize
-		fields["DeleverageOrderSize"] = marketState.DeleverageOrderSize
-		fields["LeverageTarget"] = marketState.LeverageTarget
-		fields["ShouldHaveQuantity"] = marketState.ShouldHaveQuantity
-		fields["FillPrice"] = marketState.FillPrice
-	}
+	fields = t.Algo.Params
 
 	pt, err = client.NewPoint(
 		"params",
@@ -857,30 +848,6 @@ func getPositionAbsProfit(Algo *models.Algo, marketState *models.MarketState) fl
 	return positionProfit
 }
 
-func getExitOrderSize(marketState *models.MarketState, orderSizeGreaterThanPositionSize bool) float64 {
-	if orderSizeGreaterThanPositionSize {
-		return marketState.Leverage
-	} else {
-		return marketState.ExitOrderSize
-	}
-}
-
-func getEntryOrderSize(marketState *models.MarketState, orderSizeGreaterThanMaxPositionSize bool) float64 {
-	if orderSizeGreaterThanMaxPositionSize {
-		return marketState.LeverageTarget - marketState.Leverage //-marketState.LeverageTarget
-	} else {
-		return marketState.EntryOrderSize
-	}
-}
-
-func canBuy(Algo *models.Algo, marketState *models.MarketState) float64 {
-	if marketState.CanBuyBasedOnMax {
-		return (Algo.Account.BaseAsset.Quantity * marketState.Bar.Open) * marketState.MaxLeverage
-	} else {
-		return (Algo.Account.BaseAsset.Quantity * marketState.Bar.Open) * marketState.LeverageTarget
-	}
-}
-
 //Log the state of the Algo and update variables like leverage
 func logState(Algo *models.Algo, marketState *models.MarketState, timestamp ...time.Time) (state models.History) {
 	// Algo.History.Timestamp = append(Algo.History.Timestamp, timestamp)
@@ -933,51 +900,6 @@ func logState(Algo *models.Algo, marketState *models.MarketState, timestamp ...t
 	}
 	if Algo.Debug {
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", Algo.Account.BaseAsset.Quantity*marketState.Bar.Close+(marketState.Position), 0.0, Algo.Account.BaseAsset.Quantity, marketState.Position, marketState.Bar.Close, marketState.AverageCost))
-	}
-	return
-}
-
-func getOrderSize(Algo *models.Algo, marketState *models.MarketState, currentPrice float64, live ...bool) (orderSize float64, side float64) {
-	currentWeight := math.Copysign(1, marketState.Position)
-	if marketState.Position == 0 {
-		currentWeight = float64(marketState.Weight)
-	}
-	adding := currentWeight == float64(marketState.Weight)
-	// fmt.Printf("CURRENT WEIGHT %v, adding %v, leverage target %v, can buy %v, deleverage order size %v\n", currentWeight, adding, marketState.LeverageTarget, canBuy(Algo), marketState.DeleverageOrderSize)
-	// fmt.Printf("Getting order size with quote asset quantity: %v\n", marketState.Position)
-
-	// Change order sizes for live to ensure similar boolen checks
-	exitOrderSize := marketState.ExitOrderSize
-	entryOrderSize := marketState.EntryOrderSize
-	deleverageOrderSize := marketState.DeleverageOrderSize
-
-	if live != nil && live[0] {
-		if Algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-			exitOrderSize = marketState.ExitOrderSize / 60
-			entryOrderSize = marketState.EntryOrderSize / 60
-			deleverageOrderSize = marketState.DeleverageOrderSize / 60
-		}
-	}
-
-	if (currentWeight == 0 || adding) && marketState.Leverage+marketState.DeleverageOrderSize <= marketState.LeverageTarget && marketState.Weight != 0 {
-		// fmt.Printf("Getting entry order with entry order size %v, leverage target %v, leverage %v\n", entryOrderSize, marketState.LeverageTarget, marketState.Leverage)
-		orderSize = getEntryOrderSize(marketState, entryOrderSize > marketState.LeverageTarget-marketState.Leverage)
-		side = float64(marketState.Weight)
-	} else if !adding {
-		// fmt.Printf("Getting exit order size with exit order size %v, leverage %v, weight %v\n", exitOrderSize, marketState.Leverage, marketState.Weight)
-		orderSize = getExitOrderSize(marketState, exitOrderSize > marketState.Leverage && marketState.Weight == 0)
-		side = float64(currentWeight * -1)
-	} else if math.Abs(marketState.Position) > canBuy(Algo, marketState)*(1+deleverageOrderSize) && adding {
-		orderSize = marketState.DeleverageOrderSize
-		side = float64(currentWeight * -1)
-	} else if marketState.Weight == 0 && marketState.Leverage > 0 {
-		orderSize = getExitOrderSize(marketState, exitOrderSize > marketState.Leverage)
-		//side = Opposite of the quantity
-		side = -math.Copysign(1, marketState.Position)
-	} else if canBuy(Algo, marketState) > math.Abs(marketState.Position) {
-		// If I can buy more, place order to fill diff of canBuy and current quantity
-		orderSize = utils.CalculateDifference(canBuy(Algo, marketState), math.Abs(marketState.Position))
-		side = float64(marketState.Weight)
 	}
 	return
 }
