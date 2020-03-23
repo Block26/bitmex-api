@@ -275,7 +275,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				t.UpdateMidMarketPrices()
 				t.theoEngine.ScanOptions(false, true)
 			} else {
-				logger.Infof("Cannot update active contracts, theo engine is nil\n")
+				logger.Debugf("Cannot update active contracts, theo engine is nil\n")
 			}
 			// Update your local bars
 			for _, trade := range trades {
@@ -298,15 +298,10 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 					t.logLiveState(marketState)
 					t.runTest(t.Algo, setupData, rebalance)
 					t.checkWalletHistory(t.Algo, settingsFileName)
-				} else {
-					// TODO full sync logic?
-					// if t.Algo.Timestamp == t.Algo.Client.(*tantra.Tantra).GetLastTimestamp().UTC() {
-					// 	channels.TradeBinChan = nil
-					// }
-					// channels.TradeBinChan <- trades
 				}
 			}
-			logger.Infof("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
+			logger.Debugf("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
+			channels.TradeBinChan <- trades
 			if !t.Algo.Timestamp.Before(t.endTime) {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				return
@@ -592,17 +587,17 @@ func (t *TradingEngine) GetActiveOptions() map[string]models.MarketState {
 func (t *TradingEngine) UpdateMidMarketPrices() {
 	if t.Algo.Account.ExchangeInfo.Options {
 		logger.Debugf("Updating mid markets at %v with currency %v\n", t.Algo.Timestamp, t.Algo.Account.BaseAsset.Symbol)
-		marketPrices, err := t.Algo.Client.GetMarketPricesByCurrency(t.Algo.Account.BaseAsset.Symbol)
-		if err != nil {
-			logger.Errorf("Error getting market prices for %v: %v\n", t.Algo.Account.BaseAsset.Symbol, err)
-			return
-		}
-		for symbol, price := range marketPrices {
-			option, ok := t.theoEngine.Options[symbol]
-			if ok {
-				option.MidMarketPrice = price
-			}
-		}
+		// marketPrices, err := t.Algo.Client.GetMarketPricesByCurrency(t.Algo.Account.BaseAsset.Symbol)
+		// if err != nil {
+		// 	logger.Errorf("Error getting market prices for %v: %v\n", t.Algo.Account.BaseAsset.Symbol, err)
+		// 	return
+		// }
+		// for symbol, price := range marketPrices {
+		// 	option, ok := t.theoEngine.Options[symbol]
+		// 	if ok {
+		// 		option.MidMarketPrice = price
+		// 	}
+		// }
 	} else {
 		logger.Infof("Exchange does not support options, no need to update mid market prices.\n")
 	}

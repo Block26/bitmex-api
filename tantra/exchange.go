@@ -122,7 +122,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 			// Iterate through all symbols for the respective account
 			// TODO should this all happen synchronously, or in parallel?
-			logger.Infof("New index: %v\n", index)
+			logger.Debugf("New index: %v\n", index)
 			var low float64
 			var high float64
 			var market *models.MarketState
@@ -188,7 +188,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Publish trade updates
 			logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
-			// <-t.channels.TradeBinChan
+			<-t.channels.TradeBinChan
 		}
 	}()
 	return nil
