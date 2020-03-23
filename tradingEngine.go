@@ -353,20 +353,20 @@ func (t *TradingEngine) updateOrders(Algo *models.Algo, orders []iex.Order, isUp
 				logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Symbol)
 				continue
 			}
-			marketState.Orders[newOrder.OrderID] = &newOrder
+			marketState.Orders[newOrder.OrderID] = newOrder
 		}
 	} else {
 		// Overwrite all order states
-		openOrderMap := make(map[string]map[string]*iex.Order)
-		var orderMap map[string]*iex.Order
+		openOrderMap := make(map[string]map[string]iex.Order)
+		var orderMap map[string]iex.Order
 		var ok bool
 		for _, order := range orders {
 			orderMap, ok = openOrderMap[order.Symbol]
 			if !ok {
-				openOrderMap[order.Symbol] = make(map[string]*iex.Order)
+				openOrderMap[order.Symbol] = make(map[string]iex.Order)
 				orderMap = openOrderMap[order.Symbol]
 			}
-			orderMap[order.OrderID] = &order
+			orderMap[order.OrderID] = order
 		}
 		for symbol, marketState := range Algo.Account.MarketStates {
 			orderMap, ok := openOrderMap[symbol]
@@ -374,7 +374,7 @@ func (t *TradingEngine) updateOrders(Algo *models.Algo, orders []iex.Order, isUp
 				marketState.Orders = orderMap
 				logger.Infof("Set orders for %v.\n", symbol)
 			} else {
-				marketState.Orders = make(map[string]*iex.Order)
+				marketState.Orders = make(map[string]iex.Order)
 			}
 		}
 	}
@@ -885,8 +885,9 @@ func logState(Algo *models.Algo, marketState *models.MarketState, timestamp ...t
 
 	// fmt.Println(Algo.Timestamp, "Funds", Algo.Account.BaseAsset.Quantity, "Quantity", marketState.Position)
 	// fmt.Println(Algo.Timestamp, Algo.Account.BaseAsset.Quantity, Algo.CurrentProfit(marketState.Bar))
-	marketState.Profit = (Algo.Account.BaseAsset.Quantity * (CurrentProfit(marketState, marketState.Bar.Close) * marketState.Leverage))
+	// marketState.Profit = (Algo.Account.BaseAsset.Quantity * (CurrentProfit(marketState, marketState.Bar.Close) * marketState.Leverage))
 	// fmt.Println(Algo.Timestamp, marketState.Profit)
+	marketState.Profit = marketState.UnrealizedProfit + marketState.RealizedProfit
 
 	if timestamp != nil {
 		Algo.Timestamp = timestamp[0]

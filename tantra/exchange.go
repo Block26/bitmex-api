@@ -39,6 +39,7 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		Account:               account,
 		AccountHistory:        make([]models.Account, 0),
 		orders:                make(map[string]iex.Order),
+		ordersBySymbol:        make(map[string]map[string]iex.Order),
 		newOrders:             make([]iex.Order, 0),
 		db:                    backtestDB.NewDB(),
 		locks:                 make(map[string]*sync.RWMutex),
@@ -577,13 +578,14 @@ func (t *Tantra) getFilledBidOrders(symbol string, price float64) (filledOrders 
 	if !ok {
 		logger.Debugf("No order map found for symbol %v.\n", symbol)
 	} else {
-		for _, order := range orders {
+		for id, order := range orders {
 			marketState, ok := t.Account.MarketStates[order.Market]
 			if !ok {
 				logger.Errorf("Order %v market is not in market infos for mock exchange.\n", order)
 				continue
 			}
-			if marketState.Info.MarketType != models.Option && order.Side == "Buy" {
+			if marketState.Info.MarketType != models.Option && order.Side == "buy" {
+				logger.Debugf("Filling buy order with passed symbol %v, order symbol %v, market symbol %v\n", symbol, order.Market, marketState.Info.Symbol)
 				if order.Type == "Market" {
 					o := order // make a copy so we can delete it
 					// Update Order Status
@@ -600,6 +602,9 @@ func (t *Tantra) getFilledBidOrders(symbol string, price float64) (filledOrders 
 				}
 				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
 				backtestDB.InsertTrade(t.db, marketState.Info.Symbol, price, order.Amount, "buy", marketState.UnrealizedProfit, marketState.RealizedProfit, marketState.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
+				// Remove the order
+				delete(orders, id)
+				delete(marketState.Orders, id)
 			}
 		}
 	}
@@ -615,13 +620,14 @@ func (t *Tantra) getFilledAskOrders(symbol string, price float64) (filledOrders 
 	if !ok {
 		logger.Debugf("No order map found for symbol %v.\n", symbol)
 	} else {
-		for _, order := range orders {
+		for id, order := range orders {
 			marketState, ok := t.Account.MarketStates[order.Market]
 			if !ok {
 				logger.Errorf("Order %v market is not in market infos for mock exchange.\n", order)
 				continue
 			}
 			if marketState.Info.MarketType != models.Option && order.Side == "sell" {
+				logger.Debugf("Filling buy order with passed symbol %v, order symbol %v, market symbol %v\n", symbol, order.Market, marketState.Info.Symbol)
 				if order.Type == "Market" {
 					o := order // make a copy so we can delete it
 					// Update Order Status
@@ -638,6 +644,9 @@ func (t *Tantra) getFilledAskOrders(symbol string, price float64) (filledOrders 
 				}
 				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
 				backtestDB.InsertTrade(t.db, marketState.Info.Symbol, price, order.Amount, "sell", marketState.UnrealizedProfit, marketState.RealizedProfit, marketState.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
+				// Remove the order
+				delete(orders, id)
+				delete(marketState.Orders, id)
 			}
 		}
 	}
@@ -662,7 +671,7 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 	var optionQty float64
 	if option.Status == models.Open {
 		for orderID, order := range option.Orders {
-			logger.Infof("Found order %v for option %v with market %v, price %v, qty %v\n",
+			logger.Debugf("Found order %v for option %v with market %v, price %v, qty %v\n",
 				order.OrderID, option.Symbol, order.Market, order.Rate, order.Amount)
 			optionPrice = order.Rate
 			optionQty = order.Amount
@@ -676,7 +685,7 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
 				backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, "buy", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
 				logger.Debugf("Updated buy avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
-				t.prepareOrderUpdate(*order, t.GetPotentialOrderStatus().Filled)
+				t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			} else if order.Side == "sell" {
 				if optionPrice == 0 {
 					// Simulate market order, assume theo is updated
@@ -687,15 +696,17 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
 				backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, "buy", option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
 				logger.Debugf("Updated sell avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
-				t.prepareOrderUpdate(*order, t.GetPotentialOrderStatus().Filled)
+				t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			}
 			delete(option.Orders, orderID)
+			delete(t.ordersBySymbol[option.Info.Symbol], orderID)
 			logger.Debugf("Removed option order with id %v.\n", orderID)
 		}
 	}
 }
 
-func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
+func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
+	order := newOrder //TODO is copy necessary here?
 	logger.Infof("Placing order for %v\n", order.Market)
 	lock, ok := t.locks[order.Market]
 	if !ok {
@@ -710,7 +721,6 @@ func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
 	order.TransactTime = t.CurrentTime
 	logger.Infof("Placing order: %v %v %v at %v\n", order.Side, order.Amount, order.Market, order.Rate)
 	log.Println("Placing order with price", order.Rate, "amount", order.Amount, "side", order.Side, "symbol", order.Symbol)
-	// Create uuid for order
 	uuid = t.CurrentTime.String() + string(len(t.orders))
 	order.OrderID = uuid
 	order.OrdStatus = "Open"
@@ -720,12 +730,13 @@ func (t *Tantra) PlaceOrder(order iex.Order) (uuid string, err error) {
 	logger.Infof("Unlocked [%v placeorder].\n", order.Market)
 	state, ok := t.Account.MarketStates[order.Market]
 	if ok {
-		state.Orders[uuid] = &order
+		state.Orders[uuid] = order
 		orderMap, ok := t.ordersBySymbol[order.Market]
 		if !ok {
-			orderSymbolMap := make(map[string]map[string]iex.Order)
-			orderSymbolMap[order.Market] = make(map[string]iex.Order)
-			orderSymbolMap[order.Market][uuid] = order
+			orderMap = make(map[string]iex.Order)
+			t.ordersBySymbol[order.Market] = orderMap
+			t.ordersBySymbol[order.Market][uuid] = order
+			orderMap[uuid] = order
 			logger.Infof("Built order map by symbol for order: %v\n", order)
 		} else {
 			orderMap[uuid] = order

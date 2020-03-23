@@ -31,8 +31,8 @@ type MarketState struct {
 	Profit           float64
 	Leverage         float64
 	Weight           int
-	Balance          *float64              // We want this balance to track the account balance automatically
-	Orders           map[string]*iex.Order // [orderId]Order
+	Balance          *float64             // We want this balance to track the account balance automatically
+	Orders           map[string]iex.Order // [orderId]Order
 	LastPrice        float64
 	MidMarketPrice   float64
 	BestBid          float64
@@ -71,7 +71,7 @@ func NewMarketState(marketInfo MarketInfo, balance *float64) MarketState {
 		Symbol:  marketInfo.Symbol,
 		Info:    marketInfo,
 		Balance: balance,
-		Orders:  make(map[string]*iex.Order),
+		Orders:  make(map[string]iex.Order),
 	}
 }
 
@@ -84,7 +84,7 @@ func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balanc
 		Symbol:  symbol,
 		Info:    marketInfo,
 		Balance: balance,
-		Orders:  make(map[string]*iex.Order),
+		Orders:  make(map[string]iex.Order),
 	}
 }
 
@@ -93,6 +93,6 @@ func NewMarketStateFromInfo(marketInfo MarketInfo, balance *float64) MarketState
 		Symbol:  marketInfo.Symbol,
 		Info:    marketInfo,
 		Balance: balance,
-		Orders:  make(map[string]*iex.Order),
+		Orders:  make(map[string]iex.Order),
 	}
 }
