@@ -6,7 +6,6 @@ import (
 	"math"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jinzhu/copier"
@@ -36,7 +35,6 @@ type TradingEngine struct {
 	theoEngine           *te.TheoEngine
 	lastContractUpdate   int
 	contractUpdatePeriod int
-	locks                map[string]*sync.RWMutex
 }
 
 func NewTradingEngine(Algo *models.Algo, contractUpdatePeriod int) TradingEngine {
@@ -52,7 +50,6 @@ func NewTradingEngine(Algo *models.Algo, contractUpdatePeriod int) TradingEngine
 		theoEngine:           nil,
 		lastContractUpdate:   0,
 		contractUpdatePeriod: contractUpdatePeriod,
-		locks:                make(map[string]*sync.RWMutex),
 	}
 }
 
@@ -102,11 +99,6 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 		}
 		marketState.OHLCV = ohlcv
 	}
-}
-
-func (t *TradingEngine) SetLocks(locks map[string]*sync.RWMutex) {
-	t.locks = locks
-	logger.Infof("Set locks for trading engine: %v\n", locks)
 }
 
 func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
@@ -356,16 +348,7 @@ func (t *TradingEngine) updateOrders(Algo *models.Algo, orders []iex.Order, isUp
 	logger.Infof("Processing %v order updates.\n", len(orders))
 	if isUpdate {
 		// Add to existing order state
-		var lock *sync.RWMutex
-		var ok bool
 		for _, newOrder := range orders {
-			lock, ok = t.locks[newOrder.Market]
-			if !ok {
-				lock = &sync.RWMutex{}
-				t.locks[newOrder.Market] = lock
-				logger.Infof("Built new lock for %v: %v\n", newOrder.Market, lock)
-			}
-			lock.Lock()
 			logger.Debugf("Processing order update: %v\n", newOrder)
 			marketState, ok := Algo.Account.MarketStates[newOrder.Market]
 			if !ok {
@@ -373,7 +356,6 @@ func (t *TradingEngine) updateOrders(Algo *models.Algo, orders []iex.Order, isUp
 				continue
 			}
 			marketState.Orders.Store(newOrder.OrderID, newOrder)
-			lock.Unlock()
 		}
 	} else {
 		// Overwrite all order states
