@@ -604,7 +604,7 @@ func (t *Tantra) getFilledBidOrders(symbol string, price float64) (filledOrders 
 					filledOrders = append(filledOrders, order)
 					// Remove the order
 					delete(orders, id)
-					delete(marketState.Orders, id)
+					marketState.Orders.Delete(id)
 					delete(t.orders, id)
 				}
 			}
@@ -634,7 +634,7 @@ func (t *Tantra) getFilledAskOrders(symbol string, price float64) (filledOrders 
 					filledOrders = append(filledOrders, order)
 					// Remove the order
 					delete(orders, id)
-					delete(marketState.Orders, id)
+					marketState.Orders.Delete(id)
 					delete(t.orders, id)
 				}
 			}
@@ -655,9 +655,10 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 	logger.Debugf("Getting option fills for %v\n", option.Symbol)
 	var optionPrice float64
 	var optionQty float64
-	filledOrderIds := make(map[string]bool)
 	if option.Status == models.Open {
-		for orderID, order := range option.Orders {
+		option.Orders.Range(func(key, value interface{}) bool {
+			orderID := key.(string)
+			order := value.(iex.Order)
 			logger.Debugf("Found order %v for option %v with market %v, price %v, qty %v\n",
 				order.OrderID, option.Symbol, order.Market, order.Rate, order.Amount)
 			optionPrice = order.Rate
@@ -685,13 +686,10 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 				logger.Debugf("Updated sell avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
 				t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			}
-			filledOrderIds[orderID] = true
 			delete(t.ordersBySymbol[option.Info.Symbol], orderID)
 			logger.Debugf("Removed option order with id %v.\n", orderID)
-		}
-	}
-	for orderID := range filledOrderIds {
-		delete(option.Orders, orderID)
+			return true
+		})
 	}
 }
 
@@ -720,7 +718,7 @@ func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	logger.Infof("Unlocked [%v placeorder].\n", order.Market)
 	state, ok := t.Account.MarketStates[order.Market]
 	if ok {
-		state.Orders[uuid] = order
+		state.Orders.Store(order.OrderID, order)
 		orderMap, ok := t.ordersBySymbol[order.Market]
 		if !ok {
 			orderMap = make(map[string]iex.Order)
@@ -747,7 +745,7 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 	delete(t.orders, cancel.Uuid)
 	state, ok := t.Account.MarketStates[cancel.Market]
 	if ok {
-		delete(state.Orders, cancel.Uuid)
+		state.Orders.Delete(cancel.Uuid)
 	} else {
 		logger.Infof("Cancel for order %v has unknown market %v\n", cancel.Uuid, cancel.Market)
 	}

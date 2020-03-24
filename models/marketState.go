@@ -2,8 +2,7 @@ package models
 
 import (
 	"log"
-
-	"github.com/tantralabs/tradeapi/iex"
+	"sync"
 )
 
 type MarketStatus int
@@ -31,8 +30,8 @@ type MarketState struct {
 	Profit           float64
 	Leverage         float64
 	Weight           int
-	Balance          *float64             // We want this balance to track the account balance automatically
-	Orders           map[string]iex.Order // [orderId]Order
+	Balance          *float64 // We want this balance to track the account balance automatically
+	Orders           sync.Map // [orderId]Order
 	LastPrice        float64
 	MidMarketPrice   float64
 	BestBid          float64
@@ -67,11 +66,12 @@ type MarketState struct {
 }
 
 func NewMarketState(marketInfo MarketInfo, balance *float64) MarketState {
+	var syncMap sync.Map
 	return MarketState{
 		Symbol:  marketInfo.Symbol,
 		Info:    marketInfo,
 		Balance: balance,
-		Orders:  make(map[string]iex.Order),
+		Orders:  syncMap,
 	}
 }
 
@@ -80,19 +80,21 @@ func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balanc
 	if err != nil {
 		log.Fatal("Error loading market info")
 	}
+	var syncMap sync.Map
 	return MarketState{
 		Symbol:  symbol,
 		Info:    marketInfo,
 		Balance: balance,
-		Orders:  make(map[string]iex.Order),
+		Orders:  syncMap,
 	}
 }
 
 func NewMarketStateFromInfo(marketInfo MarketInfo, balance *float64) MarketState {
+	var syncMap sync.Map
 	return MarketState{
 		Symbol:  marketInfo.Symbol,
 		Info:    marketInfo,
 		Balance: balance,
-		Orders:  make(map[string]iex.Order),
+		Orders:  syncMap,
 	}
 }

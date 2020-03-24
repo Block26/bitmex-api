@@ -372,7 +372,7 @@ func (t *TradingEngine) updateOrders(Algo *models.Algo, orders []iex.Order, isUp
 				logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Market)
 				continue
 			}
-			marketState.Orders[newOrder.OrderID] = newOrder
+			marketState.Orders.Store(newOrder.OrderID, newOrder)
 			lock.Unlock()
 		}
 	} else {
@@ -391,10 +391,10 @@ func (t *TradingEngine) updateOrders(Algo *models.Algo, orders []iex.Order, isUp
 		for symbol, marketState := range Algo.Account.MarketStates {
 			orderMap, ok := openOrderMap[symbol]
 			if ok {
-				marketState.Orders = orderMap
+				for id, order := range orderMap {
+					marketState.Orders.Store(id, order)
+				}
 				logger.Infof("Set orders for %v.\n", symbol)
-			} else {
-				marketState.Orders = make(map[string]iex.Order)
 			}
 		}
 	}
@@ -796,8 +796,8 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 	}
 
 	// LOG orders placed
-
-	for _, order := range marketState.Orders {
+	marketState.Orders.Range(func(key, value interface{}) bool {
+		order := value.(iex.Order)
 		fields = map[string]interface{}{
 			fmt.Sprintf("%0.2f", order.Rate): order.Amount,
 		}
@@ -809,7 +809,8 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 			time.Now(),
 		)
 		bp.AddPoint(pt)
-	}
+		return true
+	})
 
 	if t.Algo.State != nil {
 		pt, err := client.NewPoint(
