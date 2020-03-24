@@ -10,12 +10,15 @@ import (
 
 // A comprehensive representation of an account across all markets of an exchange
 type Account struct {
-	AccountID    string
-	ExchangeInfo ExchangeInfo
-	BaseAsset    Asset
-	Balances     map[string]*Asset
-	Orders       map[string]*iex.Order
-	MarketStates map[string]*MarketState
+	AccountID        string
+	ExchangeInfo     ExchangeInfo
+	BaseAsset        Asset
+	Balances         map[string]*Asset
+	Orders           map[string]*iex.Order
+	MarketStates     map[string]*MarketState
+	UnrealizedProfit float64
+	RealizedProfit   float64
+	Profit           float64
 }
 
 func NewAccount(baseSymbol string, exchangeInfo ExchangeInfo, balance float64) Account {

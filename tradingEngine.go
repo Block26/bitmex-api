@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/copier"
@@ -35,6 +36,7 @@ type TradingEngine struct {
 	theoEngine           *te.TheoEngine
 	lastContractUpdate   int
 	contractUpdatePeriod int
+	locks                map[string]*sync.RWMutex
 }
 
 func NewTradingEngine(Algo *models.Algo, contractUpdatePeriod int) TradingEngine {
@@ -50,6 +52,7 @@ func NewTradingEngine(Algo *models.Algo, contractUpdatePeriod int) TradingEngine
 		theoEngine:           nil,
 		lastContractUpdate:   0,
 		contractUpdatePeriod: contractUpdatePeriod,
+		locks:                make(map[string]*sync.RWMutex),
 	}
 }
 
@@ -99,6 +102,11 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 		}
 		marketState.OHLCV = ohlcv
 	}
+}
+
+func (t *TradingEngine) SetLocks(locks map[string]*sync.RWMutex) {
+	t.locks = locks
+	logger.Infof("Set locks for trading engine: %v\n", locks)
 }
 
 func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
@@ -300,6 +308,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 					t.checkWalletHistory(t.Algo, settingsFileName)
 				}
 			}
+			t.aggregateAccountProfit()
 			logger.Debugf("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			channels.TradeBinChan <- trades
 			if !t.Algo.Timestamp.Before(t.endTime) {
@@ -347,13 +356,24 @@ func (t *TradingEngine) updateOrders(Algo *models.Algo, orders []iex.Order, isUp
 	logger.Infof("Processing %v order updates.\n", len(orders))
 	if isUpdate {
 		// Add to existing order state
+		var lock *sync.RWMutex
+		var ok bool
 		for _, newOrder := range orders {
-			marketState, ok := Algo.Account.MarketStates[newOrder.Symbol]
+			lock, ok = t.locks[newOrder.Market]
 			if !ok {
-				logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Symbol)
+				lock = &sync.RWMutex{}
+				t.locks[newOrder.Market] = lock
+				logger.Infof("Built new lock for %v: %v\n", newOrder.Market, lock)
+			}
+			lock.Lock()
+			logger.Debugf("Processing order update: %v\n", newOrder)
+			marketState, ok := Algo.Account.MarketStates[newOrder.Market]
+			if !ok {
+				logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Market)
 				continue
 			}
 			marketState.Orders[newOrder.OrderID] = newOrder
+			lock.Unlock()
 		}
 	} else {
 		// Overwrite all order states
@@ -429,6 +449,20 @@ func (t *TradingEngine) updatePositions(Algo *models.Algo, positions []iex.WsPos
 		}
 	}
 	t.firstPositionUpdate = false
+}
+
+func (t *TradingEngine) aggregateAccountProfit() {
+	totalUnrealizedProfit := 0.
+	totalRealizedProfit := 0.
+	for _, marketState := range t.Algo.Account.MarketStates {
+		totalUnrealizedProfit += marketState.UnrealizedProfit
+		totalRealizedProfit += marketState.RealizedProfit
+	}
+	t.Algo.Account.UnrealizedProfit = totalUnrealizedProfit
+	t.Algo.Account.RealizedProfit = totalRealizedProfit
+	t.Algo.Account.Profit = totalUnrealizedProfit + totalRealizedProfit
+	logger.Debugf("Aggregated account unrealized profit: %v, realized profit: %v, total profit: %v\n",
+		t.Algo.Account.UnrealizedProfit, t.Algo.Account.RealizedProfit, t.Algo.Account.Profit)
 }
 
 func (t *TradingEngine) updateAlgoBalances(Algo *models.Algo, balances []iex.WSBalance) {
