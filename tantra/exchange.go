@@ -2,6 +2,7 @@ package tantra
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -54,6 +55,7 @@ type Tantra struct {
 	MarketInfos           map[string]models.MarketInfo
 	Account               *models.Account
 	AccountHistory        []models.Account
+	MarketStateHistory    []map[string]models.MarketState
 	CurrentTime           time.Time
 	orders                map[string]iex.Order
 	ordersBySymbol        map[string]map[string]iex.Order
@@ -111,6 +113,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 	}
 	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes, t.warmUpPeriod)
 
+	t.addMarketStateToHistory()
 	go func() {
 		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
 			// This is the start of the time step, at this point in time some events have not happened yet
@@ -125,9 +128,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 			var high float64
 			var market *models.MarketState
 			var ok bool
-			var lastAccountState *models.Account
-			var lastMarketState *models.MarketState
+			var lastMarketState models.MarketState
 			var tradeUpdates []iex.TradeBin
+			lastMarketStateMap := t.getPreviousMarketStateMap()
 			for symbol, marketState := range t.Account.MarketStates {
 				market, ok = t.Account.MarketStates[symbol]
 				if !ok {
@@ -145,10 +148,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 					high = -1
 				}
 				t.processFills(marketState, low, high)
-				lastAccountState = t.getLastAccountHistory()
-				lastMarketState, ok = lastAccountState.MarketStates[symbol]
+				lastMarketState, ok = lastMarketStateMap[symbol]
 				if !ok {
-					logger.Errorf("Could not load last market state for symbol %v with last account state %v\n", symbol, lastAccountState)
+					log.Fatalf("Could not load last market state for symbol %v\n", symbol)
 					continue
 				}
 				// Has the balance changed? Send a balance update. No? Do Nothing
@@ -162,12 +164,11 @@ func (t *Tantra) StartWS(config interface{}) error {
 						},
 					}
 					t.channels.WalletChan <- &wallet
-
-					// Wait for channel to complete
 					<-t.channels.WalletChan
 				}
 
 				// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
+				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
 				if lastMarketState.AverageCost != market.AverageCost || lastMarketState.Position != market.Position {
 					pos := []iex.WsPosition{
 						iex.WsPosition{
@@ -177,14 +178,13 @@ func (t *Tantra) StartWS(config interface{}) error {
 						},
 					}
 					t.channels.PositionChan <- pos
-
-					// Wait for channel to complete
 					<-t.channels.PositionChan
 				}
-				t.AccountHistory = append(t.AccountHistory, *t.Account)
 			}
+
+			t.addMarketStateToHistory()
 			// Publish trade updates
-			logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
+			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
 			<-t.channels.TradeBinChan
 		}
@@ -214,9 +214,9 @@ func (t *Tantra) updateCandle(index int, symbol string) (low, high float64) {
 	//TODO update marketState.Bar here?
 	if len(candleData) >= index+t.warmUpPeriod {
 		t.currentCandle[symbol] = candleData[index+t.warmUpPeriod]
-		logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
+		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
-		logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
+		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 		return t.currentCandle[symbol].Low, t.currentCandle[symbol].High
 	}
 	return -1, -1
@@ -244,23 +244,33 @@ func (t *Tantra) processFills(marketState *models.MarketState, low, high float64
 }
 
 // Get the last account history, the first time should just return
-func (t *Tantra) getLastAccountHistory() *models.Account {
-	length := len(t.AccountHistory)
-	if length > 0 {
-		return &t.AccountHistory[length-1]
+func (t *Tantra) getPreviousMarketStateMap() map[string]models.MarketState {
+	length := len(t.MarketStateHistory)
+	fmt.Println("length", length)
+	if length > 1 {
+		return t.MarketStateHistory[length-2]
 	}
-	return t.Account
+	return t.MarketStateHistory[0]
+}
+
+func (t *Tantra) addMarketStateToHistory() {
+	ms := make(map[string]models.MarketState)
+	for symbol, state := range t.Account.MarketStates {
+		ms[symbol] = *state
+	}
+
+	t.MarketStateHistory = append(t.MarketStateHistory, ms)
 }
 
 func (t *Tantra) publishOrderUpdates() {
 	logger.Infof("Publishing %v order updates.\n", len(t.newOrders))
-	t.channels.OrderChan <- t.newOrders
+	// t.channels.OrderChan <- t.newOrders
 	// <-t.channels.OrderChan
 	// logger.Infof("OUTPUT ORDER UPDATE: %v\n", <-t.channels.OrderChan)
-	// for _, order := range t.newOrders {
-	// 	t.channels.OrderChan <- []iex.Order{order}
-	// 	// <-t.channels.OrderChan
-	// }
+	for _, order := range t.newOrders {
+		t.channels.OrderChan <- []iex.Order{order}
+		<-t.channels.OrderChan
+	}
 	t.newOrders = make([]iex.Order, 0)
 }
 

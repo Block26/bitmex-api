@@ -266,10 +266,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	for {
 		select {
 		case positions := <-channels.PositionChan:
+			log.Println("PositionChan")
 			t.updatePositions(t.Algo, positions)
 			channels.PositionChan <- positions
 		case trades := <-channels.TradeBinChan:
-			startTimestamp := time.Now().UnixNano()
+			// startTimestamp := time.Now().UnixNano()
 			logger.Infof("Recieved %v new trade updates: %v\n", len(trades), trades)
 			// Update active contracts if we are trading options
 			if t.theoEngine != nil {
@@ -304,7 +305,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				}
 			}
 			t.aggregateAccountProfit()
-			logger.Debugf("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
+			// logger.Debugf("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			channels.TradeBinChan <- trades
 			if !t.Algo.Timestamp.Before(t.endTime) {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
@@ -314,13 +315,13 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				return
 			}
 		case newOrders := <-channels.OrderChan:
-			startTimestamp := time.Now().UnixNano()
-			logger.Infof("Recieved %v new order updates\n", len(newOrders))
+			// startTimestamp := time.Now().UnixNano()
+			// logger.Infof("Recieved %v new order updates\n", len(newOrders))
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
 			t.updateOrders(t.Algo, newOrders, true)
 			// TODO callback to order function
-			// channels.OrderChan <- newOrders
-			logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
+			// logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
+			channels.OrderChan <- newOrders
 		case update := <-channels.WalletChan:
 			t.updateAlgoBalances(t.Algo, update.Balance)
 			channels.WalletChan <- update
@@ -351,11 +352,11 @@ func (t *TradingEngine) checkWalletHistory(Algo *models.Algo, settingsFileName s
 
 // Inject orders directly into market state upon update
 func (t *TradingEngine) updateOrders(Algo *models.Algo, orders []iex.Order, isUpdate bool) {
-	logger.Infof("Processing %v order updates.\n", len(orders))
+	// logger.Infof("Processing %v order updates.\n", len(orders))
 	if isUpdate {
 		// Add to existing order state
 		for _, newOrder := range orders {
-			logger.Debugf("Processing order update: %v\n", newOrder)
+			// logger.Debugf("Processing order update: %v\n", newOrder)
 			marketState, ok := Algo.Account.MarketStates[newOrder.Market]
 			if !ok {
 				logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Market)
