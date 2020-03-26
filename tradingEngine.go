@@ -137,6 +137,7 @@ func (t *TradingEngine) LoadBarData(Algo *models.Algo, start time.Time, end time
 // The current implementation will execute rebalance every 1 minute regardless of models.Algo.RebalanceInterval
 // This is intentional, look at models.Algo.AutoOrderPlacement to understand this paradigm.
 func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance func(*models.Algo), setupData func(*models.Algo), test ...bool) {
+	startTime := time.Now()
 	utils.LoadENV(secret)
 	var isTest bool
 	if test != nil {
@@ -152,6 +153,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 
 	var err error
 	var config models.Secret
+	history := make([]models.History, 0)
 
 	if !isTest {
 		config = utils.LoadSecret(settingsFileName, secret)
@@ -293,7 +295,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				}
 			}
 			for _, marketState := range t.Algo.Account.MarketStates {
-				logState(t.Algo, marketState)
+				state := logState(t.Algo, marketState)
+				history = append(history, state)
 				if !isTest {
 					t.logLiveState(marketState)
 					t.runTest(t.Algo, setupData, rebalance)
@@ -305,6 +308,9 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			channels.TradeBinChan <- trades
 			if !t.Algo.Timestamp.Before(t.endTime) {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
+				if isTest {
+					logStats(t.Algo, history, startTime)
+				}
 				return
 			}
 		case newOrders := <-channels.OrderChan:

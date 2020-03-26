@@ -411,7 +411,7 @@ func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...st
 					SettlementPeriod:  "",
 					Strike:            -1,
 					TakerCommission:   marketState.Info.TakerFee,
-					TickSize:          marketState.Info.QuantityPrecision,
+					TickSize:          float64(marketState.Info.QuantityPrecision),
 					MidMarketPrice:    marketState.Bar.Close,
 				}
 				contracts = append(contracts, &contract)
@@ -822,9 +822,11 @@ func (t *Tantra) Withdraw(address, currency string, quantity float64, additionIn
 
 func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err error) {
 	// TODO this should return currently open orders
-	log.Fatalln("not implemented")
-	orders = make([]iex.Order, 0)
-	return
+	oo := make([]iex.Order, 0)
+	for _, o := range t.orders {
+		oo = append(oo, o)
+	}
+	return oo, nil
 }
 
 //WalletHistory not available for this exchange

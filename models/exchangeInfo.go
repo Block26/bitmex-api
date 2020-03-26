@@ -12,7 +12,7 @@ type ExchangeInfo struct {
 	TakerFee                float64
 	Slippage                float64
 	PricePrecision          float64
-	QuantityPrecision       float64
+	QuantityPrecision       int
 	MinimumOrderSize        float64
 	MaxLeverage             float64
 	BulkCancelSupported     bool
