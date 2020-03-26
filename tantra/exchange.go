@@ -780,6 +780,7 @@ func (t *Tantra) GetBalances() (balance []iex.WSBalance, err error) {
 }
 
 func (t *Tantra) GetBalance(currency string) (balance iex.Balance, err error) {
+	log.Fatalln("not implemented")
 	return
 }
 
@@ -800,23 +801,28 @@ func (t *Tantra) GetPositions(currency string) (positions []iex.WsPosition, err 
 }
 
 func (t *Tantra) GetMarketSummary(symbol string, currency string) (market iex.Market, err error) {
+	log.Fatalln("not implemented")
 	return
 }
 
 func (t *Tantra) GetMarketSummaryByCurrency(currency string) (markets []iex.Market, err error) {
+	log.Fatalln("not implemented")
 	return
 }
 
 func (t *Tantra) GetOrderBook(symbol string, currency string) (orderbook iex.OrderBook, err error) {
+	log.Fatalln("not implemented")
 	return
 }
 
 func (t *Tantra) Withdraw(address, currency string, quantity float64, additionInfo ...string) (res iex.WithdrawResponse, err error) {
+	log.Fatalln("not implemented")
 	return
 }
 
 func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err error) {
 	// TODO this should return currently open orders
+	log.Fatalln("not implemented")
 	orders = make([]iex.Order, 0)
 	return
 }
@@ -828,13 +834,16 @@ func (t *Tantra) GetWalletHistory(currency string) (res []iex.WalletHistoryItem,
 }
 
 func (t *Tantra) OpenOrders(f iex.OpenOrderF) (orders iex.OpenOrders, err error) {
+	log.Fatalln("not implemented")
 	return
 }
 
 func (t *Tantra) FormatMarketPair(pair iex.MarketPair) (res string, err error) {
+	log.Fatalln("not implemented")
 	return
 }
 
 func (t *Tantra) PrepareRequest(r *http.Request) (err error) {
+	log.Fatalln("not implemented")
 	return
 }
