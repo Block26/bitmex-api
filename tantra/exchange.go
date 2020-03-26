@@ -255,7 +255,7 @@ func (t *Tantra) getLastAccountHistory() *models.Account {
 func (t *Tantra) publishOrderUpdates() {
 	logger.Infof("Publishing %v order updates.\n", len(t.newOrders))
 	t.channels.OrderChan <- t.newOrders
-	// <-t.channels.OrderChan
+	<-t.channels.OrderChan
 	// logger.Infof("OUTPUT ORDER UPDATE: %v\n", <-t.channels.OrderChan)
 	// for _, order := range t.newOrders {
 	// 	t.channels.OrderChan <- []iex.Order{order}

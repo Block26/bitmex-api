@@ -313,7 +313,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
 			t.updateOrders(t.Algo, newOrders, true)
 			// TODO callback to order function
-			// channels.OrderChan <- newOrders
+			channels.OrderChan <- newOrders
 			logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 		case update := <-channels.WalletChan:
 			t.updateAlgoBalances(t.Algo, update.Balance)
