@@ -54,6 +54,7 @@ func NewTradingEngine(Algo *models.Algo, contractUpdatePeriod int) TradingEngine
 }
 
 func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
+	logger.SetLogLevel(t.Algo.BacktestLogLevel)
 	exchangeVars := iex.ExchangeConf{
 		Exchange:       t.Algo.Account.ExchangeInfo.Exchange,
 		ServerUrl:      t.Algo.Account.ExchangeInfo.ExchangeURL,
@@ -239,13 +240,18 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 
 	// Channels for recieving websocket response.
 	channels := &iex.WSChannels{
-		PositionChan: make(chan []iex.WsPosition, 2),
-		TradeBinChan: make(chan []iex.TradeBin, 2),
-		WalletChan:   make(chan *iex.WSWallet, 2),
-		OrderChan:    make(chan []iex.Order, 2),
+		PositionChan:         make(chan []iex.WsPosition, 1),
+		PositionChanComplete: make(chan error, 1),
+		TradeBinChan:         make(chan []iex.TradeBin, 1),
+		TradeBinChanComplete: make(chan error, 1),
+		WalletChan:           make(chan *iex.WSWallet, 1),
+		WalletChanComplete:   make(chan error, 1),
+		OrderChan:            make(chan []iex.Order, 1),
+		OrderChanComplete:    make(chan error, 1),
 	}
 
 	// Start the websocket.
+
 	err = t.Algo.Client.StartWS(&iex.WsConfig{
 		Host:      t.Algo.Account.ExchangeInfo.WSStream,
 		Streams:   subscribeInfos,
@@ -266,12 +272,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	for {
 		select {
 		case positions := <-channels.PositionChan:
-			log.Println("PositionChan")
 			t.updatePositions(t.Algo, positions)
-			channels.PositionChan <- positions
+			channels.PositionChanComplete <- nil
 		case trades := <-channels.TradeBinChan:
 			// startTimestamp := time.Now().UnixNano()
-			logger.Infof("Recieved %v new trade updates: %v\n", len(trades), trades)
+			logger.Debugf("Recieved %v new trade updates: %v\n", len(trades), trades)
 			// Update active contracts if we are trading options
 			if t.theoEngine != nil {
 				t.UpdateActiveContracts()
@@ -306,7 +311,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			}
 			t.aggregateAccountProfit()
 			// logger.Debugf("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
-			channels.TradeBinChan <- trades
+			channels.TradeBinChanComplete <- nil
 			if !t.Algo.Timestamp.Before(t.endTime) {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				if isTest {
@@ -321,10 +326,10 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			t.updateOrders(t.Algo, newOrders, true)
 			// TODO callback to order function
 			// logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
-			channels.OrderChan <- newOrders
+			channels.OrderChanComplete <- nil
 		case update := <-channels.WalletChan:
 			t.updateAlgoBalances(t.Algo, update.Balance)
-			channels.WalletChan <- update
+			channels.WalletChanComplete <- nil
 		}
 		if channels.TradeBinChan == nil {
 			logger.Errorf("Trade bin channel is nil, breaking...\n")
@@ -356,13 +361,15 @@ func (t *TradingEngine) updateOrders(Algo *models.Algo, orders []iex.Order, isUp
 	if isUpdate {
 		// Add to existing order state
 		for _, newOrder := range orders {
-			// logger.Debugf("Processing order update: %v\n", newOrder)
-			marketState, ok := Algo.Account.MarketStates[newOrder.Market]
-			if !ok {
-				logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Market)
-				continue
+			if newOrder.OrdStatus != t.Algo.Client.GetPotentialOrderStatus().Cancelled {
+				// logger.Debugf("Processing order update: %v\n", newOrder)
+				marketState, ok := Algo.Account.MarketStates[newOrder.Market]
+				if !ok {
+					logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Market)
+					continue
+				}
+				marketState.Orders.Store(newOrder.OrderID, newOrder)
 			}
-			marketState.Orders.Store(newOrder.OrderID, newOrder)
 		}
 	} else {
 		// Overwrite all order states
@@ -410,12 +417,12 @@ func (t *TradingEngine) runTest(Algo *models.Algo, setupData func(*models.Algo),
 }
 
 func (t *TradingEngine) updatePositions(Algo *models.Algo, positions []iex.WsPosition) {
-	logger.Info("Position Update:", positions)
+	logger.Debug("Position Update:", positions)
 	if len(positions) > 0 {
 		for _, position := range positions {
 			if position.Symbol == Algo.Account.BaseAsset.Symbol {
 				Algo.Account.BaseAsset.Quantity = position.CurrentQty
-				logger.Infof("Updated base asset %v: %v\n", Algo.Account.BaseAsset.Symbol, Algo.Account.BaseAsset.Quantity)
+				logger.Debugf("Updated base asset %v: %v\n", Algo.Account.BaseAsset.Symbol, Algo.Account.BaseAsset.Quantity)
 			} else {
 				marketState, ok := Algo.Account.MarketStates[position.Symbol]
 				if !ok {
@@ -428,7 +435,7 @@ func (t *TradingEngine) updatePositions(Algo *models.Algo, positions []iex.WsPos
 				} else if position.CurrentQty == 0 {
 					marketState.AverageCost = 0
 				}
-				logger.Infof("Got position update for %v with quantity %v, average cost %v\n",
+				logger.Debugf("Got position update for %v with quantity %v, average cost %v\n",
 					position.Symbol, marketState.Position, marketState.AverageCost)
 				if t.firstPositionUpdate {
 					marketState.ShouldHaveQuantity = marketState.Position
@@ -466,17 +473,17 @@ func (t *TradingEngine) updateAlgoBalances(Algo *models.Algo, balances []iex.WSB
 				Quantity: updatedBalance.Balance,
 			}
 			Algo.Account.Balances[updatedBalance.Asset] = &newAsset
-			logger.Infof("New balance found: %v\n", Algo.Account.Balances[updatedBalance.Asset])
+			logger.Debugf("New balance found: %v\n", Algo.Account.Balances[updatedBalance.Asset])
 		}
 		if updatedBalance.Asset == Algo.Account.BaseAsset.Symbol {
 			Algo.Account.BaseAsset.Quantity = updatedBalance.Balance
-			logger.Infof("Updated base asset quantity: %v\n", Algo.Account.BaseAsset.Quantity)
+			logger.Debugf("Updated base asset quantity: %v\n", Algo.Account.BaseAsset.Quantity)
 		} else if Algo.Account.ExchangeInfo.Spot {
 			// This could be a spot position update, in which case we should update the respective market state's position
 			for symbol, marketState := range Algo.Account.MarketStates {
 				if marketState.Info.MarketType == models.Spot && marketState.Info.QuoteSymbol == updatedBalance.Asset {
 					marketState.Position = updatedBalance.Balance
-					logger.Infof("Updated position for spot market %v: %v\n", symbol, marketState.Position)
+					logger.Debugf("Updated position for spot market %v: %v\n", symbol, marketState.Position)
 				}
 			}
 		}
@@ -589,7 +596,7 @@ func (t *TradingEngine) GetActiveOptions() map[string]models.MarketState {
 					marketInfo.Strike = market.Strike
 					marketInfo.OptionType = optionType
 					marketInfo.MarketType = models.Option
-					marketState = models.NewMarketStateFromInfo(marketInfo, &t.Algo.Account.BaseAsset.Quantity)
+					marketState = models.NewMarketStateFromInfo(marketInfo, t.Algo.Account.BaseAsset.Quantity)
 					marketState.MidMarketPrice = market.MidMarketPrice
 					marketState.OptionTheo = &optionTheo
 					marketState.Info.MinimumOrderSize = t.Algo.Account.ExchangeInfo.MinimumOrderSize
@@ -880,31 +887,30 @@ func logState(Algo *models.Algo, marketState *models.MarketState, timestamp ...t
 	// fmt.Println(Algo.Timestamp, marketState.Profit)
 	marketState.Profit = marketState.UnrealizedProfit + marketState.RealizedProfit
 
-	if timestamp != nil {
-		Algo.Timestamp = timestamp[0]
-		state = models.History{
-			Timestamp:   Algo.Timestamp.String(),
-			Balance:     balance,
-			Quantity:    marketState.Position,
-			AverageCost: marketState.AverageCost,
-			Leverage:    marketState.Leverage,
-			Profit:      marketState.Profit,
-			Weight:      int(marketState.Weight),
-			MaxLoss:     getPositionAbsLoss(Algo, marketState),
-			MaxProfit:   getPositionAbsProfit(Algo, marketState),
-			Price:       marketState.Bar.Close,
-		}
-
-		if marketState.Info.MarketType == models.Future {
-			if math.IsNaN(marketState.Profit) {
-				state.UBalance = balance
-			} else {
-				state.UBalance = balance + marketState.Profit
-			}
-		} else {
-			state.UBalance = (Algo.Account.BaseAsset.Quantity * marketState.Bar.Close) + marketState.Position
-		}
+	// if timestamp != nil {
+	state = models.History{
+		Timestamp:   Algo.Timestamp.String(),
+		Balance:     balance,
+		Quantity:    marketState.Position,
+		AverageCost: marketState.AverageCost,
+		Leverage:    marketState.Leverage,
+		Profit:      marketState.Profit,
+		Weight:      int(marketState.Weight),
+		MaxLoss:     getPositionAbsLoss(Algo, marketState),
+		MaxProfit:   getPositionAbsProfit(Algo, marketState),
+		Price:       marketState.Bar.Close,
 	}
+
+	if marketState.Info.MarketType == models.Future {
+		if math.IsNaN(marketState.Profit) {
+			state.UBalance = balance
+		} else {
+			state.UBalance = balance + marketState.Profit
+		}
+	} else {
+		state.UBalance = (Algo.Account.BaseAsset.Quantity * marketState.Bar.Close) + marketState.Position
+	}
+	// }
 	if Algo.Debug {
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", Algo.Account.BaseAsset.Quantity*marketState.Bar.Close+(marketState.Position), 0.0, Algo.Account.BaseAsset.Quantity, marketState.Position, marketState.Bar.Close, marketState.AverageCost))
 	}

@@ -41,7 +41,7 @@ func NewAccount(baseSymbol string, exchangeInfo ExchangeInfo, balance float64) A
 		Orders:       make(map[string]*iex.Order),
 		MarketStates: make(map[string]*MarketState),
 	}
-	baseMarketState := NewMarketStateFromInfo(baseMarketInfo, &account.BaseAsset.Quantity)
+	baseMarketState := NewMarketStateFromInfo(baseMarketInfo, account.BaseAsset.Quantity)
 
 	account.MarketStates[baseSymbol] = &baseMarketState
 	return account

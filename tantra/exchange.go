@@ -2,7 +2,6 @@ package tantra
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -154,17 +153,18 @@ func (t *Tantra) StartWS(config interface{}) error {
 					continue
 				}
 				// Has the balance changed? Send a balance update. No? Do Nothing
+				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
 				if lastMarketState.Balance != market.Balance {
 					wallet := iex.WSWallet{
 						Balance: []iex.WSBalance{
 							{
-								Asset:   symbol,
-								Balance: *market.Balance,
+								Asset:   lastMarketState.Info.BaseSymbol,
+								Balance: market.Balance,
 							},
 						},
 					}
 					t.channels.WalletChan <- &wallet
-					<-t.channels.WalletChan
+					<-t.channels.WalletChanComplete
 				}
 
 				// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
@@ -178,7 +178,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 						},
 					}
 					t.channels.PositionChan <- pos
-					<-t.channels.PositionChan
+					<-t.channels.PositionChanComplete
 				}
 			}
 
@@ -186,7 +186,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Publish trade updates
 			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
-			<-t.channels.TradeBinChan
+			<-t.channels.TradeBinChanComplete
 		}
 	}()
 	return nil
@@ -223,19 +223,19 @@ func (t *Tantra) updateCandle(index int, symbol string) (low, high float64) {
 }
 
 func (t *Tantra) processFills(marketState *models.MarketState, low, high float64) {
-	logger.Infof("Processing fills for %v with low %v and high %v\n", marketState.Symbol, low, high)
+	logger.Debugf("Processing fills for %v with low %v and high %v\n", marketState.Symbol, low, high)
 	if marketState.Info.MarketType == models.Option {
 		t.getOptionFills(marketState)
 	} else {
 		bidsFilled := t.getFilledBidOrders(marketState.Symbol, low)
 		if len(bidsFilled) > 0 {
 			fillCost, fillQuantity := t.getCostAverage(bidsFilled)
-			t.updateBalance(marketState.Balance, &marketState.Position, &marketState.AverageCost, fillCost, fillQuantity, marketState)
+			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillCost, fillQuantity, marketState)
 		}
 		asksFilled := t.getFilledAskOrders(marketState.Symbol, high)
 		if len(asksFilled) > 0 {
 			fillCost, fillQuantity := t.getCostAverage(asksFilled)
-			t.updateBalance(marketState.Balance, &marketState.Position, &marketState.AverageCost, fillCost, -fillQuantity, marketState)
+			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillCost, -fillQuantity, marketState)
 		}
 	}
 	if len(t.newOrders) > 0 {
@@ -246,7 +246,6 @@ func (t *Tantra) processFills(marketState *models.MarketState, low, high float64
 // Get the last account history, the first time should just return
 func (t *Tantra) getPreviousMarketStateMap() map[string]models.MarketState {
 	length := len(t.MarketStateHistory)
-	fmt.Println("length", length)
 	if length > 1 {
 		return t.MarketStateHistory[length-2]
 	}
@@ -263,13 +262,13 @@ func (t *Tantra) addMarketStateToHistory() {
 }
 
 func (t *Tantra) publishOrderUpdates() {
-	logger.Infof("Publishing %v order updates.\n", len(t.newOrders))
+	logger.Debugf("Publishing %v order updates.\n", len(t.newOrders))
 	// t.channels.OrderChan <- t.newOrders
 	// <-t.channels.OrderChan
 	// logger.Infof("OUTPUT ORDER UPDATE: %v\n", <-t.channels.OrderChan)
 	for _, order := range t.newOrders {
 		t.channels.OrderChan <- []iex.Order{order}
-		<-t.channels.OrderChan
+		<-t.channels.OrderChanComplete
 	}
 	t.newOrders = make([]iex.Order, 0)
 }
@@ -279,7 +278,7 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *flo
 		*currentBaseBalance, *currentPosition, *averageCost, fillPrice, fillAmount)
 	if math.Abs(fillAmount) > 0 {
 		// fee := math.Abs(fillAmount/fillPrice) * t.Account.MakerFee
-		// logger.Printf("fillPrice %.2f -> fillAmount %.2f", fillPrice, fillAmount)
+		// logger.Debugf("fillPrice %.2f -> fillAmount %.2f", fillPrice, fillAmount)
 		// logger.Debugf("Updating balance with fill cost %v, fill amount %v, qaq %v, baq %v", fillPrice, fillAmount, currentPosition, currentBaseBalance)
 		currentCost := (*currentPosition * *averageCost)
 		if marketState.Info.MarketType == models.Future {
@@ -594,13 +593,13 @@ func (t *Tantra) getFilledBidOrders(symbol string, price float64) (filledOrders 
 				//TODO get market price for market order (based on orderbook)
 				if order.Type == "Market" || order.Rate >= price {
 					t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
-					logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
-					backtestDB.InsertTrade(t.db, marketState.Info.Symbol, price, order.Amount, order.Side, marketState.UnrealizedProfit, marketState.RealizedProfit, marketState.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
+					logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
+					// backtestDB.InsertTrade(t.db, marketState.Info.Symbol, price, order.Amount, order.Side, marketState.UnrealizedProfit, marketState.RealizedProfit, marketState.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
 					filledOrders = append(filledOrders, order)
 					// Remove the order
-					delete(orders, id)
 					marketState.Orders.Delete(id)
 					delete(t.orders, id)
+					delete(t.ordersBySymbol[symbol], id)
 				}
 			}
 		}
@@ -624,8 +623,8 @@ func (t *Tantra) getFilledAskOrders(symbol string, price float64) (filledOrders 
 				//TODO get market price for market order (based on orderbook)
 				if order.Type == "Market" || order.Rate < price {
 					t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
-					logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
-					backtestDB.InsertTrade(t.db, marketState.Info.Symbol, price, order.Amount, "sell", marketState.UnrealizedProfit, marketState.RealizedProfit, marketState.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
+					logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
+					// backtestDB.InsertTrade(t.db, marketState.Info.Symbol, price, order.Amount, "sell", marketState.UnrealizedProfit, marketState.RealizedProfit, marketState.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
 					filledOrders = append(filledOrders, order)
 					// Remove the order
 					delete(orders, id)
@@ -665,7 +664,7 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 				}
 				logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
 				t.updateBalance(&option.RealizedProfit, &option.Position, &option.AverageCost, optionPrice, optionQty, option)
-				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
+				logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
 				// backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, order.Side, option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
 				logger.Debugf("Updated buy avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
 				t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
@@ -676,7 +675,7 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 				}
 				logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
 				t.updateBalance(&option.RealizedProfit, &option.Position, &option.AverageCost, optionPrice, -optionQty, option)
-				logger.Infof("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
+				logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
 				// backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, order.Side, option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
 				logger.Debugf("Updated sell avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
 				t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
@@ -690,12 +689,10 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 
 func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	order := newOrder //TODO is copy necessary here?
-	logger.Infof("Placing order for %v\n", order.Market)
 	//TODO order side to lower case
 	order.Side = strings.ToLower(order.Side)
 	order.TransactTime = t.CurrentTime
-	logger.Infof("Placing order: %v %v %v at %v\n", order.Side, order.Amount, order.Market, order.Rate)
-	log.Println("Placing order with price", order.Rate, "amount", order.Amount, "side", order.Side, "symbol", order.Symbol)
+	logger.Debugf("Placing order: %v %v %v at %v\n", order.Side, order.Amount, order.Market, order.Rate)
 	uuid = t.CurrentTime.String() + string(len(t.orders))
 	order.OrderID = uuid
 	order.OrdStatus = "Open"
@@ -710,7 +707,7 @@ func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 			t.ordersBySymbol[order.Market] = orderMap
 			t.ordersBySymbol[order.Market][uuid] = order
 			orderMap[uuid] = order
-			logger.Infof("Built order map by symbol for order: %v\n", order)
+			logger.Debugf("Built order map by symbol for order: %v\n", order)
 		} else {
 			orderMap[uuid] = order
 		}
@@ -724,13 +721,15 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 	// It wasn't making a copy so I am just reconstructing the order
 	canceledOrder := iex.Order{
 		OrderID:   cancel.Uuid,
+		Market:    cancel.Market,
 		OrdStatus: t.GetPotentialOrderStatus().Cancelled,
 	}
 	t.newOrders = append(t.newOrders, canceledOrder)
 	delete(t.orders, cancel.Uuid)
-	state, ok := t.Account.MarketStates[cancel.Market]
+	delete(t.ordersBySymbol[cancel.Market], cancel.Uuid)
+	_, ok := t.Account.MarketStates[cancel.Market]
 	if ok {
-		state.Orders.Delete(cancel.Uuid)
+		t.Account.MarketStates[cancel.Market].Orders.Delete(cancel.Uuid)
 	} else {
 		logger.Infof("Cancel for order %v has unknown market %v\n", cancel.Uuid, cancel.Market)
 	}

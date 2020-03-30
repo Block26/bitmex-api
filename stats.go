@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"time"
 
 	"github.com/fatih/structs"
-	"github.com/tantralabs/exchanges"
+	"github.com/gocarina/gocsv"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 	"gonum.org/v1/gonum/stat"
@@ -328,11 +329,11 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	mean, std := stat.MeanStdDev(percentReturn, nil)
 	score := mean / std
 	// TODO change the scoring based on 1h / 1m
-	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-		score = score * math.Sqrt(365*24)
-	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		score = score * math.Sqrt(365*24*60)
-	}
+	// if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
+	score = score * math.Sqrt(365*24)
+	// } else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
+	// 	score = score * math.Sqrt(365*24*60)
+	// }
 
 	if math.IsNaN(score) {
 		score = -100
@@ -354,6 +355,22 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		score,
 		kvparams,
 	)
+
+	if algo.LogBacktestToCSV {
+		// Log balance history
+		os.Remove("balance.csv")
+		historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+		if err != nil {
+			panic(err)
+		}
+		defer historyFile.Close()
+
+		err = gocsv.MarshalFile(&history, historyFile) // Use this to save the CSV back to the file
+		if err != nil {
+			panic(err)
+		}
+
+	}
 
 	//Log turnover stats
 	if algo.LogStats == true {
