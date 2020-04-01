@@ -58,7 +58,7 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	exchangeVars := iex.ExchangeConf{
 		Exchange:       t.Algo.Account.ExchangeInfo.Exchange,
 		ServerUrl:      t.Algo.Account.ExchangeInfo.ExchangeURL,
-		AccountID:      "test",
+		AccountID:      t.Algo.Name,
 		OutputResponse: false,
 	}
 	mockExchange := tantra.NewTest(exchangeVars, &t.Algo.Account, start, end, t.Algo.DataLength)
@@ -83,14 +83,14 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 		}
 		logger.Infof("Setting candle data for %v with %v bars.\n", symbol, len(data))
 		var ohlcv models.OHLCV
-		numBars := len(data)
-		ohlcv.Timestamp = make([]int64, numBars)
-		ohlcv.Open = make([]float64, numBars)
-		ohlcv.Low = make([]float64, numBars)
-		ohlcv.High = make([]float64, numBars)
-		ohlcv.Close = make([]float64, numBars)
-		ohlcv.Volume = make([]float64, numBars)
-		for i, candle := range data {
+		ohlcv.Timestamp = make([]int64, t.Algo.DataLength)
+		ohlcv.Open = make([]float64, t.Algo.DataLength)
+		ohlcv.Low = make([]float64, t.Algo.DataLength)
+		ohlcv.High = make([]float64, t.Algo.DataLength)
+		ohlcv.Close = make([]float64, t.Algo.DataLength)
+		ohlcv.Volume = make([]float64, t.Algo.DataLength)
+		for i := 0; i < t.Algo.DataLength; i++ {
+			candle := data[i]
 			ohlcv.Timestamp[i] = candle.Timestamp
 			ohlcv.Open[i] = candle.Open
 			ohlcv.High[i] = candle.High
@@ -509,28 +509,12 @@ func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.WSB
 	}
 }
 
-func (t *TradingEngine) updateBars(algo *models.Algo, trade iex.TradeBin) {
-	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-		diff := trade.Timestamp.Sub(time.Unix(database.GetBars()[algo.Index].Timestamp/1000, 0))
-		if diff.Minutes() >= 60 {
-			database.UpdateBars(algo.Client, trade.Symbol, algo.RebalanceInterval, 1)
-		}
-	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		database.UpdateBars(algo.Client, trade.Symbol, algo.RebalanceInterval, 1)
-	} else {
-		log.Fatal("This rebalance interval is not supported")
-	}
-	algo.Index = len(database.GetBars()) - 1
-	logger.Info("Time Elapsed", t.startTime.Sub(time.Now()), "Index", algo.Index)
-}
-
 func (t *TradingEngine) updateState(algo *models.Algo, symbol string, setupData func(*models.Algo)) {
 	marketState, ok := algo.Account.MarketStates[symbol]
 	if !ok {
 		logger.Errorf("Cannot update state for %v (could not find market state).\n", symbol)
 		return
 	}
-	setupData(algo)
 	lastCandleIndex := len(marketState.OHLCV.Timestamp) - 1
 	// TODO initialize vwap, quote volume?
 	marketState.Bar = models.Bar{
@@ -543,6 +527,8 @@ func (t *TradingEngine) updateState(algo *models.Algo, symbol string, setupData 
 	}
 	algo.Timestamp = time.Unix(marketState.Bar.Timestamp/1000, 0).UTC()
 	marketState.LastPrice = marketState.Bar.Close
+
+	setupData(algo)
 	// logger.Info("Algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if t.firstTrade {
 		logState(algo, marketState)

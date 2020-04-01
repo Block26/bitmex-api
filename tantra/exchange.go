@@ -114,7 +114,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 	t.addMarketStateToHistory()
 	go func() {
-		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
+		for index := t.index; index < numIndexes; index++ {
 			// This is the start of the time step, at this point in time some events have not happened yet
 			// so we will fill the orders that were placed at the end of the last time step first
 			// then we we publish a new trade bin so that the algo connected can make a decision for the
@@ -212,8 +212,8 @@ func (t *Tantra) updateCandle(index int, symbol string) (low, high float64) {
 		return
 	}
 	//TODO update marketState.Bar here?
-	if len(candleData) >= index+t.warmUpPeriod {
-		t.currentCandle[symbol] = candleData[index+t.warmUpPeriod]
+	if len(candleData) >= index {
+		t.currentCandle[symbol] = candleData[index]
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
