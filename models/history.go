@@ -2,6 +2,7 @@ package models
 
 type History struct {
 	Timestamp   string
+	Symbol      string
 	Balance     float64
 	UBalance    float64
 	Quantity    float64

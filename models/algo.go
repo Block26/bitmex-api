@@ -19,7 +19,7 @@ type Algo struct {
 	Timestamp         time.Time              // Current timestamp of the Algo in it's data
 	DataLength        int                    // Datalength tells the Algo when it is safe to start rebalancing, your Datalength should be longer than any TA length
 	History           []History              // Used to Store historical states
-	Params            map[string]interface{} // Save the initial Params of the Algo, for logging purposes. This is used to check the params after running a genetic search.
+	Params            Params                 // Save the initial Params of the Algo, for logging purposes. This is used to check the params after running a genetic search.
 	Result            map[string]interface{} // The result of your backtest
 	Stats             Stats                  // The stats of your backtest
 	LogStats          bool                   // Turn logs on or off for stats of your backtest, and exports them to a stats.csv in your local directory

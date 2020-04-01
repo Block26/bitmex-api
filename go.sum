@@ -86,6 +86,8 @@ github.com/tantralabs/theo-engine v0.0.0-20200319174139-3371856b691a h1:H5mXn2TT
 github.com/tantralabs/theo-engine v0.0.0-20200319174139-3371856b691a/go.mod h1:yF8aA2CM+9I18VsLYL8ifhUG3uriiQ+cwte2NyWAEVM=
 github.com/tantralabs/tradeapi v0.0.0-20200203232623-51c7d08a9113 h1:O/RLLs78ck57itA7RuE55quVZei2AG03OocWSBUdOSM=
 github.com/tantralabs/tradeapi v0.0.0-20200203232623-51c7d08a9113/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v0.0.0-20200319142049-e5f78efaf579 h1:T7dBj9IX7VAkvFIgoi4CRCg/W1ERt2JasTaQWyahuuw=
+github.com/tantralabs/tradeapi v0.0.0-20200319142049-e5f78efaf579/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610 h1:4wb3tT/wUpjsdcO7NwnOw4KSzrIaPOHdnpR4d43C6qQ=
 github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610/go.mod h1:QN0aHde2cmzDJcZklDsH9F8MchJ2hDpDgdQwXA+QnGA=
 github.com/tantralabs/vol-generator v0.0.0-20200323152559-9fb94fa3f702 h1:m3iFX10cRCIao+0BR4Ei6plR+qeS5lGRNn8Fmd0aUgU=
