@@ -30,7 +30,7 @@ type MarketState struct {
 	Profit           float64
 	Leverage         float64
 	Weight           int
-	Balance          *float64 // We want this balance to track the account balance automatically
+	Balance          float64  // We want this balance to track the account balance automatically
 	Orders           sync.Map // [orderId]Order
 	LastPrice        float64
 	MidMarketPrice   float64
@@ -65,7 +65,7 @@ type MarketState struct {
 	MaxLeverage         float64
 }
 
-func NewMarketState(marketInfo MarketInfo, balance *float64) MarketState {
+func NewMarketState(marketInfo MarketInfo, balance float64) MarketState {
 	var syncMap sync.Map
 	return MarketState{
 		Symbol:  marketInfo.Symbol,
@@ -75,7 +75,7 @@ func NewMarketState(marketInfo MarketInfo, balance *float64) MarketState {
 	}
 }
 
-func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balance *float64) MarketState {
+func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balance float64) MarketState {
 	marketInfo, err := LoadMarketInfo(exchangeInfo.Exchange, symbol)
 	if err != nil {
 		log.Fatal("Error loading market info")
@@ -89,7 +89,7 @@ func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balanc
 	}
 }
 
-func NewMarketStateFromInfo(marketInfo MarketInfo, balance *float64) MarketState {
+func NewMarketStateFromInfo(marketInfo MarketInfo, balance float64) MarketState {
 	var syncMap sync.Map
 	return MarketState{
 		Symbol:  marketInfo.Symbol,
