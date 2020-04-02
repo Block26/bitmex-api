@@ -374,6 +374,16 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 
 	}
 
+	algo.Result = models.Result{
+		DailyReturn:       history[historyLength-1].UBalance / float64(historyLength),
+		MaxLeverage:       maxLeverage,
+		MaxPositionProfit: maxProfit,
+		MaxPositionDD:     minProfit,
+		MaxDD:             drawdown,
+		Params:            utils.CreateKeyValuePairs(algo.Params.GetAllParams(), true),
+		Score:             utils.ToFixed(score, 3),
+	}
+
 	//Log turnover stats
 	if algo.LogStats == true {
 		stats := getTurnoverStats(history, algo)
@@ -388,13 +398,4 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	fmt.Println("-------------------------------")
 	log.Printf("Execution Speed: %v \n", elapsed)
 
-	algo.Result = map[string]interface{}{
-		"balance":             history[historyLength-1].UBalance,
-		"max_leverage":        maxLeverage,
-		"max_position_profit": maxProfit,
-		"max_position_dd":     minProfit,
-		"max_dd":              drawdown,
-		"params":              utils.CreateKeyValuePairs(algo.Params.GetAllParams(), true),
-		"score":               utils.ToFixed(score, 3),
-	}
 }

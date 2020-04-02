@@ -314,9 +314,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			channels.TradeBinChanComplete <- nil
 			if !t.Algo.Timestamp.Before(t.endTime) {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
-				if isTest {
-					logStats(t.Algo, history, startTime)
-				}
+				logStats(t.Algo, history, startTime)
 				return
 			}
 		case newOrders := <-channels.OrderChan:
