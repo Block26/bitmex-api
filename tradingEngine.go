@@ -27,6 +27,7 @@ type TradingEngine struct {
 	Algo                 *models.Algo
 	firstTrade           bool
 	firstPositionUpdate  bool
+	isTest               bool
 	commitHash           string
 	lastTest             int64
 	lastWalletSync       int64
@@ -81,24 +82,24 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 		if !ok {
 			logger.Errorf("Cannot set bar data for market state %v.\n", symbol)
 		}
-		logger.Infof("Setting candle data for %v with %v bars.\n", symbol, len(data))
-		var ohlcv models.OHLCV
-		ohlcv.Timestamp = make([]int64, t.Algo.DataLength)
-		ohlcv.Open = make([]float64, t.Algo.DataLength)
-		ohlcv.Low = make([]float64, t.Algo.DataLength)
-		ohlcv.High = make([]float64, t.Algo.DataLength)
-		ohlcv.Close = make([]float64, t.Algo.DataLength)
-		ohlcv.Volume = make([]float64, t.Algo.DataLength)
-		for i := 0; i < t.Algo.DataLength; i++ {
-			candle := data[i]
-			ohlcv.Timestamp[i] = candle.Timestamp
-			ohlcv.Open[i] = candle.Open
-			ohlcv.High[i] = candle.High
-			ohlcv.Low[i] = candle.Low
-			ohlcv.Close[i] = candle.Close
-			ohlcv.Volume[i] = candle.Volume
-		}
-		marketState.OHLCV = ohlcv
+		// logger.Infof("Setting candle data for %v with %v bars.\n", symbol, len(data))
+		// var ohlcv models.OHLCV
+		// ohlcv.Timestamp = make([]int64, t.Algo.DataLength)
+		// ohlcv.Open = make([]float64, t.Algo.DataLength)
+		// ohlcv.Low = make([]float64, t.Algo.DataLength)
+		// ohlcv.High = make([]float64, t.Algo.DataLength)
+		// ohlcv.Close = make([]float64, t.Algo.DataLength)
+		// ohlcv.Volume = make([]float64, t.Algo.DataLength)
+		// for i := 0; i < t.Algo.DataLength; i++ {
+		// 	candle := data[i]
+		// 	ohlcv.Timestamp[i] = candle.Timestamp
+		// 	ohlcv.Open[i] = candle.Open
+		// 	ohlcv.High[i] = candle.High
+		// 	ohlcv.Low[i] = candle.Low
+		// 	ohlcv.Close[i] = candle.Close
+		// 	ohlcv.Volume[i] = candle.Volume
+		// }
+		marketState.OHLCV = models.SetupDataModel(data, t.Algo.DataLength)
 	}
 }
 
@@ -108,15 +109,23 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 		logger.Errorf("Cannot insert new candle for symbol %v (candle=%v)\n", candle.Symbol, candle)
 		return
 	}
-	ohlcv := marketState.OHLCV
-	ohlcv.Timestamp = append(ohlcv.Timestamp, int64(utils.TimeToTimestamp(candle.Timestamp)))
-	ohlcv.Open = append(ohlcv.Open, candle.Open)
-	ohlcv.High = append(ohlcv.High, candle.High)
-	ohlcv.Low = append(ohlcv.Low, candle.Low)
-	ohlcv.Close = append(ohlcv.Close, candle.Close)
-	ohlcv.Volume = append(ohlcv.Volume, candle.Volume)
-	marketState.OHLCV = ohlcv
-	t.Algo.Index = len(ohlcv.Timestamp) - 1
+	// ohlcv := marketState.OHLCV
+	// instead of inserting a new bar in the data all the time in a test
+	// just increment the index
+	if t.isTest {
+		marketState.OHLCV.IncrementIndex()
+	} else {
+		marketState.OHLCV.AddDataFromTradeBin(candle)
+	}
+
+	// ohlcv.Timestamp = append(ohlcv.Timestamp, int64(utils.TimeToTimestamp(candle.Timestamp)))
+	// ohlcv.Open = append(ohlcv.Open, candle.Open)
+	// ohlcv.High = append(ohlcv.High, candle.High)
+	// ohlcv.Low = append(ohlcv.Low, candle.Low)
+	// ohlcv.Close = append(ohlcv.Close, candle.Close)
+	// ohlcv.Volume = append(ohlcv.Volume, candle.Volume)
+	// marketState.OHLCV = ohlcv
+	// t.Algo.Index = len(ohlcv.Timestamp) - 1
 }
 
 func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {
@@ -140,12 +149,11 @@ func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time
 func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance func(*models.Algo), setupData func(*models.Algo), test ...bool) {
 	startTime := time.Now()
 	utils.LoadENV(secret)
-	var isTest bool
 	if test != nil {
-		isTest = test[0]
+		t.isTest = test[0]
 		database.Setup()
 	} else {
-		isTest = false
+		t.isTest = false
 		database.Setup("remote")
 	}
 	if t.Algo.RebalanceInterval == "" {
@@ -156,7 +164,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	var config models.Secret
 	history := make([]models.History, 0)
 
-	if !isTest {
+	if !t.isTest {
 		config = utils.LoadSecret(settingsFileName, secret)
 		logger.Info("Loaded config for", t.Algo.Account.ExchangeInfo.Exchange, "secret", settingsFileName)
 		exchangeVars := iex.ExchangeConf{
@@ -196,7 +204,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		t.Algo.TheoEngine = &theoEngine
 		t.theoEngine = &theoEngine
 		logger.Infof("Built new theo engine.\n")
-		if isTest {
+		if t.isTest {
 			theoEngine.CurrentTime = &t.Algo.Client.(*tantra.Tantra).CurrentTime
 			t.Algo.Client.(*tantra.Tantra).SetTheoEngine(&theoEngine)
 			// theoEngine.UpdateActiveContracts()
@@ -293,17 +301,17 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				// now fetch the bars
 				// bars := database.GetData(trade.Symbol, t.Algo.Account.ExchangeInfo.Exchange, t.Algo.RebalanceInterval, t.Algo.DataLength+100)
 				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
-				if t.Algo.DataLength < len(marketState.OHLCV.Timestamp) {
+				if t.Algo.DataLength < len(marketState.OHLCV.GetMinuteData().Timestamp) {
 					t.updateState(t.Algo, trade.Symbol, setupData)
 					rebalance(t.Algo)
 				} else {
-					log.Fatalln("Not enough trade data. (local data length", len(marketState.OHLCV.Timestamp), "data length wanted by Algo", t.Algo.DataLength, ")")
+					log.Println("Not enough trade data. (local data length", len(marketState.OHLCV.GetMinuteData().Timestamp), "data length wanted by Algo", t.Algo.DataLength, ")")
 				}
 			}
 			for _, marketState := range t.Algo.Account.MarketStates {
 				state := logState(t.Algo, marketState)
 				history = append(history, state)
-				if !isTest {
+				if !t.isTest {
 					t.logLiveState(marketState)
 					t.runTest(t.Algo, setupData, rebalance)
 					t.checkWalletHistory(t.Algo, settingsFileName)
@@ -513,15 +521,16 @@ func (t *TradingEngine) updateState(algo *models.Algo, symbol string, setupData 
 		logger.Errorf("Cannot update state for %v (could not find market state).\n", symbol)
 		return
 	}
-	lastCandleIndex := len(marketState.OHLCV.Timestamp) - 1
+	lastCandleIndex := len(marketState.OHLCV.GetMinuteData().Timestamp) - 1
 	// TODO initialize vwap, quote volume?
+	minuteData := marketState.OHLCV.GetMinuteData()
 	marketState.Bar = models.Bar{
-		Timestamp: marketState.OHLCV.Timestamp[lastCandleIndex],
-		Open:      marketState.OHLCV.Open[lastCandleIndex],
-		High:      marketState.OHLCV.High[lastCandleIndex],
-		Low:       marketState.OHLCV.Low[lastCandleIndex],
-		Close:     marketState.OHLCV.Close[lastCandleIndex],
-		Volume:    marketState.OHLCV.Volume[lastCandleIndex],
+		Timestamp: minuteData.Timestamp[lastCandleIndex],
+		Open:      minuteData.Open[lastCandleIndex],
+		High:      minuteData.High[lastCandleIndex],
+		Low:       minuteData.Low[lastCandleIndex],
+		Close:     minuteData.Close[lastCandleIndex],
+		Volume:    minuteData.Volume[lastCandleIndex],
 	}
 	algo.Timestamp = time.Unix(marketState.Bar.Timestamp/1000, 0).UTC()
 	marketState.LastPrice = marketState.Bar.Close

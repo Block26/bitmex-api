@@ -22,7 +22,6 @@ import (
 func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, end time.Time, dataLength int) *Tantra {
 	logger.Infof("Init new test with start %v and end %v\n", start, end)
 	tantra := New(vars, account)
-	tantra.warmUpPeriod = dataLength
 	tantra.index = dataLength
 	tantra.start = start
 	tantra.end = end
@@ -60,7 +59,6 @@ type Tantra struct {
 	ordersBySymbol        map[string]map[string]iex.Order
 	newOrders             []iex.Order
 	index                 int
-	warmUpPeriod          int
 	candleData            map[string][]iex.TradeBin
 	currentCandle         map[string]iex.TradeBin
 	start                 time.Time
@@ -110,7 +108,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 		numIndexes = len(candleData)
 		break
 	}
-	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes, t.warmUpPeriod)
+	logger.Infof("Number of indexes found: %v\n", numIndexes)
 
 	t.addMarketStateToHistory()
 	go func() {
