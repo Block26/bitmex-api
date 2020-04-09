@@ -275,7 +275,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			t.updatePositions(t.Algo, positions)
 			channels.PositionChanComplete <- nil
 		case trades := <-channels.TradeBinChan:
-			// startTimestamp := time.Now().UnixNano()
+			startTimestamp := time.Now().UnixNano()
 			logger.Debugf("Recieved %v new trade updates: %v\n", len(trades), trades)
 			// Update active contracts if we are trading options
 			if t.theoEngine != nil {
@@ -310,7 +310,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				}
 			}
 			t.aggregateAccountProfit()
-			// logger.Debugf("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
+			logger.Infof("[Trading Engine] trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			channels.TradeBinChanComplete <- nil
 			if !t.Algo.Timestamp.Before(t.endTime) {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)

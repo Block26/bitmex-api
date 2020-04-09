@@ -1,6 +1,8 @@
 package models
 
-import "log"
+import (
+	"github.com/tantralabs/logger"
+)
 
 type Params struct {
 	store map[string]map[string]interface{}
@@ -9,7 +11,7 @@ type Params struct {
 func (p *Params) Add(symbol string, name string, params interface{}) {
 	_, ok := p.store[symbol][name]
 	if ok {
-		log.Fatalln("There is already a parameter stored with that name")
+		logger.Errorf("There is already a parameter stored with name %v\n", name)
 	} else {
 		if p.store == nil {
 			p.store = make(map[string]map[string]interface{})
@@ -27,7 +29,7 @@ func (p *Params) Update(symbol string, name string, params interface{}) interfac
 		p.store[symbol][name] = params
 		return params
 	}
-	log.Fatalln("There is no parameter stored with that name")
+	logger.Errorf("There is no parameter stored with name %v\n", name)
 	return nil
 }
 
@@ -36,7 +38,7 @@ func (p *Params) Get(symbol string, name string) interface{} {
 	if ok {
 		return p.store[symbol][name]
 	}
-	log.Fatalln("There is no parameter stored with that name")
+	logger.Errorf("There is no parameter stored with that name\n", name)
 	return nil
 }
 
@@ -45,7 +47,7 @@ func (p *Params) GetAllParamsForSymbol(symbol string) map[string]interface{} {
 	if ok {
 		return p.store[symbol]
 	}
-	log.Fatalln("There is no parameters stored with that symbol", symbol)
+	logger.Errorf("There are no parameters stored with symbol %v\n", symbol)
 	return nil
 }
 

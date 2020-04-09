@@ -114,7 +114,14 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 	t.addMarketStateToHistory()
 	go func() {
+
 		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
+			startTime := time.Now().UnixNano()
+			tradeTime := 0
+			fillTime := 0
+			positionTime := 0
+			balanceTime := 0
+			extraTime := 0
 			// This is the start of the time step, at this point in time some events have not happened yet
 			// so we will fill the orders that were placed at the end of the last time step first
 			// then we we publish a new trade bin so that the algo connected can make a decision for the
@@ -136,6 +143,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 					logger.Errorf("Symbol %v not found in account market states: %v\n", symbol, t.Account.MarketStates)
 					continue
 				}
+				tradeStart := time.Now().UnixNano()
 				if marketState.Info.MarketType != models.Option {
 					low, high = t.updateCandle(index, symbol)
 					currentCandle, ok := t.currentCandle[symbol]
@@ -146,14 +154,18 @@ func (t *Tantra) StartWS(config interface{}) error {
 					low = -1
 					high = -1
 				}
+				tradeTime += int(time.Now().UnixNano() - tradeStart)
+				fillStart := time.Now().UnixNano()
 				t.processFills(marketState, low, high)
+				fillTime += int(time.Now().UnixNano() - fillStart)
 				lastMarketState, ok = lastMarketStateMap[symbol]
 				if !ok {
-					log.Fatalf("Could not load last market state for symbol %v\n", symbol)
+					logger.Errorf("Could not load last market state for symbol %v\n", symbol)
 					continue
 				}
 				// Has the balance changed? Send a balance update. No? Do Nothing
 				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
+				balanceStart := time.Now().UnixNano()
 				if lastMarketState.Balance != market.Balance {
 					wallet := iex.WSWallet{
 						Balance: []iex.WSBalance{
@@ -166,9 +178,10 @@ func (t *Tantra) StartWS(config interface{}) error {
 					t.channels.WalletChan <- &wallet
 					<-t.channels.WalletChanComplete
 				}
-
+				balanceTime += int(time.Now().UnixNano() - balanceStart)
 				// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
 				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
+				positionStart := time.Now().UnixNano()
 				if lastMarketState.AverageCost != market.AverageCost || lastMarketState.Position != market.Position {
 					pos := []iex.WsPosition{
 						iex.WsPosition{
@@ -180,14 +193,24 @@ func (t *Tantra) StartWS(config interface{}) error {
 					t.channels.PositionChan <- pos
 					<-t.channels.PositionChanComplete
 				}
+				positionTime += int(time.Now().UnixNano() - positionStart)
 			}
 
+			extraStart := time.Now().UnixNano()
 			t.addMarketStateToHistory()
+			extraTime += int(time.Now().UnixNano() - extraStart)
 			// Publish trade updates
 			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
 			<-t.channels.TradeBinChanComplete
+			logger.Infof("[Exchange] trade time: %v ns\n", tradeTime)
+			logger.Infof("[Exchange] fill time: %v ns\n", fillTime)
+			logger.Infof("[Exchange] position time: %v ns\n", positionTime)
+			logger.Infof("[Exchange] balance time: %v ns\n", balanceTime)
+			logger.Infof("[Exchange] extra time: %v ns\n", extraTime)
+			logger.Infof("[Exchange] timestep took %v ns\n", time.Now().UnixNano()-startTime)
 		}
+		logger.Infof("Future fill time: %v, option fill time %v\n", futureFillTime, optionFillTime)
 	}()
 	return nil
 }
@@ -222,11 +245,14 @@ func (t *Tantra) updateCandle(index int, symbol string) (low, high float64) {
 	return -1, -1
 }
 
+var futureFillTime = 0
+
 func (t *Tantra) processFills(marketState *models.MarketState, low, high float64) {
 	logger.Debugf("Processing fills for %v with low %v and high %v\n", marketState.Symbol, low, high)
 	if marketState.Info.MarketType == models.Option {
 		t.getOptionFills(marketState)
 	} else {
+		fillStart := time.Now().UnixNano()
 		bidsFilled := t.getFilledBidOrders(marketState.Symbol, low)
 		if len(bidsFilled) > 0 {
 			fillCost, fillQuantity := t.getCostAverage(bidsFilled)
@@ -237,6 +263,7 @@ func (t *Tantra) processFills(marketState *models.MarketState, low, high float64
 			fillCost, fillQuantity := t.getCostAverage(asksFilled)
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillCost, -fillQuantity, marketState)
 		}
+		futureFillTime += int(time.Now().UnixNano() - fillStart)
 	}
 	if len(t.newOrders) > 0 {
 		t.publishOrderUpdates()
@@ -253,6 +280,7 @@ func (t *Tantra) getPreviousMarketStateMap() map[string]models.MarketState {
 }
 
 func (t *Tantra) addMarketStateToHistory() {
+	// TODO make a copy here?
 	ms := make(map[string]models.MarketState)
 	for symbol, state := range t.Account.MarketStates {
 		ms[symbol] = *state
@@ -644,8 +672,11 @@ func (t *Tantra) prepareOrderUpdate(order iex.Order, status string) {
 	t.newOrders = append(t.newOrders, o)
 }
 
+var optionFillTime = 0
+
 // TODO can this be generalized?
 func (t *Tantra) getOptionFills(option *models.MarketState) {
+	optionFillStart := time.Now().UnixNano()
 	logger.Debugf("Getting option fills for %v\n", option.Symbol)
 	var optionPrice float64
 	var optionQty float64
@@ -685,6 +716,7 @@ func (t *Tantra) getOptionFills(option *models.MarketState) {
 			return true
 		})
 	}
+	optionFillTime += int(time.Now().UnixNano() - optionFillStart)
 }
 
 func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
