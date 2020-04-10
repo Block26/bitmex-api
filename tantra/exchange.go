@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -37,7 +38,6 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
 		AccountHistory:        make([]models.Account, 0),
-		orders:                make(map[string]iex.Order),
 		ordersBySymbol:        make(map[string]map[string]iex.Order),
 		newOrders:             make([]iex.Order, 0),
 		db:                    backtestDB.NewDB(),
@@ -56,13 +56,14 @@ type Tantra struct {
 	AccountHistory        []models.Account
 	MarketStateHistory    []map[string]models.MarketState
 	CurrentTime           time.Time
-	orders                map[string]iex.Order
+	orders                sync.Map
 	ordersBySymbol        map[string]map[string]iex.Order
 	newOrders             []iex.Order
 	index                 int
 	warmUpPeriod          int
 	candleData            map[string][]iex.TradeBin
 	currentCandle         map[string]iex.TradeBin
+	sequenceNumber        int
 	start                 time.Time
 	end                   time.Time
 	theoEngine            *te.TheoEngine
@@ -130,8 +131,6 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Iterate through all symbols for the respective account
 			// TODO should this all happen synchronously, or in parallel?
 			logger.Debugf("New index: %v\n", index)
-			var low float64
-			var high float64
 			var market *models.MarketState
 			var ok bool
 			var lastMarketState models.MarketState
@@ -145,57 +144,62 @@ func (t *Tantra) StartWS(config interface{}) error {
 				}
 				tradeStart := time.Now().UnixNano()
 				if marketState.Info.MarketType != models.Option {
-					low, high = t.updateCandle(index, symbol)
+					t.updateCandle(index, symbol)
 					currentCandle, ok := t.currentCandle[symbol]
 					if ok {
 						tradeUpdates = append(tradeUpdates, currentCandle)
 					}
-				} else {
-					low = -1
-					high = -1
 				}
 				tradeTime += int(time.Now().UnixNano() - tradeStart)
-				fillStart := time.Now().UnixNano()
-				t.processFills(marketState, low, high)
-				fillTime += int(time.Now().UnixNano() - fillStart)
-				lastMarketState, ok = lastMarketStateMap[symbol]
-				if !ok {
-					logger.Errorf("Could not load last market state for symbol %v\n", symbol)
-					continue
-				}
-				// Has the balance changed? Send a balance update. No? Do Nothing
-				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
-				balanceStart := time.Now().UnixNano()
-				if lastMarketState.Balance != market.Balance {
-					wallet := iex.WSWallet{
-						Balance: []iex.WSBalance{
-							{
-								Asset:   lastMarketState.Info.BaseSymbol,
-								Balance: market.Balance,
-							},
-						},
-					}
-					t.channels.WalletChan <- &wallet
-					<-t.channels.WalletChanComplete
-				}
-				balanceTime += int(time.Now().UnixNano() - balanceStart)
-				// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
-				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
-				positionStart := time.Now().UnixNano()
-				if lastMarketState.AverageCost != market.AverageCost || lastMarketState.Position != market.Position {
-					pos := []iex.WsPosition{
-						iex.WsPosition{
-							Symbol:       symbol,
-							CurrentQty:   market.Position,
-							AvgCostPrice: market.AverageCost,
-						},
-					}
-					t.channels.PositionChan <- pos
-					<-t.channels.PositionChanComplete
-				}
-				positionTime += int(time.Now().UnixNano() - positionStart)
 			}
 
+			// Fill all orders with the newest candles
+			fillStart := time.Now().UnixNano()
+			filled := t.processFills()
+			fillTime += int(time.Now().UnixNano() - fillStart)
+
+			// Send position and balance updates if we have any fills
+			// TODO should we send balance updates if no fills?
+			if filled {
+				for symbol, _ := range t.Account.MarketStates {
+					lastMarketState, ok = lastMarketStateMap[symbol]
+					if !ok {
+						logger.Errorf("Could not load last market state for symbol %v\n", symbol)
+						continue
+					}
+					// Has the balance changed? Send a balance update. No? Do Nothing
+					// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
+					balanceStart := time.Now().UnixNano()
+					if lastMarketState.Balance != market.Balance {
+						wallet := iex.WSWallet{
+							Balance: []iex.WSBalance{
+								{
+									Asset:   lastMarketState.Info.BaseSymbol,
+									Balance: market.Balance,
+								},
+							},
+						}
+						t.channels.WalletChan <- &wallet
+						<-t.channels.WalletChanComplete
+					}
+					balanceTime += int(time.Now().UnixNano() - balanceStart)
+					// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
+					// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
+					positionStart := time.Now().UnixNano()
+					if lastMarketState.AverageCost != market.AverageCost || lastMarketState.Position != market.Position {
+						pos := []iex.WsPosition{
+							iex.WsPosition{
+								Symbol:       symbol,
+								CurrentQty:   market.Position,
+								AvgCostPrice: market.AverageCost,
+							},
+						}
+						t.channels.PositionChan <- pos
+						<-t.channels.PositionChanComplete
+					}
+					positionTime += int(time.Now().UnixNano() - positionStart)
+				}
+			}
 			extraStart := time.Now().UnixNano()
 			t.addMarketStateToHistory()
 			extraTime += int(time.Now().UnixNano() - extraStart)
@@ -210,7 +214,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			logger.Infof("[Exchange] extra time: %v ns\n", extraTime)
 			logger.Infof("[Exchange] timestep took %v ns\n", time.Now().UnixNano()-startTime)
 		}
-		logger.Infof("Future fill time: %v, option fill time %v\n", futureFillTime, optionFillTime)
+		logger.Infof("Fill time: %v ns\n", fillTime)
 	}()
 	return nil
 }
@@ -229,7 +233,7 @@ func (t *Tantra) SetCurrentTime(currentTime time.Time) {
 	logger.Infof("Set current timestamp: %v\n", t.CurrentTime)
 }
 
-func (t *Tantra) updateCandle(index int, symbol string) (low, high float64) {
+func (t *Tantra) updateCandle(index int, symbol string) {
 	candleData, ok := t.candleData[symbol]
 	if !ok {
 		return
@@ -240,34 +244,84 @@ func (t *Tantra) updateCandle(index int, symbol string) (low, high float64) {
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
-		return t.currentCandle[symbol].Low, t.currentCandle[symbol].High
 	}
-	return -1, -1
 }
 
-var futureFillTime = 0
+// optionPrice = order.Rate
+// 			optionQty = order.Amount
+// 			if order.Side == "buy" {
+// 				if optionPrice == 0 {
+// 					// Simulate market order, assume theo is updated
+// 					optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "buy", option.Info.Slippage)
+// 				}
+// 				logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
+// 				t.updateBalance(&option.RealizedProfit, &option.Position, &option.AverageCost, optionPrice, optionQty, option)
+// 				logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
+// 				// backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, order.Side, option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
+// 				logger.Debugf("Updated buy avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
+// 				t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 
-func (t *Tantra) processFills(marketState *models.MarketState, low, high float64) {
-	logger.Debugf("Processing fills for %v with low %v and high %v\n", marketState.Symbol, low, high)
-	if marketState.Info.MarketType == models.Option {
-		t.getOptionFills(marketState)
-	} else {
-		fillStart := time.Now().UnixNano()
-		bidsFilled := t.getFilledBidOrders(marketState.Symbol, low)
-		if len(bidsFilled) > 0 {
-			fillCost, fillQuantity := t.getCostAverage(bidsFilled)
-			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillCost, fillQuantity, marketState)
+func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount float64) {
+	lastCandle, ok := t.currentCandle[order.Market]
+	if !ok {
+		// This is probably an option order, for now simply check if market order
+		if order.Rate == 0 {
+			option := t.Account.MarketStates[order.Market]
+			if option.Info.MarketType == models.Option {
+				isFilled = true
+				fillPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, order.Side, option.Info.Slippage)
+				if order.Side == "sell" {
+					fillAmount = -order.Amount
+				} else {
+					fillAmount = order.Amount
+				}
+				return
+			} else {
+				logger.Errorf("Found order for non option market without last candle: %v\n", order)
+			}
 		}
-		asksFilled := t.getFilledAskOrders(marketState.Symbol, high)
-		if len(asksFilled) > 0 {
-			fillCost, fillQuantity := t.getCostAverage(asksFilled)
-			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillCost, -fillQuantity, marketState)
-		}
-		futureFillTime += int(time.Now().UnixNano() - fillStart)
 	}
+	// If a future/spot order, check if our current candle fills the high (ask) or low (bid) for the order
+	if order.Side == "buy" && lastCandle.Low <= order.Rate {
+		isFilled = true
+		fillPrice = lastCandle.Low
+		fillAmount = order.Amount
+	} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+		isFilled = true
+		fillPrice = lastCandle.High
+		fillAmount = -order.Amount
+	}
+	return
+}
+
+var fillTime = 0
+
+// Find any orders that should be filled, and update local positions/balances. Then, publish these updates to clients
+func (t *Tantra) processFills() bool {
+	// Only iterate through current open orders
+	var isFilled bool
+	var fillAmount, fillPrice float64
+	t.orders.Range(func(key, value interface{}) bool {
+		order := value.(iex.Order)
+		logger.Debugf("Found open order: %v\n", order)
+		marketState, ok := t.Account.MarketStates[order.Market]
+		if !ok {
+			logger.Errorf("Could not find market state for %v\n", order.Market)
+			return true
+		}
+		isFilled, fillPrice, fillAmount = t.getFill(order)
+		if isFilled {
+			logger.Debugf("Processing fill for order: %v\n", order)
+			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
+			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
+		}
+		return true
+	})
 	if len(t.newOrders) > 0 {
 		t.publishOrderUpdates()
+		return true
 	}
+	return false
 }
 
 // Get the last account history, the first time should just return
@@ -589,82 +643,6 @@ func (t *Tantra) CurrentOptionProfit() float64 {
 	return currentProfit
 }
 
-func (t *Tantra) getCostAverage(filledOrders []iex.Order) (averageCost float64, quantity float64) {
-	// print(len(prices), len(orders), len(timestamp_arr[0]))
-	totalCost := 0.0
-	for _, order := range filledOrders {
-		totalCost += order.Rate * order.Amount
-		quantity += order.Amount
-	}
-	if quantity > 0 {
-		averageCost = totalCost / quantity
-		logger.Debugf("Got avergae cost: %v\n", averageCost)
-		return
-	}
-
-	return 0.0, 0.0
-}
-
-func (t *Tantra) getFilledBidOrders(symbol string, price float64) (filledOrders []iex.Order) {
-	orders, ok := t.ordersBySymbol[symbol]
-	if !ok {
-		logger.Debugf("No order map found for symbol %v.\n", symbol)
-	} else {
-		for id, order := range orders {
-			marketState, ok := t.Account.MarketStates[order.Market]
-			if !ok {
-				logger.Errorf("Order %v market is not in market infos for mock exchange.\n", order)
-				continue
-			}
-			if marketState.Info.MarketType != models.Option && order.Side == "buy" {
-				logger.Debugf("Filling buy order with passed symbol %v, order symbol %v, market symbol %v\n", symbol, order.Market, marketState.Info.Symbol)
-				//TODO get market price for market order (based on orderbook)
-				if order.Type == "Market" || order.Rate >= price {
-					t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
-					logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
-					// backtestDB.InsertTrade(t.db, marketState.Info.Symbol, price, order.Amount, order.Side, marketState.UnrealizedProfit, marketState.RealizedProfit, marketState.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
-					filledOrders = append(filledOrders, order)
-					// Remove the order
-					marketState.Orders.Delete(id)
-					delete(t.orders, id)
-					delete(t.ordersBySymbol[symbol], id)
-				}
-			}
-		}
-	}
-	return
-}
-
-func (t *Tantra) getFilledAskOrders(symbol string, price float64) (filledOrders []iex.Order) {
-	orders, ok := t.ordersBySymbol[symbol]
-	if !ok {
-		logger.Debugf("No order map found for symbol %v.\n", symbol)
-	} else {
-		for id, order := range orders {
-			marketState, ok := t.Account.MarketStates[order.Market]
-			if !ok {
-				logger.Errorf("Order %v market is not in market infos for mock exchange.\n", order)
-				continue
-			}
-			if marketState.Info.MarketType != models.Option && order.Side == "sell" {
-				logger.Debugf("Filling buy order with passed symbol %v, order symbol %v, market symbol %v\n", symbol, order.Market, marketState.Info.Symbol)
-				//TODO get market price for market order (based on orderbook)
-				if order.Type == "Market" || order.Rate < price {
-					t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
-					logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
-					// backtestDB.InsertTrade(t.db, marketState.Info.Symbol, price, order.Amount, "sell", marketState.UnrealizedProfit, marketState.RealizedProfit, marketState.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
-					filledOrders = append(filledOrders, order)
-					// Remove the order
-					delete(orders, id)
-					marketState.Orders.Delete(id)
-					delete(t.orders, id)
-				}
-			}
-		}
-	}
-	return
-}
-
 func (t *Tantra) prepareOrderUpdate(order iex.Order, status string) {
 	o := order // make a copy so we can delete it
 	o.OrdStatus = status
@@ -672,63 +650,21 @@ func (t *Tantra) prepareOrderUpdate(order iex.Order, status string) {
 	t.newOrders = append(t.newOrders, o)
 }
 
-var optionFillTime = 0
-
-// TODO can this be generalized?
-func (t *Tantra) getOptionFills(option *models.MarketState) {
-	optionFillStart := time.Now().UnixNano()
-	logger.Debugf("Getting option fills for %v\n", option.Symbol)
-	var optionPrice float64
-	var optionQty float64
-	if option.Status == models.Open {
-		option.Orders.Range(func(key, value interface{}) bool {
-			orderID := key.(string)
-			order := value.(iex.Order)
-			logger.Debugf("Found order %v for option %v with market %v, price %v, qty %v\n",
-				order.OrderID, option.Symbol, order.Market, order.Rate, order.Amount)
-			optionPrice = order.Rate
-			optionQty = order.Amount
-			if order.Side == "buy" {
-				if optionPrice == 0 {
-					// Simulate market order, assume theo is updated
-					optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "buy", option.Info.Slippage)
-				}
-				logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
-				t.updateBalance(&option.RealizedProfit, &option.Position, &option.AverageCost, optionPrice, optionQty, option)
-				logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
-				// backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, order.Side, option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
-				logger.Debugf("Updated buy avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
-				t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
-			} else if order.Side == "sell" {
-				if optionPrice == 0 {
-					// Simulate market order, assume theo is updated
-					optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "sell", option.Info.Slippage)
-				}
-				logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
-				t.updateBalance(&option.RealizedProfit, &option.Position, &option.AverageCost, optionPrice, -optionQty, option)
-				logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
-				// backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, order.Side, option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
-				logger.Debugf("Updated sell avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
-				t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
-			}
-			delete(t.ordersBySymbol[option.Info.Symbol], orderID)
-			logger.Debugf("Removed option order with id %v.\n", orderID)
-			return true
-		})
-	}
-	optionFillTime += int(time.Now().UnixNano() - optionFillStart)
-}
-
 func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
+	if newOrder.Amount <= 0 || newOrder.Rate < 0 {
+		logger.Errorf("Invalid order: %v\n", newOrder)
+		return
+	}
 	order := newOrder //TODO is copy necessary here?
 	//TODO order side to lower case
 	order.Side = strings.ToLower(order.Side)
 	order.TransactTime = t.CurrentTime
 	logger.Debugf("Placing order: %v %v %v at %v\n", order.Side, order.Amount, order.Market, order.Rate)
-	uuid = t.CurrentTime.String() + string(len(t.orders))
+	uuid = t.CurrentTime.String() + string(t.sequenceNumber)
+	t.sequenceNumber += 1
 	order.OrderID = uuid
 	order.OrdStatus = "Open"
-	t.orders[uuid] = order
+	t.orders.Store(uuid, order)
 	t.newOrders = append(t.newOrders, order)
 	state, ok := t.Account.MarketStates[order.Market]
 	if ok {
@@ -757,7 +693,7 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 		OrdStatus: t.GetPotentialOrderStatus().Cancelled,
 	}
 	t.newOrders = append(t.newOrders, canceledOrder)
-	delete(t.orders, cancel.Uuid)
+	t.orders.Delete(cancel.Uuid)
 	delete(t.ordersBySymbol[cancel.Market], cancel.Uuid)
 	_, ok := t.Account.MarketStates[cancel.Market]
 	if ok {
@@ -861,12 +797,16 @@ func (t *Tantra) Withdraw(address, currency string, quantity float64, additionIn
 	return
 }
 
+// TODO can keep a non/synced copy of order map for quick queries
 func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err error) {
 	// TODO this should return currently open orders
 	oo := make([]iex.Order, 0)
-	for _, o := range t.orders {
-		oo = append(oo, o)
-	}
+	var order iex.Order
+	t.orders.Range(func(key, value interface{}) bool {
+		order = value.(iex.Order)
+		oo = append(oo, order)
+		return true
+	})
 	return oo, nil
 }
 
