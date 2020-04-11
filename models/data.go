@@ -100,12 +100,19 @@ func (d *Data) AddData(newBars []*Bar) {
 	}
 }
 
-func (d *Data) GetOHLCVData(resampleInterval int) OHLCV {
-	return d.getOHLCV(resampleInterval)
+func (d *Data) GetOHLCVData(resampleInterval int) (data OHLCV, index int) {
+	data = d.getOHLCV(resampleInterval)
+	index = len(data.Timestamp) - 1
+	return
+}
+
+func (d *Data) FetchAllData(resampleInterval int) (data OHLCV) {
+	data = d.getOHLCV(resampleInterval)
+	return
 }
 
 func (d *Data) GetCurrentIndex(resampleInterval int) int {
-	return int(d.index/resampleInterval) - 1
+	return int(d.index / resampleInterval)
 }
 
 func (d *Data) GetMinuteData() OHLCV {
@@ -121,17 +128,31 @@ func (d *Data) GetFiveMinuteData() OHLCV {
 }
 
 // getOHLCVBars Break down the bars into open, high, low, close arrays that are easier to manipulate.
-func (d *Data) getOHLCV(resampleInterval int) OHLCV {
+func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 	bars := d.minuteBars
 	resampledIndex := int(d.index / resampleInterval)
+	adjuster := 0
+	if resampleInterval == 1 {
+		adjuster = 1
+	}
 	if val, ok := d.data[resampleInterval]; ok {
+		if len(all) > 0 && all[0] == true {
+			return OHLCV{
+				Timestamp: val.Timestamp,
+				Open:      val.Open,
+				High:      val.High,
+				Low:       val.Low,
+				Close:     val.Close,
+				Volume:    val.Volume,
+			}
+		}
 		return OHLCV{
-			Timestamp: val.Timestamp[:resampledIndex-1],
-			Open:      val.Open[:resampledIndex-1],
-			High:      val.High[:resampledIndex-1],
-			Low:       val.Low[:resampledIndex-1],
-			Close:     val.Close[:resampledIndex-1],
-			Volume:    val.Volume[:resampledIndex-1],
+			Timestamp: val.Timestamp[:resampledIndex-adjuster],
+			Open:      val.Open[:resampledIndex-adjuster],
+			High:      val.High[:resampledIndex-adjuster],
+			Low:       val.Low[:resampledIndex-adjuster],
+			Close:     val.Close[:resampledIndex-adjuster],
+			Volume:    val.Volume[:resampledIndex-adjuster],
 		}
 	} else {
 		length := (len(bars) / resampleInterval) + 1
@@ -170,13 +191,24 @@ func (d *Data) getOHLCV(resampleInterval int) OHLCV {
 		d.data[resampleInterval] = ohlcv
 	}
 
+	if len(all) > 0 && all[0] == true {
+		return OHLCV{
+			Timestamp: d.data[resampleInterval].Timestamp,
+			Open:      d.data[resampleInterval].Open,
+			High:      d.data[resampleInterval].High,
+			Low:       d.data[resampleInterval].Low,
+			Close:     d.data[resampleInterval].Close,
+			Volume:    d.data[resampleInterval].Volume,
+		}
+	}
+
 	return OHLCV{
-		Timestamp: d.data[resampleInterval].Timestamp[:resampledIndex-1],
-		Open:      d.data[resampleInterval].Open[:resampledIndex-1],
-		High:      d.data[resampleInterval].High[:resampledIndex-1],
-		Low:       d.data[resampleInterval].Low[:resampledIndex-1],
-		Close:     d.data[resampleInterval].Close[:resampledIndex-1],
-		Volume:    d.data[resampleInterval].Volume[:resampledIndex-1],
+		Timestamp: d.data[resampleInterval].Timestamp[:resampledIndex-adjuster],
+		Open:      d.data[resampleInterval].Open[:resampledIndex-adjuster],
+		High:      d.data[resampleInterval].High[:resampledIndex-adjuster],
+		Low:       d.data[resampleInterval].Low[:resampledIndex-adjuster],
+		Close:     d.data[resampleInterval].Close[:resampledIndex-adjuster],
+		Volume:    d.data[resampleInterval].Volume[:resampledIndex-adjuster],
 	}
 
 }

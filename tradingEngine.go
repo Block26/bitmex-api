@@ -320,6 +320,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			t.aggregateAccountProfit()
 			// logger.Debugf("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			channels.TradeBinChanComplete <- nil
+			log.Printf("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 			if !t.Algo.Timestamp.Before(t.endTime) {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, history, startTime)
