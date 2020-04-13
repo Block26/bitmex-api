@@ -123,6 +123,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			positionTime := 0
 			balanceTime := 0
 			extraTime := 0
+			extraStart := time.Now().UnixNano()
 			// This is the start of the time step, at this point in time some events have not happened yet
 			// so we will fill the orders that were placed at the end of the last time step first
 			// then we we publish a new trade bin so that the algo connected can make a decision for the
@@ -136,6 +137,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			var lastMarketState models.MarketState
 			var tradeUpdates []iex.TradeBin
 			lastMarketStateMap := t.getPreviousMarketStateMap()
+			extraTime += int(time.Now().UnixNano() - extraStart)
 			for symbol, marketState := range t.Account.MarketStates {
 				market, ok = t.Account.MarketStates[symbol]
 				if !ok {
@@ -200,7 +202,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 					positionTime += int(time.Now().UnixNano() - positionStart)
 				}
 			}
-			extraStart := time.Now().UnixNano()
+			extraStart = time.Now().UnixNano()
 			t.addMarketStateToHistory()
 			extraTime += int(time.Now().UnixNano() - extraStart)
 			// Publish trade updates

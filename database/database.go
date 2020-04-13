@@ -46,11 +46,13 @@ func GetCandlesByTime(symbol string, exchange string, interval string, startTime
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 
+	logger.Infof("Getting candles with pg connect string: %v\n", psqlInfo)
+
 	db, err := sqlx.Connect("postgres", psqlInfo)
 
 	if err != nil {
 		if host == "localhost" {
-			log.Println("Falied to connect to database, attempting to connect to cloud database. Please setup tantradb locally.")
+			logger.Errorf("Falied to connect to database, attempting to connect to cloud database. Please setup tantradb locally.")
 			Setup("remote")
 			return GetCandlesByTime(symbol, exchange, interval, startTimestamp, endTimestamp, numPrepending)
 		} else {
@@ -145,6 +147,8 @@ func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
 		host, port, user, password, dbname)
 	db, err := sqlx.Connect("postgres", psqlInfo)
 
+	logger.Infof("Getting implied vols with pg connect string: %v\n", psqlInfo)
+
 	if err != nil {
 		if host == "localhost" {
 			log.Println("Falied to connect to database, attempting to connect to cloud database. Please setup tantradb locally.")
@@ -157,7 +161,7 @@ func LoadImpliedVols(symbol string, start int, end int) []models.ImpliedVol {
 
 	ivs := []models.ImpliedVol{}
 	cmd := fmt.Sprintf("select symbol, iv, timestamp, interval, indexprice, vwiv, strike, timetoexpiry, volume from impliedvol where symbol = '%s' and timestamp >= %d and timestamp <= %d order by timestamp\n", symbol, start, end)
-	// fmt.Printf("Command: %v", cmd)
+	logger.Infof("Vol query: %v\n", cmd)
 	err = db.Select(&ivs, cmd)
 
 	if err != nil {
