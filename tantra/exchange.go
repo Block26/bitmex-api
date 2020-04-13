@@ -38,7 +38,6 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
 		AccountHistory:        make(map[int]models.Account),
-		MarketStateHistory:    make(map[int]map[string]models.MarketState),
 		ordersBySymbol:        make(map[string]map[string]iex.Order),
 		newOrders:             make([]iex.Order, 0),
 		db:                    backtestDB.NewDB(),
@@ -55,8 +54,7 @@ type Tantra struct {
 	MarketInfos           map[string]models.MarketInfo
 	Account               *models.Account
 	AccountHistory        map[int]models.Account
-	MarketStateHistory    map[int]map[string]models.MarketState
-	PreviousMarketStates  map[string]models.MarketState
+	PreviousAccountState  models.Account
 	CurrentTime           time.Time
 	orders                sync.Map
 	ordersBySymbol        map[string]map[string]iex.Order
@@ -114,8 +112,6 @@ func (t *Tantra) StartWS(config interface{}) error {
 		break
 	}
 	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes, t.warmUpPeriod)
-
-	t.addMarketStatesToHistory()
 	t.addAccountStateToHistory()
 	go func() {
 
@@ -137,7 +133,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			logger.Debugf("New index: %v\n", index)
 			var market *models.MarketState
 			var ok bool
-			var lastMarketState models.MarketState
+			var lastMarketState *models.MarketState
 			var tradeUpdates []iex.TradeBin
 			extraTime += int(time.Now().UnixNano() - extraStart)
 			for symbol, marketState := range t.Account.MarketStates {
@@ -164,11 +160,11 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 			// Send position and balance updates if we have any fills
 			// TODO should we send balance updates if no fills?
-			if t.PreviousMarketStates == nil {
-				logger.Errorf("Could not find previous market states, not updating balances.\n")
+			if t.PreviousAccountState.AccountID != t.Account.AccountID {
+				logger.Errorf("Could not find previous account state, not updating balances.\n")
 			} else if filled {
 				for symbol := range t.Account.MarketStates {
-					lastMarketState, ok = t.PreviousMarketStates[symbol]
+					lastMarketState, ok = t.PreviousAccountState.MarketStates[symbol]
 					if !ok {
 						logger.Errorf("Could not load last market state for symbol %v\n", symbol)
 						continue
@@ -207,7 +203,6 @@ func (t *Tantra) StartWS(config interface{}) error {
 				}
 			}
 			extraStart = time.Now().UnixNano()
-			t.addMarketStatesToHistory()
 			t.addAccountStateToHistory()
 			extraTime += int(time.Now().UnixNano() - extraStart)
 			// Publish trade updates
@@ -222,6 +217,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			logger.Infof("[Exchange] timestep took %v ns\n", time.Now().UnixNano()-startTime)
 		}
 		logger.Infof("Fill time: %v ns\n", fillTime)
+		t.insertAccountHistory()
 	}()
 	return nil
 }
@@ -317,23 +313,15 @@ func (t *Tantra) processFills() bool {
 	return false
 }
 
-func (t *Tantra) addMarketStatesToHistory() {
-	ms := make(map[string]models.MarketState)
-	for symbol, state := range t.Account.MarketStates {
-		ms[symbol] = *state
-	}
-	t.MarketStateHistory[utils.TimeToTimestamp(t.CurrentTime)] = ms
-	t.PreviousMarketStates = ms
-	logger.Debugf("Added market states to history [%v records]\n", len(t.MarketStateHistory))
-}
-
 func (t *Tantra) addAccountStateToHistory() {
 	t.AccountHistory[utils.TimeToTimestamp(t.CurrentTime)] = *t.Account
 	logger.Debugf("Added account to history [%v records]\n", len(t.AccountHistory))
 }
 
-func (t *Tantra) insertBacktestEvents() {
-
+func (t *Tantra) insertAccountHistory() {
+	logger.Infof("Inserting account history...\n")
+	backtestDB.InsertAccountHistory(t.db, t.AccountHistory)
+	logger.Infof("Inserted account history. [%v records]\n", len(t.AccountHistory))
 }
 
 func (t *Tantra) publishOrderUpdates() {
