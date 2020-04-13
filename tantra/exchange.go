@@ -37,7 +37,8 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		client:                client,
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
-		AccountHistory:        make([]models.Account, 0),
+		AccountHistory:        make(map[int]models.Account),
+		MarketStateHistory:    make(map[int]map[string]models.MarketState),
 		ordersBySymbol:        make(map[string]map[string]iex.Order),
 		newOrders:             make([]iex.Order, 0),
 		db:                    backtestDB.NewDB(),
@@ -53,8 +54,9 @@ type Tantra struct {
 	SimulatedExchangeName string
 	MarketInfos           map[string]models.MarketInfo
 	Account               *models.Account
-	AccountHistory        []models.Account
-	MarketStateHistory    []map[string]models.MarketState
+	AccountHistory        map[int]models.Account
+	MarketStateHistory    map[int]map[string]models.MarketState
+	PreviousMarketStates  map[string]models.MarketState
 	CurrentTime           time.Time
 	orders                sync.Map
 	ordersBySymbol        map[string]map[string]iex.Order
@@ -113,7 +115,8 @@ func (t *Tantra) StartWS(config interface{}) error {
 	}
 	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes, t.warmUpPeriod)
 
-	t.addMarketStateToHistory()
+	t.addMarketStatesToHistory()
+	t.addAccountStateToHistory()
 	go func() {
 
 		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
@@ -136,7 +139,6 @@ func (t *Tantra) StartWS(config interface{}) error {
 			var ok bool
 			var lastMarketState models.MarketState
 			var tradeUpdates []iex.TradeBin
-			lastMarketStateMap := t.getPreviousMarketStateMap()
 			extraTime += int(time.Now().UnixNano() - extraStart)
 			for symbol, marketState := range t.Account.MarketStates {
 				market, ok = t.Account.MarketStates[symbol]
@@ -162,9 +164,11 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 			// Send position and balance updates if we have any fills
 			// TODO should we send balance updates if no fills?
-			if filled {
-				for symbol, _ := range t.Account.MarketStates {
-					lastMarketState, ok = lastMarketStateMap[symbol]
+			if t.PreviousMarketStates == nil {
+				logger.Errorf("Could not find previous market states, not updating balances.\n")
+			} else if filled {
+				for symbol := range t.Account.MarketStates {
+					lastMarketState, ok = t.PreviousMarketStates[symbol]
 					if !ok {
 						logger.Errorf("Could not load last market state for symbol %v\n", symbol)
 						continue
@@ -203,7 +207,8 @@ func (t *Tantra) StartWS(config interface{}) error {
 				}
 			}
 			extraStart = time.Now().UnixNano()
-			t.addMarketStateToHistory()
+			t.addMarketStatesToHistory()
+			t.addAccountStateToHistory()
 			extraTime += int(time.Now().UnixNano() - extraStart)
 			// Publish trade updates
 			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
@@ -248,20 +253,6 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 	}
 }
-
-// optionPrice = order.Rate
-// 			optionQty = order.Amount
-// 			if order.Side == "buy" {
-// 				if optionPrice == 0 {
-// 					// Simulate market order, assume theo is updated
-// 					optionPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, "buy", option.Info.Slippage)
-// 				}
-// 				logger.Debugf("Updating option position for %v: position %v, price %v, qty %v\n", option.Symbol, option.Position, optionPrice, optionQty)
-// 				t.updateBalance(&option.RealizedProfit, &option.Position, &option.AverageCost, optionPrice, optionQty, option)
-// 				logger.Debugf("Filled trade: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, optionPrice)
-// 				// backtestDB.InsertTrade(t.db, option.Symbol, optionPrice, optionQty, order.Side, option.UnrealizedProfit, option.RealizedProfit, option.AverageCost, "market", utils.TimeToTimestamp(t.CurrentTime))
-// 				logger.Debugf("Updated buy avgcost for option %v: %v with realized profit %v\n", option.Symbol, option.AverageCost, option.RealizedProfit)
-// 				t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 
 func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount float64) {
 	lastCandle, ok := t.currentCandle[order.Market]
@@ -326,23 +317,23 @@ func (t *Tantra) processFills() bool {
 	return false
 }
 
-// Get the last account history, the first time should just return
-func (t *Tantra) getPreviousMarketStateMap() map[string]models.MarketState {
-	length := len(t.MarketStateHistory)
-	if length > 1 {
-		return t.MarketStateHistory[length-2]
-	}
-	return t.MarketStateHistory[0]
-}
-
-func (t *Tantra) addMarketStateToHistory() {
-	// TODO make a copy here?
+func (t *Tantra) addMarketStatesToHistory() {
 	ms := make(map[string]models.MarketState)
 	for symbol, state := range t.Account.MarketStates {
 		ms[symbol] = *state
 	}
+	t.MarketStateHistory[utils.TimeToTimestamp(t.CurrentTime)] = ms
+	t.PreviousMarketStates = ms
+	logger.Debugf("Added market states to history [%v records]\n", len(t.MarketStateHistory))
+}
 
-	t.MarketStateHistory = append(t.MarketStateHistory, ms)
+func (t *Tantra) addAccountStateToHistory() {
+	t.AccountHistory[utils.TimeToTimestamp(t.CurrentTime)] = *t.Account
+	logger.Debugf("Added account to history [%v records]\n", len(t.AccountHistory))
+}
+
+func (t *Tantra) insertBacktestEvents() {
+
 }
 
 func (t *Tantra) publishOrderUpdates() {
