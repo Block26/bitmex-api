@@ -37,12 +37,13 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		client:                client,
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
-		AccountHistory:        make(map[int]models.Account),
 		ordersBySymbol:        make(map[string]map[string]iex.Order),
 		newOrders:             make([]iex.Order, 0),
 		db:                    backtestDB.NewDB(),
 	}
 }
+
+const InsertBatchSize = 1000
 
 // Tantra represents a mock exchange client
 type Tantra struct {
@@ -53,7 +54,9 @@ type Tantra struct {
 	SimulatedExchangeName string
 	MarketInfos           map[string]models.MarketInfo
 	Account               *models.Account
-	AccountHistory        map[int]models.Account
+	AccountHistory        []models.Account
+	MarketHistory         []map[string]models.MarketState
+	TimestampHistory      []int
 	PreviousAccountState  models.Account
 	CurrentTime           time.Time
 	orders                sync.Map
@@ -68,6 +71,7 @@ type Tantra struct {
 	end                   time.Time
 	theoEngine            *te.TheoEngine
 	db                    *sqlx.DB
+	lastInsertIndex       int
 }
 
 func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
@@ -112,9 +116,8 @@ func (t *Tantra) StartWS(config interface{}) error {
 		break
 	}
 	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes, t.warmUpPeriod)
-	t.addAccountStateToHistory()
+	t.insertHistoryToDB(false)
 	go func() {
-
 		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
 			startTime := time.Now().UnixNano()
 			tradeTime := 0
@@ -203,12 +206,13 @@ func (t *Tantra) StartWS(config interface{}) error {
 				}
 			}
 			extraStart = time.Now().UnixNano()
-			t.addAccountStateToHistory()
+			t.appendToHistory()
 			extraTime += int(time.Now().UnixNano() - extraStart)
 			// Publish trade updates
 			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
 			<-t.channels.TradeBinChanComplete
+			t.insertHistoryToDB(false)
 			logger.Infof("[Exchange] trade time: %v ns\n", tradeTime)
 			logger.Infof("[Exchange] fill time: %v ns\n", fillTime)
 			logger.Infof("[Exchange] position time: %v ns\n", positionTime)
@@ -217,7 +221,10 @@ func (t *Tantra) StartWS(config interface{}) error {
 			logger.Infof("[Exchange] timestep took %v ns\n", time.Now().UnixNano()-startTime)
 		}
 		logger.Infof("Fill time: %v ns\n", fillTime)
-		t.insertAccountHistory()
+		logger.Infof("Insert time: %v ns\n", insertTime)
+		t.insertHistoryToDB(true)
+		log.Println("Done with test.")
+		return
 	}()
 	return nil
 }
@@ -246,6 +253,7 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 		t.currentCandle[symbol] = candleData[index+t.warmUpPeriod]
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
+		log.Println("[Exchange] advanced to", t.CurrentTime)
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 	}
 }
@@ -284,6 +292,7 @@ func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount 
 }
 
 var fillTime = 0
+var insertTime = 0
 
 // Find any orders that should be filled, and update local positions/balances. Then, publish these updates to clients
 func (t *Tantra) processFills() bool {
@@ -313,15 +322,42 @@ func (t *Tantra) processFills() bool {
 	return false
 }
 
-func (t *Tantra) addAccountStateToHistory() {
-	t.AccountHistory[utils.TimeToTimestamp(t.CurrentTime)] = *t.Account
-	logger.Debugf("Added account to history [%v records]\n", len(t.AccountHistory))
+func (t *Tantra) appendToHistory() {
+	t.PreviousAccountState = *t.Account
+	t.AccountHistory = append(t.AccountHistory, *t.Account)
+	marketStates := make(map[string]models.MarketState)
+	for symbol, market := range t.Account.MarketStates {
+		marketStates[symbol] = *market
+	}
+	t.MarketHistory = append(t.MarketHistory, marketStates)
+	t.TimestampHistory = append(t.TimestampHistory, utils.TimeToTimestamp(t.CurrentTime))
+	logger.Debugf("Appended to history [%v records]\n", len(t.AccountHistory))
 }
 
-func (t *Tantra) insertAccountHistory() {
-	logger.Infof("Inserting account history...\n")
-	backtestDB.InsertAccountHistory(t.db, t.AccountHistory)
-	logger.Infof("Inserted account history. [%v records]\n", len(t.AccountHistory))
+func (t *Tantra) insertHistoryToDB(isLast bool) {
+	insertStart := time.Now().UnixNano()
+	start := t.lastInsertIndex
+	logger.Infof("Inserting acount history with start %v, len history %v\n", start, len(t.AccountHistory))
+	var end int
+	if isLast {
+		end = len(t.AccountHistory)
+	} else {
+		if len(t.AccountHistory)-start < InsertBatchSize {
+			return
+		}
+		end = start + InsertBatchSize
+	}
+	if start == end {
+		return
+	}
+	timestamps := t.TimestampHistory[start:end]
+	accounts := t.AccountHistory[start:end]
+	markets := t.MarketHistory[start:end]
+	backtestDB.InsertAccountHistory(t.db, timestamps, accounts)
+	backtestDB.InsertMarketHistory(t.db, timestamps, markets)
+	logger.Infof("Inserted history. [%v records]\n", len(accounts))
+	t.lastInsertIndex = end
+	insertTime += int(time.Now().UnixNano() - insertStart)
 }
 
 func (t *Tantra) publishOrderUpdates() {
@@ -465,6 +501,7 @@ func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...st
 	var contracts []*iex.Contract
 	var err error
 	if getFutures {
+		logger.Infof("Getting futures markets at %v\n", t.CurrentTime)
 		for symbol, marketState := range t.Account.MarketStates {
 			if marketState.Info.MarketType == models.Future {
 				contract := iex.Contract{
@@ -548,6 +585,7 @@ func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...st
 						TickSize:          t.Account.ExchangeInfo.PricePrecision,
 						MidMarketPrice:    -1,
 					}
+					logger.Infof("Generated option contract for %v.\n", contract.Symbol)
 					contracts = append(contracts, &contract)
 				}
 			}
