@@ -38,7 +38,7 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
 		ordersBySymbol:        make(map[string]map[string]iex.Order),
-		newOrders:             make([]iex.Order, 0),
+		ordersToPublish:       make(map[string]iex.Order),
 		db:                    backtestDB.NewDB(),
 	}
 }
@@ -61,7 +61,7 @@ type Tantra struct {
 	CurrentTime           time.Time
 	orders                sync.Map
 	ordersBySymbol        map[string]map[string]iex.Order
-	newOrders             []iex.Order
+	ordersToPublish       map[string]iex.Order
 	index                 int
 	warmUpPeriod          int
 	candleData            map[string][]iex.TradeBin
@@ -219,6 +219,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			logger.Infof("[Exchange] balance time: %v ns\n", balanceTime)
 			logger.Infof("[Exchange] extra time: %v ns\n", extraTime)
 			logger.Infof("[Exchange] timestep took %v ns\n", time.Now().UnixNano()-startTime)
+			logger.Infof("[Exchange] cumulative insert time: %v ns\n", insertTime)
 		}
 		logger.Infof("Fill time: %v ns\n", fillTime)
 		logger.Infof("Insert time: %v ns\n", insertTime)
@@ -315,7 +316,7 @@ func (t *Tantra) processFills() bool {
 		}
 		return true
 	})
-	if len(t.newOrders) > 0 {
+	if len(t.ordersToPublish) > 0 {
 		t.publishOrderUpdates()
 		return true
 	}
@@ -361,15 +362,15 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 }
 
 func (t *Tantra) publishOrderUpdates() {
-	logger.Debugf("Publishing %v order updates.\n", len(t.newOrders))
-	// t.channels.OrderChan <- t.newOrders
+	logger.Debugf("Publishing %v order updates.\n", len(t.ordersToPublish))
+	// t.channels.OrderChan <- t.ordersToPublish
 	// <-t.channels.OrderChan
 	// logger.Infof("OUTPUT ORDER UPDATE: %v\n", <-t.channels.OrderChan)
-	for _, order := range t.newOrders {
+	for _, order := range t.ordersToPublish {
 		t.channels.OrderChan <- []iex.Order{order}
 		<-t.channels.OrderChanComplete
 	}
-	t.newOrders = make([]iex.Order, 0)
+	t.ordersToPublish = make(map[string]iex.Order)
 }
 
 func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *float64, averageCost *float64, fillPrice float64, fillAmount float64, marketState *models.MarketState) {
@@ -666,7 +667,7 @@ func (t *Tantra) prepareOrderUpdate(order iex.Order, status string) {
 	o := order // make a copy so we can delete it
 	o.OrdStatus = status
 	logger.Debugf("New order update: %v %v %v at %v (%v)\n", order.Side, order.Amount, order.Market, order.Rate, o.OrdStatus)
-	t.newOrders = append(t.newOrders, o)
+	t.ordersToPublish[o.OrderID] = order
 }
 
 func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
@@ -684,7 +685,7 @@ func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	order.OrderID = uuid
 	order.OrdStatus = "Open"
 	t.orders.Store(uuid, order)
-	t.newOrders = append(t.newOrders, order)
+	t.ordersToPublish[order.OrderID] = order
 	state, ok := t.Account.MarketStates[order.Market]
 	if ok {
 		state.Orders.Store(order.OrderID, order)
@@ -711,7 +712,7 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 		Market:    cancel.Market,
 		OrdStatus: t.GetPotentialOrderStatus().Cancelled,
 	}
-	t.newOrders = append(t.newOrders, canceledOrder)
+	t.ordersToPublish[canceledOrder.OrderID] = canceledOrder
 	t.orders.Delete(cancel.Uuid)
 	delete(t.ordersBySymbol[cancel.Market], cancel.Uuid)
 	_, ok := t.Account.MarketStates[cancel.Market]
