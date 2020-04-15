@@ -9,13 +9,12 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	backtestDB "github.com/tantralabs/backtest-db"
-	"github.com/tantralabs/database"
 	"github.com/tantralabs/logger"
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi/global/clients"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/utils"
+	"github.com/tantralabs/yantra/database"
 	"github.com/tantralabs/yantra/models"
 )
 
@@ -37,7 +36,7 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		Account:               account,
 		orders:                make(map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
-		db:                    backtestDB.NewDB(),
+		db:                    database.NewDB(),
 		LogBacktest:           true,
 	}
 }
@@ -53,10 +52,10 @@ type Tantra struct {
 	SimulatedExchangeName string
 	MarketInfos           map[string]models.MarketInfo
 	Account               *models.Account
-	AccountHistory        []models.Account
-	MarketHistory         []map[string]models.MarketState
-	TimestampHistory      []int
-	PreviousMarketStates  map[string]models.MarketState
+	AccountHistory        []models.AccountHistory
+	MarketHistory         []map[string]models.MarketHistory
+	TradeHistory          []models.Trade
+	PreviousMarketStates  map[string]models.MarketHistory
 	CurrentTime           time.Time
 	orders                map[string]iex.Order
 	ordersToPublish       map[string]iex.Order
@@ -134,7 +133,6 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Iterate through all symbols for the respective account
 			// TODO should this all happen synchronously, or in parallel?
 			logger.Debugf("New index: %v\n", index)
-			var lastMarketState models.MarketState
 			var tradeUpdates []iex.TradeBin
 			extraTime += int(time.Now().UnixNano() - extraStart)
 			for symbol, marketState := range t.Account.MarketStates {
@@ -159,6 +157,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// TODO should we send balance updates if no fills?
 			var lastBalance, lastPosition, lastAverageCost float64
 			var currentMarketState *models.MarketState
+			var lastMarketState models.MarketHistory
 			var currentOk, lastOk bool
 			for symbol := range filledSymbols {
 				currentMarketState, currentOk = t.Account.MarketStates[symbol]
@@ -180,7 +179,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 					wallet := iex.WSWallet{
 						Balance: []iex.WSBalance{
 							{
-								Asset:   lastMarketState.Info.BaseSymbol,
+								Asset:   currentMarketState.Info.BaseSymbol,
 								Balance: currentMarketState.Balance,
 							},
 						},
@@ -326,6 +325,7 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 		isFilled, fillPrice, fillAmount = t.getFill(order)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
+			t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			delete(t.orders, key)
@@ -343,16 +343,21 @@ var appendTime = 0
 
 func (t *Tantra) appendToHistory() {
 	appendStart := time.Now().UnixNano()
-	t.AccountHistory = append(t.AccountHistory, *t.Account)
-	marketStates := make(map[string]models.MarketState)
+	timestamp := utils.TimeToTimestamp(t.CurrentTime)
+	t.AccountHistory = append(t.AccountHistory, models.NewAccountHistory(*t.Account, timestamp))
+	marketStates := make(map[string]models.MarketHistory)
 	for symbol, market := range t.Account.MarketStates {
-		marketStates[symbol] = *market
+		marketStates[symbol] = models.NewMarketHistory(*market, timestamp)
 	}
 	t.PreviousMarketStates = marketStates
 	t.MarketHistory = append(t.MarketHistory, marketStates)
-	t.TimestampHistory = append(t.TimestampHistory, utils.TimeToTimestamp(t.CurrentTime))
 	logger.Debugf("Appended to history [%v records]\n", len(t.AccountHistory))
 	appendTime += int(time.Now().UnixNano() - appendStart)
+}
+
+func (t *Tantra) processTrade(trade models.Trade) {
+	t.TradeHistory = append(t.TradeHistory, trade)
+	logger.Debugf("Processed trade: %v\n", trade)
 }
 
 func (t *Tantra) insertHistoryToDB(isLast bool) {
@@ -361,6 +366,8 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	logger.Debugf("Inserting acount history with start %v, len history %v\n", start, len(t.AccountHistory))
 	var end int
 	if isLast {
+		// Insert trade history
+		database.InsertTradeHistory(t.db, t.TradeHistory)
 		end = len(t.AccountHistory)
 	} else {
 		if len(t.AccountHistory)-start < InsertBatchSize {
@@ -371,11 +378,10 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	if start == end {
 		return
 	}
-	timestamps := t.TimestampHistory[start:end]
 	accounts := t.AccountHistory[start:end]
 	markets := t.MarketHistory[start:end]
-	backtestDB.InsertAccountHistory(t.db, timestamps, accounts)
-	backtestDB.InsertMarketHistory(t.db, timestamps, markets)
+	database.InsertAccountHistory(t.db, accounts)
+	database.InsertMarketHistory(t.db, markets)
 	logger.Infof("Inserted history. [%v records]\n", len(accounts))
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
@@ -384,14 +390,12 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 
 func (t *Tantra) flushHistory() {
 	start := t.lastInsertIndex
-	end := len(t.TimestampHistory) - 1
+	end := len(t.AccountHistory) - 1
 	if end <= start {
 		// Full flush
-		t.TimestampHistory = []int{}
-		t.AccountHistory = []models.Account{}
-		t.MarketHistory = []map[string]models.MarketState{}
+		t.AccountHistory = []models.AccountHistory{}
+		t.MarketHistory = []map[string]models.MarketHistory{}
 	} else {
-		t.TimestampHistory = t.TimestampHistory[start:end]
 		t.AccountHistory = t.AccountHistory[start:end]
 		t.MarketHistory = t.MarketHistory[start:end]
 	}
@@ -761,12 +765,12 @@ func (t *Tantra) GetLastTimestamp() time.Time {
 	return t.CurrentTime
 }
 
-func (t *Tantra) GetData(symbol string, binSize string, amount int) ([]iex.TradeBin, error) {
+func (t *Tantra) GetCandles(symbol string, binSize string, amount int) ([]iex.TradeBin, error) {
 	// only fetch data the first time
 	candleData, ok := t.candleData[symbol]
 	if !ok {
 		candleData = []iex.TradeBin{}
-		bars := database.GetData(symbol, t.SimulatedExchangeName, binSize, t.start, t.end)
+		bars := database.GetCandlesByTime(symbol, t.SimulatedExchangeName, binSize, t.start, t.end)
 		var tb iex.TradeBin
 		for i := range bars {
 			tb = iex.TradeBin{

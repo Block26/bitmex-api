@@ -107,7 +107,7 @@ func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time
 		logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
 		// TODO handle extra bars to account for dataLength here
 		// barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
-		barData[symbol] = database.GetCandlesByTime(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
+		barData[symbol] = database.GetCandlesByTimeWithBuffer(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
 		algo.Index = algo.DataLength
 		marketState.Bar = *barData[symbol][len(barData[symbol])-1]
 		marketState.LastPrice = marketState.Bar.Close
