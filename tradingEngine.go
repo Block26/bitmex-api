@@ -72,7 +72,7 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	mockExchange.SetCurrentTime(start)
 	t.Algo.Client = mockExchange
 	t.Algo.Timestamp = start
-	t.endTime = end
+	t.endTime = end.AddDate(0, 0, -1)
 	t.Connect("", false, rebalance, setupData, true)
 }
 
@@ -320,7 +320,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			t.aggregateAccountProfit()
 			// logger.Debugf("Trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			channels.TradeBinChanComplete <- nil
-			log.Printf("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
+			// log.Printf("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 			if !t.Algo.Timestamp.Before(t.endTime) {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, history, startTime)

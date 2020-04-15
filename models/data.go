@@ -170,8 +170,9 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 			ohlcv.Open[i] = bars[oldIndex-resampleInterval].Open
 			ohlcv.Close[i] = bars[oldIndex-1].Close
 			ohlcv.Timestamp[i] = bars[oldIndex-1].Timestamp
+			low := ohlcv.Open[i]
 
-			var high, low, volume float64
+			var high, volume float64
 			for j := -resampleInterval; j < 0; j++ {
 				if high < bars[oldIndex+j].High {
 					high = bars[oldIndex+j].High
@@ -179,7 +180,6 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 
 				if low > bars[oldIndex+j].Low {
 					low = bars[oldIndex+j].Low
-
 				}
 				volume += bars[oldIndex+j].Volume
 			}

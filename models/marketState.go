@@ -65,6 +65,15 @@ type MarketState struct {
 	MaxLeverage         float64
 }
 
+func (ms *MarketState) GetCurrentWeight() int {
+	if ms.Position > 0 {
+		return 1
+	} else if ms.Position < 0 {
+		return -1
+	}
+	return 0
+}
+
 func NewMarketState(marketInfo MarketInfo, balance float64) MarketState {
 	var syncMap sync.Map
 	return MarketState{

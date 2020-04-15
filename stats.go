@@ -330,7 +330,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	score := mean / std
 	// TODO change the scoring based on 1h / 1m
 	// if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-	score = score * math.Sqrt(365*24)
+	score = score * math.Sqrt(365*24*60)
 	// } else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
 	// 	score = score * math.Sqrt(365*24*60)
 	// }

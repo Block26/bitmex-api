@@ -33,9 +33,9 @@ func CreateNATREMA(high []float64, low []float64, close []float64, index int, na
 }
 
 // GetDX Calculate a DX slice based on a data length and DX length. OHLC lengths > data length > length
-func GetDX(high []float64, low []float64, close []float64, index int, datalength int, length int) []float64 {
+func GetDX(ohlcv models.OHLCV, index int, datalength int, length int) []float64 {
 	//TODO check live
-	return talib.Dx(high[index-datalength:index], low[index-datalength:index], close[index-datalength:index], length)
+	return talib.Dx(ohlcv.High[index-datalength:index], ohlcv.Low[index-datalength:index], ohlcv.Close[index-datalength:index], length)
 }
 
 // GetADX Calculate an ADX slice based on a data length and DX length. OHLC lengths > data length > length
