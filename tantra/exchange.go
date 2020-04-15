@@ -53,11 +53,10 @@ type Tantra struct {
 	SimulatedExchangeName string
 	MarketInfos           map[string]models.MarketInfo
 	Account               *models.Account
-	AccountHistory        []models.Account
-	MarketHistory         []map[string]models.MarketState
+	AccountHistory        []models.AccountHistory
+	MarketHistory         []map[string]models.MarketHistory
 	TradeHistory          []models.Trade
-	TimestampHistory      []int
-	PreviousMarketStates  map[string]models.MarketState
+	PreviousMarketStates  map[string]models.MarketHistory
 	CurrentTime           time.Time
 	orders                sync.Map
 	ordersToPublish       map[string]iex.Order
@@ -136,7 +135,6 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Iterate through all symbols for the respective account
 			// TODO should this all happen synchronously, or in parallel?
 			logger.Debugf("New index: %v\n", index)
-			var lastMarketState models.MarketState
 			var tradeUpdates []iex.TradeBin
 			extraTime += int(time.Now().UnixNano() - extraStart)
 			for symbol, marketState := range t.Account.MarketStates {
@@ -161,6 +159,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// TODO should we send balance updates if no fills?
 			var lastBalance, lastPosition, lastAverageCost float64
 			var currentMarketState *models.MarketState
+			var lastMarketState models.MarketHistory
 			var currentOk, lastOk bool
 			for symbol := range filledSymbols {
 				currentMarketState, currentOk = t.Account.MarketStates[symbol]
@@ -182,7 +181,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 					wallet := iex.WSWallet{
 						Balance: []iex.WSBalance{
 							{
-								Asset:   lastMarketState.Info.BaseSymbol,
+								Asset:   currentMarketState.Info.BaseSymbol,
 								Balance: currentMarketState.Balance,
 							},
 						},
@@ -342,14 +341,14 @@ var appendTime = 0
 
 func (t *Tantra) appendToHistory() {
 	appendStart := time.Now().UnixNano()
-	t.AccountHistory = append(t.AccountHistory, *t.Account)
-	marketStates := make(map[string]models.MarketState)
+	timestamp := utils.TimeToTimestamp(t.CurrentTime)
+	t.AccountHistory = append(t.AccountHistory, models.NewAccountHistory(*t.Account, timestamp))
+	marketStates := make(map[string]models.MarketHistory)
 	for symbol, market := range t.Account.MarketStates {
-		marketStates[symbol] = *market
+		marketStates[symbol] = models.NewMarketHistory(*market, timestamp)
 	}
 	t.PreviousMarketStates = marketStates
 	t.MarketHistory = append(t.MarketHistory, marketStates)
-	t.TimestampHistory = append(t.TimestampHistory, utils.TimeToTimestamp(t.CurrentTime))
 	logger.Debugf("Appended to history [%v records]\n", len(t.AccountHistory))
 	appendTime += int(time.Now().UnixNano() - appendStart)
 }
@@ -377,11 +376,10 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	if start == end {
 		return
 	}
-	timestamps := t.TimestampHistory[start:end]
 	accounts := t.AccountHistory[start:end]
 	markets := t.MarketHistory[start:end]
-	database.InsertAccountHistory(t.db, timestamps, accounts)
-	database.InsertMarketHistory(t.db, timestamps, markets)
+	database.InsertAccountHistory(t.db, accounts)
+	database.InsertMarketHistory(t.db, markets)
 	logger.Infof("Inserted history. [%v records]\n", len(accounts))
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
@@ -390,14 +388,12 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 
 func (t *Tantra) flushHistory() {
 	start := t.lastInsertIndex
-	end := len(t.TimestampHistory) - 1
+	end := len(t.AccountHistory) - 1
 	if end <= start {
 		// Full flush
-		t.TimestampHistory = []int{}
-		t.AccountHistory = []models.Account{}
-		t.MarketHistory = []map[string]models.MarketState{}
+		t.AccountHistory = []models.AccountHistory{}
+		t.MarketHistory = []map[string]models.MarketHistory{}
 	} else {
-		t.TimestampHistory = t.TimestampHistory[start:end]
 		t.AccountHistory = t.AccountHistory[start:end]
 		t.MarketHistory = t.MarketHistory[start:end]
 	}

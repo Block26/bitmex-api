@@ -387,32 +387,27 @@ func LogWalletHistory(algo *models.Algo, accountId string, history []iex.WalletH
 	db.Close()
 }
 
-func getOptionInsertString(market models.MarketState, timestamp int) (insertString string) {
-	if market.OptionTheo != nil {
-		insertString = fmt.Sprintf(`(%v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v)`,
-			QuoteI(timestamp), Quote(market.Symbol), QuoteF(market.Balance), QuoteF(market.AverageCost), QuoteF(market.UnrealizedProfit),
-			QuoteF(market.RealizedProfit), QuoteF(market.Info.Strike), QuoteI(int(market.Info.OptionType)),
-			QuoteI(market.Info.Expiry), QuoteF(market.OptionTheo.Theo), QuoteF(market.OptionTheo.Delta), QuoteF(market.OptionTheo.Gamma),
-			QuoteF(market.OptionTheo.Theta), QuoteF(market.OptionTheo.Vega), QuoteF(market.OptionTheo.WeightedVega),
-			QuoteF(market.OptionTheo.Volatility), QuoteF(market.Position))
-	} else {
-		logger.Errorf("Cannot insert for %v at %v (option theo is nil)\n", market.Info.Symbol, timestamp)
-		return
-	}
+func getOptionInsertString(market models.MarketHistory) (insertString string) {
+	insertString = fmt.Sprintf(`(%v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v)`,
+		QuoteI(market.Timestamp), Quote(market.Symbol), QuoteF(market.Balance), QuoteF(market.AverageCost), QuoteF(market.UnrealizedProfit),
+		QuoteF(market.RealizedProfit), QuoteF(market.Strike), QuoteI(int(market.OptionType)),
+		QuoteI(market.Expiry), QuoteF(market.Theo), QuoteF(market.Delta), QuoteF(market.Gamma),
+		QuoteF(market.Theta), QuoteF(market.Vega), QuoteF(market.WeightedVega),
+		QuoteF(market.Volatility), QuoteF(market.Position))
 	return
 }
 
-func getFutureInsertString(market models.MarketState, timestamp int) (insertString string) {
+func getFutureInsertString(market models.MarketHistory) (insertString string) {
 	insertString = fmt.Sprintf(`
 	(%v, %v, %v, %v, %v, %v, %v)`,
-		QuoteI(timestamp), Quote(market.Symbol), QuoteF(market.Balance), QuoteF(market.AverageCost),
+		QuoteI(market.Timestamp), Quote(market.Symbol), QuoteF(market.Balance), QuoteF(market.AverageCost),
 		QuoteF(market.UnrealizedProfit), QuoteF(market.RealizedProfit), QuoteF(market.Position))
 	return
 }
 
-func getAccountInsertString(account models.Account, timestamp int) (insertString string) {
+func getAccountInsertString(account models.AccountHistory) (insertString string) {
 	insertString = fmt.Sprintf(`(%v, %v, %v, %v)`,
-		QuoteI(timestamp), QuoteF(account.RealizedProfit), QuoteF(account.UnrealizedProfit), QuoteF(account.Profit))
+		QuoteI(account.Timestamp), QuoteF(account.RealizedProfit), QuoteF(account.UnrealizedProfit), QuoteF(account.Profit))
 	return
 }
 
@@ -423,13 +418,13 @@ func getTradeInsertString(trade models.Trade) (insertString string) {
 	return
 }
 
-func InsertAccountHistory(db *sqlx.DB, timestamps []int, accounts []models.Account) {
+func InsertAccountHistory(db *sqlx.DB, accounts []models.AccountHistory) {
 	logger.Debugf("Inserting account history for %v records...\n", len(accounts))
 	var insertStrings []string
 	var query string
 	var err error
-	for i, account := range accounts {
-		insertStrings = append(insertStrings, getAccountInsertString(account, timestamps[i]))
+	for _, account := range accounts {
+		insertStrings = append(insertStrings, getAccountInsertString(account))
 	}
 	query = fmt.Sprintf(`
 	insert into account_snapshots(timestamp, unrealized_profit, realized_profit, profit)
@@ -442,16 +437,16 @@ func InsertAccountHistory(db *sqlx.DB, timestamps []int, accounts []models.Accou
 	}
 }
 
-func InsertMarketHistory(db *sqlx.DB, timestamps []int, markets []map[string]models.MarketState) {
+func InsertMarketHistory(db *sqlx.DB, markets []map[string]models.MarketHistory) {
 	logger.Debugf("Inserting market history for %v records...\n", len(markets))
 	var insertStrings []string
 	var query string
 	var err error
 	// Insert futures histories first
-	for i, marketMap := range markets {
+	for _, marketMap := range markets {
 		for _, market := range marketMap {
-			if market.Info.MarketType != models.Option {
-				insertStrings = append(insertStrings, getFutureInsertString(market, timestamps[i]))
+			if market.MarketType != models.Option {
+				insertStrings = append(insertStrings, getFutureInsertString(market))
 			}
 		}
 	}
@@ -467,10 +462,10 @@ func InsertMarketHistory(db *sqlx.DB, timestamps []int, markets []map[string]mod
 	// Insert option histories
 	insertStrings = nil
 	var insertString string
-	for i, marketMap := range markets {
+	for _, marketMap := range markets {
 		for _, market := range marketMap {
-			if market.Info.MarketType == models.Option {
-				insertString = getOptionInsertString(market, timestamps[i])
+			if market.MarketType == models.Option {
+				insertString = getOptionInsertString(market)
 				if len(insertString) > 0 {
 					insertStrings = append(insertStrings, insertString)
 				}
