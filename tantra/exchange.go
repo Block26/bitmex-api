@@ -56,6 +56,7 @@ type Tantra struct {
 	Account               *models.Account
 	AccountHistory        []models.Account
 	MarketHistory         []map[string]models.MarketState
+	TradeHistory          []models.Trade
 	TimestampHistory      []int
 	PreviousMarketStates  map[string]models.MarketState
 	CurrentTime           time.Time
@@ -323,6 +324,7 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 		isFilled, fillPrice, fillAmount = t.getFill(order)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
+			t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			t.orders.Delete(key)
@@ -353,6 +355,11 @@ func (t *Tantra) appendToHistory() {
 	appendTime += int(time.Now().UnixNano() - appendStart)
 }
 
+func (t *Tantra) processTrade(trade models.Trade) {
+	t.TradeHistory = append(t.TradeHistory, trade)
+	logger.Debugf("Processed trade: %v\n", trade)
+}
+
 func (t *Tantra) insertHistoryToDB(isLast bool) {
 	insertStart := time.Now().UnixNano()
 	start := t.lastInsertIndex
@@ -378,6 +385,11 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
 	t.flushHistory()
+	if isLast {
+		// Insert trade history
+		backtestDB.InsertTradeHistory(t.db, t.TradeHistory)
+	}
+
 }
 
 func (t *Tantra) flushHistory() {
