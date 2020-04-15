@@ -233,9 +233,11 @@ func (t *Tantra) StartWS(config interface{}) error {
 		if t.LogBacktest {
 			t.insertHistoryToDB(true)
 		}
+		logger.Infof("Exiting.\n")
 		log.Println("Done with test.")
 		return
 	}()
+	logger.Infof("Done with time series iteration.\n")
 	return nil
 }
 
@@ -323,6 +325,8 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 			logger.Debugf("Processing fill for order: %v\n", order)
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
+			t.orders.Delete(key)
+			logger.Debugf("Deleted order with key: %v\n", key)
 		}
 		filledSymbols[order.Market] = true
 		return true
