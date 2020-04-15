@@ -82,23 +82,6 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 		if !ok {
 			logger.Errorf("Cannot set bar data for market state %v.\n", symbol)
 		}
-		// logger.Infof("Setting candle data for %v with %v bars.\n", symbol, len(data))
-		// var ohlcv models.OHLCV
-		// ohlcv.Timestamp = make([]int64, t.Algo.DataLength)
-		// ohlcv.Open = make([]float64, t.Algo.DataLength)
-		// ohlcv.Low = make([]float64, t.Algo.DataLength)
-		// ohlcv.High = make([]float64, t.Algo.DataLength)
-		// ohlcv.Close = make([]float64, t.Algo.DataLength)
-		// ohlcv.Volume = make([]float64, t.Algo.DataLength)
-		// for i := 0; i < t.Algo.DataLength; i++ {
-		// 	candle := data[i]
-		// 	ohlcv.Timestamp[i] = candle.Timestamp
-		// 	ohlcv.Open[i] = candle.Open
-		// 	ohlcv.High[i] = candle.High
-		// 	ohlcv.Low[i] = candle.Low
-		// 	ohlcv.Close[i] = candle.Close
-		// 	ohlcv.Volume[i] = candle.Volume
-		// }
 		marketState.OHLCV = models.SetupDataModel(data, t.Algo.DataLength)
 	}
 }
@@ -109,7 +92,6 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 		logger.Errorf("Cannot insert new candle for symbol %v (candle=%v)\n", candle.Symbol, candle)
 		return
 	}
-	// ohlcv := marketState.OHLCV
 	// instead of inserting a new bar in the data all the time in a test
 	// just increment the index
 	if t.isTest {
@@ -117,15 +99,6 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 	} else {
 		marketState.OHLCV.AddDataFromTradeBin(candle)
 	}
-
-	// ohlcv.Timestamp = append(ohlcv.Timestamp, int64(utils.TimeToTimestamp(candle.Timestamp)))
-	// ohlcv.Open = append(ohlcv.Open, candle.Open)
-	// ohlcv.High = append(ohlcv.High, candle.High)
-	// ohlcv.Low = append(ohlcv.Low, candle.Low)
-	// ohlcv.Close = append(ohlcv.Close, candle.Close)
-	// ohlcv.Volume = append(ohlcv.Volume, candle.Volume)
-	// marketState.OHLCV = ohlcv
-	// t.Algo.Index = len(ohlcv.Timestamp) - 1
 }
 
 func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {

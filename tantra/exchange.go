@@ -113,10 +113,10 @@ func (t *Tantra) StartWS(config interface{}) error {
 		numIndexes = len(candleData)
 		break
 	}
-	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes, t.warmUpPeriod)
+	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes)
 	t.insertHistoryToDB(false)
 	go func() {
-		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
+		for index := 0; index < numIndexes; index++ {
 			startTime := time.Now().UnixNano()
 			tradeTime := 0
 			fillTime := 0
@@ -211,13 +211,14 @@ func (t *Tantra) StartWS(config interface{}) error {
 			t.channels.TradeBinChan <- tradeUpdates
 			<-t.channels.TradeBinChanComplete
 			t.insertHistoryToDB(false)
-			logger.Infof("[Exchange] trade time: %v ns\n", tradeTime)
-			logger.Infof("[Exchange] fill time: %v ns\n", fillTime)
-			logger.Infof("[Exchange] position time: %v ns\n", positionTime)
-			logger.Infof("[Exchange] balance time: %v ns\n", balanceTime)
-			logger.Infof("[Exchange] extra time: %v ns\n", extraTime)
-			logger.Infof("[Exchange] timestep took %v ns\n", time.Now().UnixNano()-startTime)
-			logger.Infof("[Exchange] cumulative insert time: %v ns\n", insertTime)
+			logger.Debugf(`
+			[Exchange] trade time: %v ns\n
+			[Exchange] fill time: %v ns\n
+			[Exchange] position time: %v ns\n
+			[Exchange] balance time: %v ns\n
+			[Exchange] extra time: %v ns\n
+			[Exchange] timestep took %v ns\n
+			[Exchange] cumulative insert time: %v ns\n`, tradeTime, fillTime, positionTime, balanceTime, extraTime, time.Now().UnixNano()-startTime, insertTime)
 		}
 		logger.Infof("Fill time: %v ns\n", fillTime)
 		logger.Infof("Insert time: %v ns\n", insertTime)
