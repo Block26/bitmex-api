@@ -6,7 +6,6 @@ import (
 	"math"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -36,13 +35,14 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		client:                client,
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
+		orders:                make(map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
 		db:                    backtestDB.NewDB(),
 		LogBacktest:           true,
 	}
 }
 
-const InsertBatchSize = 10000
+const InsertBatchSize = 100
 
 // Tantra represents a mock exchange client
 type Tantra struct {
@@ -58,7 +58,7 @@ type Tantra struct {
 	TimestampHistory      []int
 	PreviousMarketStates  map[string]models.MarketState
 	CurrentTime           time.Time
-	orders                sync.Map
+	orders                map[string]iex.Order
 	ordersToPublish       map[string]iex.Order
 	index                 int
 	candleData            map[string][]iex.TradeBin
@@ -317,25 +317,22 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 	filledSymbols = make(map[string]bool)
 	var isFilled bool
 	var fillAmount, fillPrice float64
-	t.orders.Range(func(key, value interface{}) bool {
-		order := value.(iex.Order)
+	for key, order := range t.orders {
 		logger.Debugf("Found open order: %v\n", order)
 		marketState, ok := t.Account.MarketStates[order.Market]
 		if !ok {
 			logger.Errorf("Could not find market state for %v\n", order.Market)
-			return true
 		}
 		isFilled, fillPrice, fillAmount = t.getFill(order)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
-			t.orders.Delete(key)
+			delete(t.orders, key)
 			logger.Debugf("Deleted order with key: %v\n", key)
 		}
 		filledSymbols[order.Market] = true
-		return true
-	})
+	}
 	if len(t.ordersToPublish) > 0 {
 		t.publishOrderUpdates()
 	}
@@ -729,7 +726,7 @@ func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	t.sequenceNumber += 1
 	order.OrderID = uuid
 	order.OrdStatus = "Open"
-	t.orders.Store(uuid, order)
+	t.orders[uuid] = order
 	t.ordersToPublish[order.OrderID] = order
 	return
 }
@@ -742,7 +739,7 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 		OrdStatus: t.GetPotentialOrderStatus().Cancelled,
 	}
 	t.ordersToPublish[canceledOrder.OrderID] = canceledOrder
-	t.orders.Delete(cancel.Uuid)
+	delete(t.orders, cancel.Uuid)
 	_, ok := t.Account.MarketStates[cancel.Market]
 	if ok {
 		t.Account.MarketStates[cancel.Market].Orders.Delete(cancel.Uuid)
@@ -849,12 +846,9 @@ func (t *Tantra) Withdraw(address, currency string, quantity float64, additionIn
 func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err error) {
 	// TODO this should return currently open orders
 	oo := make([]iex.Order, 0)
-	var order iex.Order
-	t.orders.Range(func(key, value interface{}) bool {
-		order = value.(iex.Order)
+	for _, order := range t.orders {
 		oo = append(oo, order)
-		return true
-	})
+	}
 	return oo, nil
 }
 
