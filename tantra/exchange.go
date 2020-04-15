@@ -10,13 +10,12 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	backtestDB "github.com/tantralabs/backtest-db"
-	"github.com/tantralabs/database"
 	"github.com/tantralabs/logger"
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi/global/clients"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/utils"
+	"github.com/tantralabs/yantra/database"
 	"github.com/tantralabs/yantra/models"
 )
 
@@ -38,7 +37,7 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
 		ordersToPublish:       make(map[string]iex.Order),
-		db:                    backtestDB.NewDB(),
+		db:                    database.NewDB(),
 		LogBacktest:           true,
 	}
 }
@@ -367,7 +366,7 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	var end int
 	if isLast {
 		// Insert trade history
-		backtestDB.InsertTradeHistory(t.db, t.TradeHistory)
+		database.InsertTradeHistory(t.db, t.TradeHistory)
 		end = len(t.AccountHistory)
 	} else {
 		if len(t.AccountHistory)-start < InsertBatchSize {
@@ -381,8 +380,8 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	timestamps := t.TimestampHistory[start:end]
 	accounts := t.AccountHistory[start:end]
 	markets := t.MarketHistory[start:end]
-	backtestDB.InsertAccountHistory(t.db, timestamps, accounts)
-	backtestDB.InsertMarketHistory(t.db, timestamps, markets)
+	database.InsertAccountHistory(t.db, timestamps, accounts)
+	database.InsertMarketHistory(t.db, timestamps, markets)
 	logger.Infof("Inserted history. [%v records]\n", len(accounts))
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
@@ -768,12 +767,12 @@ func (t *Tantra) GetLastTimestamp() time.Time {
 	return t.CurrentTime
 }
 
-func (t *Tantra) GetData(symbol string, binSize string, amount int) ([]iex.TradeBin, error) {
+func (t *Tantra) GetCandles(symbol string, binSize string, amount int) ([]iex.TradeBin, error) {
 	// only fetch data the first time
 	candleData, ok := t.candleData[symbol]
 	if !ok {
 		candleData = []iex.TradeBin{}
-		bars := database.GetData(symbol, t.SimulatedExchangeName, binSize, t.start, t.end)
+		bars := database.GetCandlesByTime(symbol, t.SimulatedExchangeName, binSize, t.start, t.end)
 		var tb iex.TradeBin
 		for i := range bars {
 			tb = iex.TradeBin{
