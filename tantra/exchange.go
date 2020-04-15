@@ -363,9 +363,11 @@ func (t *Tantra) processTrade(trade models.Trade) {
 func (t *Tantra) insertHistoryToDB(isLast bool) {
 	insertStart := time.Now().UnixNano()
 	start := t.lastInsertIndex
-	logger.Infof("Inserting acount history with start %v, len history %v\n", start, len(t.AccountHistory))
+	logger.Infof("Inserting account history with start %v, len history %v\n", start, len(t.AccountHistory))
 	var end int
 	if isLast {
+		// Insert trade history
+		backtestDB.InsertTradeHistory(t.db, t.TradeHistory)
 		end = len(t.AccountHistory)
 	} else {
 		if len(t.AccountHistory)-start < InsertBatchSize {
@@ -385,11 +387,6 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
 	t.flushHistory()
-	if isLast {
-		// Insert trade history
-		backtestDB.InsertTradeHistory(t.db, t.TradeHistory)
-	}
-
 }
 
 func (t *Tantra) flushHistory() {
