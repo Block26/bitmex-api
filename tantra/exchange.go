@@ -36,13 +36,13 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		client:                client,
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
-		ordersBySymbol:        make(map[string]map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
 		db:                    backtestDB.NewDB(),
+		LogBacktest:           true,
 	}
 }
 
-const InsertBatchSize = 1000
+const InsertBatchSize = 10000
 
 // Tantra represents a mock exchange client
 type Tantra struct {
@@ -56,10 +56,9 @@ type Tantra struct {
 	AccountHistory        []models.Account
 	MarketHistory         []map[string]models.MarketState
 	TimestampHistory      []int
-	PreviousAccountState  models.Account
+	PreviousMarketStates  map[string]models.MarketState
 	CurrentTime           time.Time
 	orders                sync.Map
-	ordersBySymbol        map[string]map[string]iex.Order
 	ordersToPublish       map[string]iex.Order
 	index                 int
 	candleData            map[string][]iex.TradeBin
@@ -70,6 +69,7 @@ type Tantra struct {
 	theoEngine            *te.TheoEngine
 	db                    *sqlx.DB
 	lastInsertIndex       int
+	LogBacktest           bool
 }
 
 func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
@@ -114,7 +114,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 		break
 	}
 	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes)
-	t.insertHistoryToDB(false)
+	if t.LogBacktest {
+		t.insertHistoryToDB(false)
+	}
 	go func() {
 		for index := 0; index < numIndexes; index++ {
 			startTime := time.Now().UnixNano()
@@ -132,17 +134,10 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Iterate through all symbols for the respective account
 			// TODO should this all happen synchronously, or in parallel?
 			logger.Debugf("New index: %v\n", index)
-			var market *models.MarketState
-			var ok bool
-			var lastMarketState *models.MarketState
+			var lastMarketState models.MarketState
 			var tradeUpdates []iex.TradeBin
 			extraTime += int(time.Now().UnixNano() - extraStart)
 			for symbol, marketState := range t.Account.MarketStates {
-				market, ok = t.Account.MarketStates[symbol]
-				if !ok {
-					logger.Errorf("Symbol %v not found in account market states: %v\n", symbol, t.Account.MarketStates)
-					continue
-				}
 				tradeStart := time.Now().UnixNano()
 				if marketState.Info.MarketType != models.Option {
 					t.updateCandle(index, symbol)
@@ -156,52 +151,60 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 			// Fill all orders with the newest candles
 			fillStart := time.Now().UnixNano()
-			filled := t.processFills()
+			filledSymbols := t.processFills()
+			logger.Infof("Got filled symbols: %v\n", filledSymbols)
 			fillTime += int(time.Now().UnixNano() - fillStart)
 
 			// Send position and balance updates if we have any fills
 			// TODO should we send balance updates if no fills?
-			if t.PreviousAccountState.AccountID != t.Account.AccountID {
-				logger.Errorf("Could not find previous account state, not updating balances.\n")
-			} else if filled {
-				for symbol := range t.Account.MarketStates {
-					lastMarketState, ok = t.PreviousAccountState.MarketStates[symbol]
-					if !ok {
-						logger.Errorf("Could not load last market state for symbol %v\n", symbol)
-						continue
-					}
-					// Has the balance changed? Send a balance update. No? Do Nothing
-					// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
-					balanceStart := time.Now().UnixNano()
-					if lastMarketState.Balance != market.Balance {
-						wallet := iex.WSWallet{
-							Balance: []iex.WSBalance{
-								{
-									Asset:   lastMarketState.Info.BaseSymbol,
-									Balance: market.Balance,
-								},
-							},
-						}
-						t.channels.WalletChan <- &wallet
-						<-t.channels.WalletChanComplete
-					}
-					balanceTime += int(time.Now().UnixNano() - balanceStart)
-					// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
-					// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
-					positionStart := time.Now().UnixNano()
-					if lastMarketState.AverageCost != market.AverageCost || lastMarketState.Position != market.Position {
-						pos := []iex.WsPosition{
-							iex.WsPosition{
-								Symbol:       symbol,
-								CurrentQty:   market.Position,
-								AvgCostPrice: market.AverageCost,
-							},
-						}
-						t.channels.PositionChan <- pos
-						<-t.channels.PositionChanComplete
-					}
-					positionTime += int(time.Now().UnixNano() - positionStart)
+			var lastBalance, lastPosition, lastAverageCost float64
+			var currentMarketState *models.MarketState
+			var currentOk, lastOk bool
+			for symbol := range filledSymbols {
+				currentMarketState, currentOk = t.Account.MarketStates[symbol]
+				lastMarketState, lastOk = t.PreviousMarketStates[symbol]
+				if !currentOk || !lastOk {
+					logger.Debugf("Error loading market states for %v\n", symbol)
+					lastBalance = 0
+					lastPosition = 0
+					lastAverageCost = 0
+				} else {
+					lastBalance = lastMarketState.Balance
+					lastPosition = lastMarketState.Position
+					lastAverageCost = lastMarketState.AverageCost
 				}
+				// Has the balance changed? Send a balance update. No? Do Nothing
+				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
+				balanceStart := time.Now().UnixNano()
+				if lastBalance != currentMarketState.Balance {
+					wallet := iex.WSWallet{
+						Balance: []iex.WSBalance{
+							{
+								Asset:   lastMarketState.Info.BaseSymbol,
+								Balance: currentMarketState.Balance,
+							},
+						},
+					}
+					t.channels.WalletChan <- &wallet
+					<-t.channels.WalletChanComplete
+				}
+				balanceTime += int(time.Now().UnixNano() - balanceStart)
+				// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
+				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
+				positionStart := time.Now().UnixNano()
+				if lastAverageCost != currentMarketState.AverageCost || lastPosition != currentMarketState.Position {
+					logger.Infof("Building position update [last=%v, current=%v]\n", lastPosition, currentMarketState.Position)
+					pos := []iex.WsPosition{
+						iex.WsPosition{
+							Symbol:       symbol,
+							CurrentQty:   currentMarketState.Position,
+							AvgCostPrice: currentMarketState.AverageCost,
+						},
+					}
+					t.channels.PositionChan <- pos
+					<-t.channels.PositionChanComplete
+				}
+				positionTime += int(time.Now().UnixNano() - positionStart)
 			}
 			extraStart = time.Now().UnixNano()
 			t.appendToHistory()
@@ -222,10 +225,14 @@ func (t *Tantra) StartWS(config interface{}) error {
 		}
 		logger.Infof("Fill time: %v ns\n", fillTime)
 		logger.Infof("Insert time: %v ns\n", insertTime)
-		t.insertHistoryToDB(true)
+		if t.LogBacktest {
+			t.insertHistoryToDB(true)
+		}
+		logger.Infof("Exiting.\n")
 		log.Println("Done with test.")
 		return
 	}()
+	logger.Infof("Done with time series iteration.\n")
 	return nil
 }
 
@@ -305,8 +312,9 @@ var fillTime = 0
 var insertTime = 0
 
 // Find any orders that should be filled, and update local positions/balances. Then, publish these updates to clients
-func (t *Tantra) processFills() bool {
+func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 	// Only iterate through current open orders
+	filledSymbols = make(map[string]bool)
 	var isFilled bool
 	var fillAmount, fillPrice float64
 	t.orders.Range(func(key, value interface{}) bool {
@@ -322,26 +330,32 @@ func (t *Tantra) processFills() bool {
 			logger.Debugf("Processing fill for order: %v\n", order)
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
+			t.orders.Delete(key)
+			logger.Debugf("Deleted order with key: %v\n", key)
 		}
+		filledSymbols[order.Market] = true
 		return true
 	})
 	if len(t.ordersToPublish) > 0 {
 		t.publishOrderUpdates()
-		return true
 	}
-	return false
+	return
 }
 
+var appendTime = 0
+
 func (t *Tantra) appendToHistory() {
-	t.PreviousAccountState = *t.Account
+	appendStart := time.Now().UnixNano()
 	t.AccountHistory = append(t.AccountHistory, *t.Account)
 	marketStates := make(map[string]models.MarketState)
 	for symbol, market := range t.Account.MarketStates {
 		marketStates[symbol] = *market
 	}
+	t.PreviousMarketStates = marketStates
 	t.MarketHistory = append(t.MarketHistory, marketStates)
 	t.TimestampHistory = append(t.TimestampHistory, utils.TimeToTimestamp(t.CurrentTime))
 	logger.Debugf("Appended to history [%v records]\n", len(t.AccountHistory))
+	appendTime += int(time.Now().UnixNano() - appendStart)
 }
 
 func (t *Tantra) insertHistoryToDB(isLast bool) {
@@ -368,6 +382,24 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	logger.Infof("Inserted history. [%v records]\n", len(accounts))
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
+	t.flushHistory()
+}
+
+func (t *Tantra) flushHistory() {
+	start := t.lastInsertIndex
+	end := len(t.TimestampHistory) - 1
+	if end <= start {
+		// Full flush
+		t.TimestampHistory = []int{}
+		t.AccountHistory = []models.Account{}
+		t.MarketHistory = []map[string]models.MarketState{}
+	} else {
+		t.TimestampHistory = t.TimestampHistory[start:end]
+		t.AccountHistory = t.AccountHistory[start:end]
+		t.MarketHistory = t.MarketHistory[start:end]
+	}
+	t.lastInsertIndex = 0
+	logger.Infof("Flushed history (last=%v)\n", end)
 }
 
 func (t *Tantra) publishOrderUpdates() {
@@ -606,6 +638,8 @@ func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...st
 	return contracts, err
 }
 
+var theoTime = 0
+
 func (t *Tantra) GetMarketPricesByCurrency(currency string) (priceMap map[string]float64, err error) {
 	priceMap = make(map[string]float64)
 	if t.theoEngine == nil {
@@ -616,10 +650,12 @@ func (t *Tantra) GetMarketPricesByCurrency(currency string) (priceMap map[string
 		logger.Errorf("Cannot get market prices for currency %v with account currency %v.\n", currency, t.Account.BaseAsset.Symbol)
 		return
 	}
+	theoStart := time.Now().UnixNano()
 	for _, option := range t.theoEngine.Options {
 		option.OptionTheo.CalcTheo(false)
 		priceMap[option.Symbol] = option.OptionTheo.Theo
 	}
+	theoTime += int(time.Now().UnixNano() - theoStart)
 	return
 }
 
@@ -695,22 +731,6 @@ func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	order.OrdStatus = "Open"
 	t.orders.Store(uuid, order)
 	t.ordersToPublish[order.OrderID] = order
-	state, ok := t.Account.MarketStates[order.Market]
-	if ok {
-		state.Orders.Store(order.OrderID, order)
-		orderMap, ok := t.ordersBySymbol[order.Market]
-		if !ok {
-			orderMap = make(map[string]iex.Order)
-			t.ordersBySymbol[order.Market] = orderMap
-			t.ordersBySymbol[order.Market][uuid] = order
-			orderMap[uuid] = order
-			logger.Debugf("Built order map by symbol for order: %v\n", order)
-		} else {
-			orderMap[uuid] = order
-		}
-	} else {
-		logger.Errorf("Got order %v for unknown market: %v (num markets=%v)\n", uuid, order.Market, len(t.Account.MarketStates))
-	}
 	return
 }
 
@@ -723,7 +743,6 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 	}
 	t.ordersToPublish[canceledOrder.OrderID] = canceledOrder
 	t.orders.Delete(cancel.Uuid)
-	delete(t.ordersBySymbol[cancel.Market], cancel.Uuid)
 	_, ok := t.Account.MarketStates[cancel.Market]
 	if ok {
 		t.Account.MarketStates[cancel.Market].Orders.Delete(cancel.Uuid)
