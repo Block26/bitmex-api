@@ -279,14 +279,24 @@ func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount 
 		}
 	}
 	// If a future/spot order, check if our current candle fills the high (ask) or low (bid) for the order
-	if order.Side == "buy" && lastCandle.Low <= order.Rate {
+	if order.Type == "market" {
 		isFilled = true
-		fillPrice = lastCandle.Low
-		fillAmount = order.Amount
-	} else if order.Side == "sell" && lastCandle.High >= order.Rate {
-		isFilled = true
-		fillPrice = lastCandle.High
-		fillAmount = -order.Amount
+		fillPrice = lastCandle.Close // TODO implement multiple market order fill types
+		if order.Side == "buy" {
+			fillAmount = order.Amount
+		} else if order.Side == "sell" {
+			fillAmount = -order.Amount
+		}
+	} else {
+		if order.Side == "buy" && lastCandle.Low <= order.Rate {
+			isFilled = true
+			fillPrice = order.Rate
+			fillAmount = order.Amount
+		} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+			isFilled = true
+			fillPrice = order.Rate
+			fillAmount = -order.Amount
+		}
 	}
 	return
 }
