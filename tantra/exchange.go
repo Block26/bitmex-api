@@ -37,13 +37,13 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		client:                client,
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
-		ordersBySymbol:        make(map[string]map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
 		db:                    backtestDB.NewDB(),
+		LogBacktest:           true,
 	}
 }
 
-const InsertBatchSize = 1000
+const InsertBatchSize = 10000
 
 // Tantra represents a mock exchange client
 type Tantra struct {
@@ -60,7 +60,6 @@ type Tantra struct {
 	PreviousAccountState  models.Account
 	CurrentTime           time.Time
 	orders                sync.Map
-	ordersBySymbol        map[string]map[string]iex.Order
 	ordersToPublish       map[string]iex.Order
 	index                 int
 	warmUpPeriod          int
@@ -72,6 +71,7 @@ type Tantra struct {
 	theoEngine            *te.TheoEngine
 	db                    *sqlx.DB
 	lastInsertIndex       int
+	LogBacktest           bool
 }
 
 func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
@@ -116,7 +116,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 		break
 	}
 	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes, t.warmUpPeriod)
-	t.insertHistoryToDB(false)
+	if t.LogBacktest {
+		t.insertHistoryToDB(false)
+	}
 	go func() {
 		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
 			startTime := time.Now().UnixNano()
@@ -212,7 +214,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
 			<-t.channels.TradeBinChanComplete
-			t.insertHistoryToDB(false)
+			if t.LogBacktest {
+				t.insertHistoryToDB(false)
+			}
 			logger.Infof("[Exchange] trade time: %v ns\n", tradeTime)
 			logger.Infof("[Exchange] fill time: %v ns\n", fillTime)
 			logger.Infof("[Exchange] position time: %v ns\n", positionTime)
@@ -220,10 +224,14 @@ func (t *Tantra) StartWS(config interface{}) error {
 			logger.Infof("[Exchange] extra time: %v ns\n", extraTime)
 			logger.Infof("[Exchange] timestep took %v ns\n", time.Now().UnixNano()-startTime)
 			logger.Infof("[Exchange] cumulative insert time: %v ns\n", insertTime)
+			logger.Infof("[Exchange] cumulative append time: %v ns\n", appendTime)
+			logger.Infof("[Exchange] cumulative theo time: %v ns [%v options]\n", theoTime, len(t.theoEngine.Options))
 		}
 		logger.Infof("Fill time: %v ns\n", fillTime)
 		logger.Infof("Insert time: %v ns\n", insertTime)
-		t.insertHistoryToDB(true)
+		if t.LogBacktest {
+			t.insertHistoryToDB(true)
+		}
 		log.Println("Done with test.")
 		return
 	}()
@@ -323,7 +331,10 @@ func (t *Tantra) processFills() bool {
 	return false
 }
 
+var appendTime = 0
+
 func (t *Tantra) appendToHistory() {
+	appendStart := time.Now().UnixNano()
 	t.PreviousAccountState = *t.Account
 	t.AccountHistory = append(t.AccountHistory, *t.Account)
 	marketStates := make(map[string]models.MarketState)
@@ -333,6 +344,7 @@ func (t *Tantra) appendToHistory() {
 	t.MarketHistory = append(t.MarketHistory, marketStates)
 	t.TimestampHistory = append(t.TimestampHistory, utils.TimeToTimestamp(t.CurrentTime))
 	logger.Debugf("Appended to history [%v records]\n", len(t.AccountHistory))
+	appendTime += int(time.Now().UnixNano() - appendStart)
 }
 
 func (t *Tantra) insertHistoryToDB(isLast bool) {
@@ -359,6 +371,24 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	logger.Infof("Inserted history. [%v records]\n", len(accounts))
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
+	t.flushHistory()
+}
+
+func (t *Tantra) flushHistory() {
+	start := t.lastInsertIndex
+	end := len(t.TimestampHistory) - 1
+	if end <= start {
+		// Full flush
+		t.TimestampHistory = []int{}
+		t.AccountHistory = []models.Account{}
+		t.MarketHistory = []map[string]models.MarketState{}
+	} else {
+		t.TimestampHistory = t.TimestampHistory[start:end]
+		t.AccountHistory = t.AccountHistory[start:end]
+		t.MarketHistory = t.MarketHistory[start:end]
+	}
+	t.lastInsertIndex = 0
+	logger.Infof("Flushed history (last=%v)\n", end)
 }
 
 func (t *Tantra) publishOrderUpdates() {
@@ -597,6 +627,8 @@ func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...st
 	return contracts, err
 }
 
+var theoTime = 0
+
 func (t *Tantra) GetMarketPricesByCurrency(currency string) (priceMap map[string]float64, err error) {
 	priceMap = make(map[string]float64)
 	if t.theoEngine == nil {
@@ -607,10 +639,12 @@ func (t *Tantra) GetMarketPricesByCurrency(currency string) (priceMap map[string
 		logger.Errorf("Cannot get market prices for currency %v with account currency %v.\n", currency, t.Account.BaseAsset.Symbol)
 		return
 	}
+	theoStart := time.Now().UnixNano()
 	for _, option := range t.theoEngine.Options {
 		option.OptionTheo.CalcTheo(false)
 		priceMap[option.Symbol] = option.OptionTheo.Theo
 	}
+	theoTime += int(time.Now().UnixNano() - theoStart)
 	return
 }
 
@@ -686,22 +720,6 @@ func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	order.OrdStatus = "Open"
 	t.orders.Store(uuid, order)
 	t.ordersToPublish[order.OrderID] = order
-	state, ok := t.Account.MarketStates[order.Market]
-	if ok {
-		state.Orders.Store(order.OrderID, order)
-		orderMap, ok := t.ordersBySymbol[order.Market]
-		if !ok {
-			orderMap = make(map[string]iex.Order)
-			t.ordersBySymbol[order.Market] = orderMap
-			t.ordersBySymbol[order.Market][uuid] = order
-			orderMap[uuid] = order
-			logger.Debugf("Built order map by symbol for order: %v\n", order)
-		} else {
-			orderMap[uuid] = order
-		}
-	} else {
-		logger.Errorf("Got order %v for unknown market: %v (num markets=%v)\n", uuid, order.Market, len(t.Account.MarketStates))
-	}
 	return
 }
 
@@ -714,7 +732,6 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 	}
 	t.ordersToPublish[canceledOrder.OrderID] = canceledOrder
 	t.orders.Delete(cancel.Uuid)
-	delete(t.ordersBySymbol[cancel.Market], cancel.Uuid)
 	_, ok := t.Account.MarketStates[cancel.Market]
 	if ok {
 		t.Account.MarketStates[cancel.Market].Orders.Delete(cancel.Uuid)
