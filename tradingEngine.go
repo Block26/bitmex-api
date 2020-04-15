@@ -156,7 +156,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 
 	//TODO do we need this order status?
 	// t.orderStatus = algo.Client.GetPotentialOrderStatus()
-
 	if t.Algo.Account.ExchangeInfo.Options {
 		// Build theo engine
 		// Assume the first futures market we find is the underlying market
@@ -270,7 +269,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			for _, trade := range trades {
 				t.InsertNewCandle(trade)
 				marketState, _ := t.Algo.Account.MarketStates[trade.Symbol]
-				// t.updateBars(t.Algo, trade)
 				// now fetch the bars
 				// bars := database.GetData(trade.Symbol, t.Algo.Account.ExchangeInfo.Exchange, t.Algo.RebalanceInterval, t.Algo.DataLength+100)
 				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
@@ -291,7 +289,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				}
 			}
 			t.aggregateAccountProfit()
-			logger.Infof("[Trading Engine] trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
+			logger.Debugf("[Trading Engine] trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			channels.TradeBinChanComplete <- nil
 			if t.Algo.Timestamp.After(t.endTime) {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)

@@ -118,7 +118,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 		t.insertHistoryToDB(false)
 	}
 	go func() {
-		for index := 0; index < numIndexes; index++ {
+		for index := t.index; index < numIndexes; index++ {
 			startTime := time.Now().UnixNano()
 			tradeTime := 0
 			fillTime := 0
@@ -361,7 +361,7 @@ func (t *Tantra) appendToHistory() {
 func (t *Tantra) insertHistoryToDB(isLast bool) {
 	insertStart := time.Now().UnixNano()
 	start := t.lastInsertIndex
-	logger.Infof("Inserting acount history with start %v, len history %v\n", start, len(t.AccountHistory))
+	logger.Debugf("Inserting acount history with start %v, len history %v\n", start, len(t.AccountHistory))
 	var end int
 	if isLast {
 		end = len(t.AccountHistory)
