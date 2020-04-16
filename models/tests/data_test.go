@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tantralabs/database"
+	"github.com/tantralabs/yantra/database"
 	"github.com/tantralabs/yantra/models"
 )
 

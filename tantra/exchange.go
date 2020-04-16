@@ -14,9 +14,9 @@ import (
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi/global/clients"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/utils"
 	"github.com/tantralabs/yantra/database"
 	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/utils"
 )
 
 func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, end time.Time, dataLength int) *Tantra {
