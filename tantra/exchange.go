@@ -91,9 +91,9 @@ func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
 			candleData = append(candleData, bar)
 		}
 		t.candleData[symbol] = candleData
-		logger.Infof("Set %v candles for %v.\n", len(candleData), symbol)
+		logger.Debugf("Set %v candles for %v.\n", len(candleData), symbol)
 	}
-	logger.Infof("Set candle data for %v symbols.\n", len(t.candleData))
+	logger.Debugf("Set candle data for %v symbols.\n", len(t.candleData))
 }
 
 func (t *Tantra) StartWS(config interface{}) error {
@@ -150,7 +150,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Fill all orders with the newest candles
 			fillStart := time.Now().UnixNano()
 			filledSymbols := t.processFills()
-			logger.Infof("Got filled symbols: %v\n", filledSymbols)
+			logger.Debugf("Got filled symbols: %v\n", filledSymbols)
 			fillTime += int(time.Now().UnixNano() - fillStart)
 
 			// Send position and balance updates if we have any fills
@@ -192,7 +192,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
 				positionStart := time.Now().UnixNano()
 				if lastAverageCost != currentMarketState.AverageCost || lastPosition != currentMarketState.Position {
-					logger.Infof("Building position update [last=%v, current=%v]\n", lastPosition, currentMarketState.Position)
+					logger.Debugf("Building position update [last=%v, current=%v]\n", lastPosition, currentMarketState.Position)
 					pos := []iex.WsPosition{
 						iex.WsPosition{
 							Symbol:       symbol,
@@ -379,10 +379,10 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 		return
 	}
 	accounts := t.AccountHistory[start:end]
-	markets := t.MarketHistory[start:end]
-	database.InsertAccountHistory(t.db, accounts)
-	database.InsertMarketHistory(t.db, markets)
-	logger.Infof("Inserted history. [%v records]\n", len(accounts))
+	// markets := t.MarketHistory[start:end]
+	// database.InsertAccountHistory(t.db, accounts)
+	// database.InsertMarketHistory(t.db, markets)
+	logger.Debugf("Inserted history. [%v records]\n", len(accounts))
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
 	t.flushHistory()
@@ -400,7 +400,7 @@ func (t *Tantra) flushHistory() {
 		t.MarketHistory = t.MarketHistory[start:end]
 	}
 	t.lastInsertIndex = 0
-	logger.Infof("Flushed history (last=%v)\n", end)
+	logger.Debugf("Flushed history (last=%v)\n", end)
 }
 
 func (t *Tantra) publishOrderUpdates() {

@@ -72,7 +72,7 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	mockExchange.SetCurrentTime(start)
 	t.Algo.Client = mockExchange
 	t.Algo.Timestamp = start
-	t.endTime = end.AddDate(0, 0, -1)
+	t.endTime = end //.AddDate(0, 0, -1)
 	t.Connect("", false, rebalance, setupData, true)
 }
 
@@ -82,7 +82,11 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 		if !ok {
 			logger.Errorf("Cannot set bar data for market state %v.\n", symbol)
 		}
-		marketState.OHLCV = models.SetupDataModel(data, t.Algo.DataLength)
+		if t.isTest {
+			marketState.OHLCV = models.SetupDataModel(data, t.Algo.DataLength)
+		} else {
+			marketState.OHLCV = models.SetupDataModel(data, len(data))
+		}
 	}
 }
 
@@ -128,6 +132,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	} else {
 		t.isTest = false
 		database.Setup("remote")
+		logger.SetLogLevel(t.Algo.LogLevel)
 	}
 	if t.Algo.RebalanceInterval == "" {
 		log.Fatal("RebalanceInterval must be set")
@@ -149,6 +154,12 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			OutputResponse: false,
 		}
 		t.Algo.Client, err = tradeapi.New(exchangeVars)
+		//  Fetch prelim data from db to run live
+		barData := make(map[string][]*models.Bar)
+		for symbol, ms := range t.Algo.Account.MarketStates {
+			barData[symbol] = database.GetLatestMinuteData(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+3000)
+		}
+		t.SetAlgoCandleData(barData)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -205,14 +216,13 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	// SUBSCRIBE TO WEBSOCKETS
 	// channels to subscribe to (only futures and spot for now)
 	var subscribeInfos []iex.WSSubscribeInfo
-	for marketSymbol, marketState := range t.Algo.Account.MarketStates {
+	for symbol, marketState := range t.Algo.Account.MarketStates {
 		if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
-			symbol := strings.ToLower(marketSymbol)
 			//Ordering is important, get wallet and position first then market info
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_ORDER, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_POSITION, Symbol: symbol})
-			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol})
+			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol, Market: iex.WSMarketType{Contract: iex.WS_SWAP}})
 		}
 	}
 
@@ -240,9 +250,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		ApiKey:    config.APIKey,
 	})
 
-	logger.Infof("Started client order channel: %v\n", channels.OrderChan)
-	logger.Infof("Started client trade channel: %v\n", channels.TradeBinChan)
-
 	if err != nil {
 		msg := fmt.Sprintf("Error starting websockets: %v\n", err)
 		log.Fatal(msg)
@@ -269,8 +276,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			for _, trade := range trades {
 				t.InsertNewCandle(trade)
 				marketState, _ := t.Algo.Account.MarketStates[trade.Symbol]
-				// now fetch the bars
-				// bars := database.GetData(trade.Symbol, t.Algo.Account.ExchangeInfo.Exchange, t.Algo.RebalanceInterval, t.Algo.DataLength+100)
 				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
 				if t.Algo.DataLength < len(marketState.OHLCV.GetMinuteData().Timestamp) {
 					t.updateState(t.Algo, trade.Symbol, setupData)
@@ -284,14 +289,14 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				history = append(history, state)
 				if !t.isTest {
 					t.logLiveState(marketState)
-					t.runTest(t.Algo, setupData, rebalance)
+					// t.runTest(t.Algo, setupData, rebalance)
 					t.checkWalletHistory(t.Algo, settingsFileName)
 				}
 			}
 			t.aggregateAccountProfit()
 			logger.Debugf("[Trading Engine] trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			channels.TradeBinChanComplete <- nil
-			if t.Algo.Timestamp.After(t.endTime) {
+			if t.Algo.Timestamp.After(t.endTime) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, history, startTime)
 				return

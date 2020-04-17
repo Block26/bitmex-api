@@ -15,7 +15,7 @@ require (
 	github.com/joshdk/go-junit v0.0.0-20200312181801-e5d93c0f31a8 // indirect
 	github.com/lib/pq v1.3.0
 	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70
-	github.com/tantralabs/backtest-db v0.0.0-20200319235048-37ca050a52ce
+	github.com/tantralabs/backtest-db v0.0.0-20200319235048-37ca050a52ce // indirect
 	github.com/tantralabs/database v0.0.0-20200204183143-0da0f0e5aa3c
 	github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441
 	github.com/tantralabs/exchanges v0.0.0-20200204190209-ebc589b6dd8e

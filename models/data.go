@@ -37,7 +37,7 @@ func SetupDataModel(minuteBars []*Bar, initialIndex int) Data {
 
 	minuteBars = minuteBars[firstHourIndex : len(minuteBars)-1]
 	return Data{
-		index:      initialIndex,
+		index:      initialIndex - firstHourIndex,
 		minuteBars: minuteBars,
 		data:       make(map[int]OHLCV),
 	}
