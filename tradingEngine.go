@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
 	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
@@ -78,6 +77,7 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	t.Algo.Client = mockExchange
 	t.Algo.Timestamp = start
 	t.endTime = end.AddDate(0, 0, -1)
+	setupData(t.Algo)
 	t.Connect("", false, rebalance, setupData, true)
 }
 
@@ -519,7 +519,9 @@ func (t *TradingEngine) updateState(algo *models.Algo, symbol string, setupData 
 	algo.Timestamp = time.Unix(marketState.Bar.Timestamp/1000, 0).UTC()
 	marketState.LastPrice = marketState.Bar.Close
 
-	setupData(algo)
+	if !t.isTest {
+		setupData(algo)
+	}
 	// logger.Info("Algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if t.firstTrade {
 		logState(algo, marketState)

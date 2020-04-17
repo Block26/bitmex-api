@@ -107,7 +107,7 @@ func (d *Data) GetOHLCVData(resampleInterval int) (data OHLCV, index int) {
 }
 
 func (d *Data) FetchAllData(resampleInterval int) (data OHLCV) {
-	data = d.getOHLCV(resampleInterval)
+	data = d.getOHLCV(resampleInterval, true)
 	return
 }
 
