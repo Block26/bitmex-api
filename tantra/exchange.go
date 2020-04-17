@@ -36,8 +36,8 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		Account:               account,
 		orders:                make(map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
-		db:                    database.NewDB(),
-		LogBacktest:           true,
+		// db:                    database.NewDB(),
+		LogBacktest: true,
 	}
 }
 
@@ -213,17 +213,16 @@ func (t *Tantra) StartWS(config interface{}) error {
 			t.channels.TradeBinChan <- tradeUpdates
 			<-t.channels.TradeBinChanComplete
 			t.insertHistoryToDB(false)
-			logger.Debugf(`
-			[Exchange] trade time: %v ns\n
-			[Exchange] fill time: %v ns\n
-			[Exchange] position time: %v ns\n
-			[Exchange] balance time: %v ns\n
-			[Exchange] extra time: %v ns\n
-			[Exchange] timestep took %v ns\n
-			[Exchange] cumulative insert time: %v ns\n`, tradeTime, fillTime, positionTime, balanceTime, extraTime, time.Now().UnixNano()-startTime, insertTime)
+			logger.Debugf(`[Exchange] trade time: %v ns
+[Exchange] fill time: %v ns
+[Exchange] position time: %v ns
+[Exchange] balance time: %v ns
+[Exchange] extra time: %v ns
+[Exchange] timestep took %v ns
+[Exchange] cumulative insert time: %v ns`, tradeTime, fillTime, positionTime, balanceTime, extraTime, time.Now().UnixNano()-startTime, insertTime)
 		}
-		logger.Infof("Fill time: %v ns\n", fillTime)
-		logger.Infof("Insert time: %v ns\n", insertTime)
+		logger.Infof("Fill time: %v ns", fillTime)
+		logger.Infof("Insert time: %v ns", insertTime)
 		if t.LogBacktest {
 			t.insertHistoryToDB(true)
 		}
@@ -259,7 +258,7 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 		t.currentCandle[symbol] = candleData[index]
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
-		log.Println("[Exchange] advanced to", t.CurrentTime)
+		// log.Println("[Exchange] advanced to", t.CurrentTime)
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 	}
 }
@@ -356,7 +355,7 @@ func (t *Tantra) appendToHistory() {
 }
 
 func (t *Tantra) processTrade(trade models.Trade) {
-	t.TradeHistory = append(t.TradeHistory, trade)
+	// t.TradeHistory = append(t.TradeHistory, trade)
 	logger.Debugf("Processed trade: %v\n", trade)
 }
 
@@ -367,7 +366,7 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	var end int
 	if isLast {
 		// Insert trade history
-		database.InsertTradeHistory(t.db, t.TradeHistory)
+		// database.InsertTradeHistory(t.db, t.TradeHistory)
 		end = len(t.AccountHistory)
 	} else {
 		if len(t.AccountHistory)-start < InsertBatchSize {

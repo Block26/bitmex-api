@@ -9,7 +9,7 @@ import (
 )
 
 func OESOptimize(Evaluate func([]float64) float64, sigma []float64) {
-	var ga, err = eaopt.NewOES(1000, 10, sigma, 0.005, true, nil)
+	var ga, err = eaopt.NewOES(1000, 10, sigma, 0.005, false, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -26,7 +26,7 @@ func OESOptimize(Evaluate func([]float64) float64, sigma []float64) {
 }
 
 func DiffEvoOptimize(Evaluate func([]float64) float64, min, max []float64) {
-	var ga, err = eaopt.NewDiffEvo(400, 100, 0.5, 0.2, min, max, true, nil)
+	var ga, err = eaopt.NewDiffEvo(400, 100, 0.5, 0.2, min, max, false, nil)
 	if err != nil {
 		fmt.Println(err)
 		return

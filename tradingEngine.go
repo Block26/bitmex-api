@@ -55,6 +55,7 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int) TradingEngine
 }
 
 func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
+	t.isTest = true
 	logger.SetLogLevel(t.Algo.BacktestLogLevel)
 	exchangeVars := iex.ExchangeConf{
 		Exchange:       t.Algo.Account.ExchangeInfo.Exchange,
@@ -72,7 +73,7 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	mockExchange.SetCurrentTime(start)
 	t.Algo.Client = mockExchange
 	t.Algo.Timestamp = start
-	t.endTime = end //.AddDate(0, 0, -1)
+	t.endTime = end.AddDate(0, 0, -1)
 	t.Connect("", false, rebalance, setupData, true)
 }
 
@@ -83,9 +84,11 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 			logger.Errorf("Cannot set bar data for market state %v.\n", symbol)
 		}
 		if t.isTest {
-			marketState.OHLCV = models.SetupDataModel(data, t.Algo.DataLength)
+			d := models.SetupDataModel(data, t.Algo.DataLength)
+			marketState.OHLCV = &d
 		} else {
-			marketState.OHLCV = models.SetupDataModel(data, len(data))
+			d := models.SetupDataModel(data, len(data))
+			marketState.OHLCV = &d
 		}
 	}
 }
