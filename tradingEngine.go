@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
 	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
@@ -22,6 +23,8 @@ import (
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
 )
+
+var currentRunUUID time.Time
 
 type TradingEngine struct {
 	Algo                 *models.Algo
@@ -39,6 +42,7 @@ type TradingEngine struct {
 }
 
 func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int) TradingEngine {
+	currentRunUUID = time.Now()
 	//TODO: should theo engine and other vars be initialized here?
 	return TradingEngine{
 		Algo:                 algo,
@@ -302,6 +306,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			if t.Algo.Timestamp.After(t.endTime) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, history, startTime)
+				logBacktest(*t.Algo)
 				return
 			}
 		case newOrders := <-channels.OrderChan:
@@ -925,6 +930,46 @@ func getInfluxClient() client.Client {
 	}
 
 	return influx
+}
+
+func logBacktest(algo models.Algo) {
+	influxURL := os.Getenv("YANTRA_BACKTEST_DB_URL")
+	if influxURL == "" {
+		log.Fatalln("You need to set the `YANTRA_BACKTEST_DB_URL` env variable")
+	}
+
+	influxUser := os.Getenv("YANTRA_BACKTEST_DB_USER")
+	influxPassword := os.Getenv("YANTRA_BACKTEST_DB_PASSWORD")
+
+	influx, _ := client.NewHTTPClient(client.HTTPConfig{
+		Addr:     influxURL,
+		Username: influxUser,
+		Password: influxPassword,
+		Timeout:  (time.Millisecond * 1000 * 10),
+	})
+
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+		Database:  "backtests",
+		Precision: "us",
+	})
+
+	uuid := algo.Name + "-" + uuid.New().String()
+	tags := map[string]string{
+		"algo_name":   algo.Name,
+		"run_id":      currentRunUUID.String(),
+		"backtest_id": uuid,
+	}
+
+	pt, _ := client.NewPoint(
+		"result",
+		tags,
+		structs.Map(algo.Result),
+		time.Now(),
+	)
+	bp.AddPoint(pt)
+
+	client.Client.Write(influx, bp)
+	influx.Close()
 }
 
 // CreateSpread Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.

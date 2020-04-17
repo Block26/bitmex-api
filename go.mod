@@ -7,7 +7,7 @@ require (
 	github.com/chobie/go-gaussian v0.0.0-20150107165016-53c09d90eeaf
 	github.com/fatih/structs v1.1.0
 	github.com/gocarina/gocsv v0.0.0-20200324105150-9eab084b7a45
-	github.com/google/uuid v1.1.1 // indirect
+	github.com/google/uuid v1.1.1
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
