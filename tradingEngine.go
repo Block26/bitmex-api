@@ -306,7 +306,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			if t.Algo.Timestamp.After(t.endTime) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, history, startTime)
-				logBacktest(*t.Algo)
+				logBacktest(t.Algo)
 				return
 			}
 		case newOrders := <-channels.OrderChan:
@@ -934,7 +934,7 @@ func getInfluxClient() client.Client {
 	return influx
 }
 
-func logBacktest(algo models.Algo) {
+func logBacktest(algo *models.Algo) {
 	influxURL := os.Getenv("YANTRA_BACKTEST_DB_URL")
 	if influxURL == "" {
 		log.Fatalln("You need to set the `YANTRA_BACKTEST_DB_URL` env variable")
@@ -955,11 +955,10 @@ func logBacktest(algo models.Algo) {
 		Precision: "us",
 	})
 
-	uuid := algo.Name + "-" + uuid.New().String()
+	// uuid := algo.Name + "-" + uuid.New().String()
 	tags := map[string]string{
-		"algo_name":   algo.Name,
-		"run_id":      currentRunUUID.String(),
-		"backtest_id": uuid,
+		"algo_name": algo.Name,
+		"run_id":    currentRunUUID.String(),
 	}
 
 	pt, _ := client.NewPoint(
@@ -968,9 +967,11 @@ func logBacktest(algo models.Algo) {
 		structs.Map(algo.Result),
 		time.Now(),
 	)
+
 	bp.AddPoint(pt)
 
-	client.Client.Write(influx, bp)
+	err := client.Client.Write(influx, bp)
+	log.Println(algo.Name, err)
 	influx.Close()
 }
 
