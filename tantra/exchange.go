@@ -36,12 +36,12 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		Account:               account,
 		orders:                make(map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
-		// db:                    database.NewDB(),
-		LogBacktest: true,
+		db:                    database.NewDB(),
+		LogBacktest:           true,
 	}
 }
 
-const InsertBatchSize = 100
+const InsertBatchSize = 10000
 
 // Tantra represents a mock exchange client
 type Tantra struct {
@@ -112,7 +112,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 		numIndexes = len(candleData)
 		break
 	}
-	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes)
+	logger.Infof("Number of indexes found: %v (LogBacktest=%v)\n", numIndexes, t.LogBacktest)
 	if t.LogBacktest {
 		t.insertHistoryToDB(false)
 	}
@@ -258,7 +258,7 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 		t.currentCandle[symbol] = candleData[index]
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
-		// log.Println("[Exchange] advanced to", t.CurrentTime)
+		log.Println("[Exchange] advanced to", t.CurrentTime)
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 	}
 }
@@ -324,7 +324,9 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 		isFilled, fillPrice, fillAmount = t.getFill(order)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
-			t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
+			if t.LogBacktest {
+				t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
+			}
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			delete(t.orders, key)
@@ -355,7 +357,7 @@ func (t *Tantra) appendToHistory() {
 }
 
 func (t *Tantra) processTrade(trade models.Trade) {
-	// t.TradeHistory = append(t.TradeHistory, trade)
+	t.TradeHistory = append(t.TradeHistory, trade)
 	logger.Debugf("Processed trade: %v\n", trade)
 }
 
@@ -366,7 +368,8 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	var end int
 	if isLast {
 		// Insert trade history
-		// database.InsertTradeHistory(t.db, t.TradeHistory)
+		logger.Debugf("Inserting trade history [%v records].\n", len(t.TradeHistory))
+		database.InsertTradeHistory(t.db, t.TradeHistory)
 		end = len(t.AccountHistory)
 	} else {
 		if len(t.AccountHistory)-start < InsertBatchSize {
@@ -377,10 +380,14 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	if start == end {
 		return
 	}
+	log.Println("[Exchange] Inserting", end-start, "records...")
 	accounts := t.AccountHistory[start:end]
-	// markets := t.MarketHistory[start:end]
-	// database.InsertAccountHistory(t.db, accounts)
-	// database.InsertMarketHistory(t.db, markets)
+	markets := t.MarketHistory[start:end]
+	database.InsertAccountHistory(t.db, accounts)
+	database.InsertMarketHistory(t.db, markets)
+	logger.Debugf("Inserting trade history [%v records].\n", len(t.TradeHistory))
+	database.InsertTradeHistory(t.db, t.TradeHistory)
+	t.TradeHistory = []models.Trade{}
 	logger.Debugf("Inserted history. [%v records]\n", len(accounts))
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
