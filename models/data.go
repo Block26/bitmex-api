@@ -4,11 +4,14 @@ import (
 	"log"
 	"sort"
 	"time"
+
+	"github.com/tantralabs/tradeapi/iex"
 )
 
 type Data struct {
 	minuteBars     []*Bar
 	lastIndex      time.Time
+	index          int
 	data           map[int]OHLCV
 	lookbackLength int
 }
@@ -18,7 +21,7 @@ const (
 )
 
 // SetupDataModel is always passed minute level data
-func SetupDataModel(minuteBars []*Bar) Data {
+func SetupDataModel(minuteBars []*Bar, initialIndex int) Data {
 	// Sort the data where index 0 is the start and index -1 is the end
 	sort.Slice(minuteBars, func(i, j int) bool { return minuteBars[i].Timestamp < minuteBars[j].Timestamp })
 	// Remove from the start of the dataset and pin to the start of an hour
@@ -32,14 +35,37 @@ func SetupDataModel(minuteBars []*Bar) Data {
 		}
 	}
 
+	minuteBars = minuteBars[firstHourIndex : len(minuteBars)-1]
 	return Data{
-		minuteBars: minuteBars[firstHourIndex : len(minuteBars)-1],
+		index:      initialIndex - firstHourIndex,
+		minuteBars: minuteBars,
 		data:       make(map[int]OHLCV),
 	}
 }
 
 func (d *Data) GetBarData() []*Bar {
 	return d.minuteBars
+}
+
+func (d *Data) AddDataFromTradeBin(tradeBin iex.TradeBin) {
+	arr := make([]*Bar, 0)
+
+	bar := &Bar{
+		Timestamp:   tradeBin.Timestamp.Unix(),
+		Open:        tradeBin.Open,
+		High:        tradeBin.High,
+		Low:         tradeBin.Low,
+		Close:       tradeBin.Close,
+		Volume:      tradeBin.Volume,
+		QuoteVolume: tradeBin.Volume * tradeBin.Close,
+	}
+	arr = append(arr, bar)
+
+	d.AddData(arr)
+}
+
+func (d *Data) IncrementIndex() {
+	d.index += 1
 }
 
 func (d *Data) AddData(newBars []*Bar) {
@@ -64,6 +90,7 @@ func (d *Data) AddData(newBars []*Bar) {
 					Close:     newBars[y].Close,
 				})
 				d.lookbackLength += 1
+				d.IncrementIndex()
 			}
 		}
 	}
@@ -73,12 +100,23 @@ func (d *Data) AddData(newBars []*Bar) {
 	}
 }
 
-func (d *Data) GetMinuteData(resampleInterval ...int) OHLCV {
-	if resampleInterval != nil {
-		return d.getOHLCV(resampleInterval[0])
-	} else {
-		return d.getOHLCV(1)
-	}
+func (d *Data) GetOHLCVData(resampleInterval int) (data OHLCV, index int) {
+	data = d.getOHLCV(resampleInterval)
+	index = len(data.Timestamp) - 1
+	return
+}
+
+func (d *Data) FetchAllData(resampleInterval int) (data OHLCV) {
+	data = d.getOHLCV(resampleInterval, true)
+	return
+}
+
+func (d *Data) GetCurrentIndex(resampleInterval int) int {
+	return int(d.index / resampleInterval)
+}
+
+func (d *Data) GetMinuteData() OHLCV {
+	return d.getOHLCV(1)
 }
 
 func (d *Data) GetHourData() OHLCV {
@@ -90,11 +128,32 @@ func (d *Data) GetFiveMinuteData() OHLCV {
 }
 
 // getOHLCVBars Break down the bars into open, high, low, close arrays that are easier to manipulate.
-func (d *Data) getOHLCV(resampleInterval int) OHLCV {
+func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 	bars := d.minuteBars
-
+	resampledIndex := int(d.index / resampleInterval)
+	adjuster := 0
+	if resampleInterval == 1 {
+		adjuster = 1
+	}
 	if val, ok := d.data[resampleInterval]; ok {
-		return val
+		if len(all) > 0 && all[0] == true {
+			return OHLCV{
+				Timestamp: val.Timestamp,
+				Open:      val.Open,
+				High:      val.High,
+				Low:       val.Low,
+				Close:     val.Close,
+				Volume:    val.Volume,
+			}
+		}
+		return OHLCV{
+			Timestamp: val.Timestamp[:resampledIndex-adjuster],
+			Open:      val.Open[:resampledIndex-adjuster],
+			High:      val.High[:resampledIndex-adjuster],
+			Low:       val.Low[:resampledIndex-adjuster],
+			Close:     val.Close[:resampledIndex-adjuster],
+			Volume:    val.Volume[:resampledIndex-adjuster],
+		}
 	} else {
 		length := (len(bars) / resampleInterval) + 1
 		ohlcv := OHLCV{
@@ -111,8 +170,9 @@ func (d *Data) getOHLCV(resampleInterval int) OHLCV {
 			ohlcv.Open[i] = bars[oldIndex-resampleInterval].Open
 			ohlcv.Close[i] = bars[oldIndex-1].Close
 			ohlcv.Timestamp[i] = bars[oldIndex-1].Timestamp
+			low := ohlcv.Open[i]
 
-			var high, low, volume float64
+			var high, volume float64
 			for j := -resampleInterval; j < 0; j++ {
 				if high < bars[oldIndex+j].High {
 					high = bars[oldIndex+j].High
@@ -120,7 +180,6 @@ func (d *Data) getOHLCV(resampleInterval int) OHLCV {
 
 				if low > bars[oldIndex+j].Low {
 					low = bars[oldIndex+j].Low
-
 				}
 				volume += bars[oldIndex+j].Volume
 			}
@@ -132,7 +191,26 @@ func (d *Data) getOHLCV(resampleInterval int) OHLCV {
 		d.data[resampleInterval] = ohlcv
 	}
 
-	return d.data[resampleInterval]
+	if len(all) > 0 && all[0] == true {
+		return OHLCV{
+			Timestamp: d.data[resampleInterval].Timestamp,
+			Open:      d.data[resampleInterval].Open,
+			High:      d.data[resampleInterval].High,
+			Low:       d.data[resampleInterval].Low,
+			Close:     d.data[resampleInterval].Close,
+			Volume:    d.data[resampleInterval].Volume,
+		}
+	}
+
+	return OHLCV{
+		Timestamp: d.data[resampleInterval].Timestamp[:resampledIndex-adjuster],
+		Open:      d.data[resampleInterval].Open[:resampledIndex-adjuster],
+		High:      d.data[resampleInterval].High[:resampledIndex-adjuster],
+		Low:       d.data[resampleInterval].Low[:resampledIndex-adjuster],
+		Close:     d.data[resampleInterval].Close[:resampledIndex-adjuster],
+		Volume:    d.data[resampleInterval].Volume[:resampledIndex-adjuster],
+	}
+
 }
 
 func (d *Data) rebuildOHLCV(resampleInterval int) {

@@ -6,7 +6,6 @@ import (
 	"math"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -22,7 +21,6 @@ import (
 func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, end time.Time, dataLength int) *Tantra {
 	logger.Infof("Init new test with start %v and end %v\n", start, end)
 	tantra := New(vars, account)
-	tantra.warmUpPeriod = dataLength
 	tantra.index = dataLength
 	tantra.start = start
 	tantra.end = end
@@ -36,13 +34,14 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		client:                client,
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
+		orders:                make(map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
-		db:                    database.NewDB(),
-		LogBacktest:           true,
+		// db:                    database.NewDB(),
+		LogBacktest: true,
 	}
 }
 
-const InsertBatchSize = 10000
+const InsertBatchSize = 100
 
 // Tantra represents a mock exchange client
 type Tantra struct {
@@ -58,10 +57,9 @@ type Tantra struct {
 	TradeHistory          []models.Trade
 	PreviousMarketStates  map[string]models.MarketHistory
 	CurrentTime           time.Time
-	orders                sync.Map
+	orders                map[string]iex.Order
 	ordersToPublish       map[string]iex.Order
 	index                 int
-	warmUpPeriod          int
 	candleData            map[string][]iex.TradeBin
 	currentCandle         map[string]iex.TradeBin
 	sequenceNumber        int
@@ -93,9 +91,9 @@ func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
 			candleData = append(candleData, bar)
 		}
 		t.candleData[symbol] = candleData
-		logger.Infof("Set %v candles for %v.\n", len(candleData), symbol)
+		logger.Debugf("Set %v candles for %v.\n", len(candleData), symbol)
 	}
-	logger.Infof("Set candle data for %v symbols.\n", len(t.candleData))
+	logger.Debugf("Set candle data for %v symbols.\n", len(t.candleData))
 }
 
 func (t *Tantra) StartWS(config interface{}) error {
@@ -114,12 +112,12 @@ func (t *Tantra) StartWS(config interface{}) error {
 		numIndexes = len(candleData)
 		break
 	}
-	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes, t.warmUpPeriod)
+	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes)
 	if t.LogBacktest {
 		t.insertHistoryToDB(false)
 	}
 	go func() {
-		for index := 0; index < numIndexes-t.warmUpPeriod; index++ {
+		for index := t.index; index < numIndexes; index++ {
 			startTime := time.Now().UnixNano()
 			tradeTime := 0
 			fillTime := 0
@@ -152,7 +150,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// Fill all orders with the newest candles
 			fillStart := time.Now().UnixNano()
 			filledSymbols := t.processFills()
-			logger.Infof("Got filled symbols: %v\n", filledSymbols)
+			logger.Debugf("Got filled symbols: %v\n", filledSymbols)
 			fillTime += int(time.Now().UnixNano() - fillStart)
 
 			// Send position and balance updates if we have any fills
@@ -194,7 +192,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
 				positionStart := time.Now().UnixNano()
 				if lastAverageCost != currentMarketState.AverageCost || lastPosition != currentMarketState.Position {
-					logger.Infof("Building position update [last=%v, current=%v]\n", lastPosition, currentMarketState.Position)
+					logger.Debugf("Building position update [last=%v, current=%v]\n", lastPosition, currentMarketState.Position)
 					pos := []iex.WsPosition{
 						iex.WsPosition{
 							Symbol:       symbol,
@@ -214,21 +212,17 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
 			<-t.channels.TradeBinChanComplete
-			if t.LogBacktest {
-				t.insertHistoryToDB(false)
-			}
-			logger.Infof("[Exchange] trade time: %v ns\n", tradeTime)
-			logger.Infof("[Exchange] fill time: %v ns\n", fillTime)
-			logger.Infof("[Exchange] position time: %v ns\n", positionTime)
-			logger.Infof("[Exchange] balance time: %v ns\n", balanceTime)
-			logger.Infof("[Exchange] extra time: %v ns\n", extraTime)
-			logger.Infof("[Exchange] timestep took %v ns\n", time.Now().UnixNano()-startTime)
-			logger.Infof("[Exchange] cumulative insert time: %v ns\n", insertTime)
-			logger.Infof("[Exchange] cumulative append time: %v ns\n", appendTime)
-			logger.Infof("[Exchange] cumulative theo time: %v ns [%v options]\n", theoTime, len(t.theoEngine.Options))
+			t.insertHistoryToDB(false)
+			logger.Debugf(`[Exchange] trade time: %v ns
+[Exchange] fill time: %v ns
+[Exchange] position time: %v ns
+[Exchange] balance time: %v ns
+[Exchange] extra time: %v ns
+[Exchange] timestep took %v ns
+[Exchange] cumulative insert time: %v ns`, tradeTime, fillTime, positionTime, balanceTime, extraTime, time.Now().UnixNano()-startTime, insertTime)
 		}
-		logger.Infof("Fill time: %v ns\n", fillTime)
-		logger.Infof("Insert time: %v ns\n", insertTime)
+		logger.Infof("Fill time: %v ns", fillTime)
+		logger.Infof("Insert time: %v ns", insertTime)
 		if t.LogBacktest {
 			t.insertHistoryToDB(true)
 		}
@@ -260,11 +254,11 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 		return
 	}
 	//TODO update marketState.Bar here?
-	if len(candleData) >= index+t.warmUpPeriod {
-		t.currentCandle[symbol] = candleData[index+t.warmUpPeriod]
+	if len(candleData) >= index {
+		t.currentCandle[symbol] = candleData[index]
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
-		log.Println("[Exchange] advanced to", t.CurrentTime)
+		// log.Println("[Exchange] advanced to", t.CurrentTime)
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 	}
 }
@@ -290,14 +284,24 @@ func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount 
 		}
 	}
 	// If a future/spot order, check if our current candle fills the high (ask) or low (bid) for the order
-	if order.Side == "buy" && lastCandle.Low <= order.Rate {
+	if order.Type == "market" {
 		isFilled = true
-		fillPrice = lastCandle.Low
-		fillAmount = order.Amount
-	} else if order.Side == "sell" && lastCandle.High >= order.Rate {
-		isFilled = true
-		fillPrice = lastCandle.High
-		fillAmount = -order.Amount
+		fillPrice = lastCandle.Close // TODO implement multiple market order fill types
+		if order.Side == "buy" {
+			fillAmount = order.Amount
+		} else if order.Side == "sell" {
+			fillAmount = -order.Amount
+		}
+	} else {
+		if order.Side == "buy" && lastCandle.Low <= order.Rate {
+			isFilled = true
+			fillPrice = order.Rate
+			fillAmount = order.Amount
+		} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+			isFilled = true
+			fillPrice = order.Rate
+			fillAmount = -order.Amount
+		}
 	}
 	return
 }
@@ -311,13 +315,11 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 	filledSymbols = make(map[string]bool)
 	var isFilled bool
 	var fillAmount, fillPrice float64
-	t.orders.Range(func(key, value interface{}) bool {
-		order := value.(iex.Order)
+	for key, order := range t.orders {
 		logger.Debugf("Found open order: %v\n", order)
 		marketState, ok := t.Account.MarketStates[order.Market]
 		if !ok {
 			logger.Errorf("Could not find market state for %v\n", order.Market)
-			return true
 		}
 		isFilled, fillPrice, fillAmount = t.getFill(order)
 		if isFilled {
@@ -325,12 +327,11 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 			t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
-			t.orders.Delete(key)
+			delete(t.orders, key)
 			logger.Debugf("Deleted order with key: %v\n", key)
 		}
 		filledSymbols[order.Market] = true
-		return true
-	})
+	}
 	if len(t.ordersToPublish) > 0 {
 		t.publishOrderUpdates()
 	}
@@ -354,18 +355,18 @@ func (t *Tantra) appendToHistory() {
 }
 
 func (t *Tantra) processTrade(trade models.Trade) {
-	t.TradeHistory = append(t.TradeHistory, trade)
+	// t.TradeHistory = append(t.TradeHistory, trade)
 	logger.Debugf("Processed trade: %v\n", trade)
 }
 
 func (t *Tantra) insertHistoryToDB(isLast bool) {
 	insertStart := time.Now().UnixNano()
 	start := t.lastInsertIndex
-	logger.Infof("Inserting account history with start %v, len history %v\n", start, len(t.AccountHistory))
+	logger.Debugf("Inserting acount history with start %v, len history %v\n", start, len(t.AccountHistory))
 	var end int
 	if isLast {
 		// Insert trade history
-		database.InsertTradeHistory(t.db, t.TradeHistory)
+		// database.InsertTradeHistory(t.db, t.TradeHistory)
 		end = len(t.AccountHistory)
 	} else {
 		if len(t.AccountHistory)-start < InsertBatchSize {
@@ -377,10 +378,10 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 		return
 	}
 	accounts := t.AccountHistory[start:end]
-	markets := t.MarketHistory[start:end]
-	database.InsertAccountHistory(t.db, accounts)
-	database.InsertMarketHistory(t.db, markets)
-	logger.Infof("Inserted history. [%v records]\n", len(accounts))
+	// markets := t.MarketHistory[start:end]
+	// database.InsertAccountHistory(t.db, accounts)
+	// database.InsertMarketHistory(t.db, markets)
+	logger.Debugf("Inserted history. [%v records]\n", len(accounts))
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
 	t.flushHistory()
@@ -398,7 +399,7 @@ func (t *Tantra) flushHistory() {
 		t.MarketHistory = t.MarketHistory[start:end]
 	}
 	t.lastInsertIndex = 0
-	logger.Infof("Flushed history (last=%v)\n", end)
+	logger.Debugf("Flushed history (last=%v)\n", end)
 }
 
 func (t *Tantra) publishOrderUpdates() {
@@ -728,7 +729,7 @@ func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	t.sequenceNumber += 1
 	order.OrderID = uuid
 	order.OrdStatus = "Open"
-	t.orders.Store(uuid, order)
+	t.orders[uuid] = order
 	t.ordersToPublish[order.OrderID] = order
 	return
 }
@@ -741,7 +742,7 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 		OrdStatus: t.GetPotentialOrderStatus().Cancelled,
 	}
 	t.ordersToPublish[canceledOrder.OrderID] = canceledOrder
-	t.orders.Delete(cancel.Uuid)
+	delete(t.orders, cancel.Uuid)
 	_, ok := t.Account.MarketStates[cancel.Market]
 	if ok {
 		t.Account.MarketStates[cancel.Market].Orders.Delete(cancel.Uuid)
@@ -848,12 +849,9 @@ func (t *Tantra) Withdraw(address, currency string, quantity float64, additionIn
 func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err error) {
 	// TODO this should return currently open orders
 	oo := make([]iex.Order, 0)
-	var order iex.Order
-	t.orders.Range(func(key, value interface{}) bool {
-		order = value.(iex.Order)
+	for _, order := range t.orders {
 		oo = append(oo, order)
-		return true
-	})
+	}
 	return oo, nil
 }
 

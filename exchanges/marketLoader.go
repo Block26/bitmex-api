@@ -108,7 +108,7 @@ func LoadExchangeInfo(exchange string) (exchangeInfo models.ExchangeInfo, err er
 			BulkCancelSupported:     false,
 			DenominatedInUnderlying: true,
 			Futures:                 true,
-			Options:                 true,
+			Options:                 false,
 			Symbols:                 symbols,
 		}, nil
 	} else if exchange == DeribitTestNet {

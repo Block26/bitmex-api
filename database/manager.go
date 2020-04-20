@@ -4,8 +4,9 @@ import (
 	"log"
 	"sort"
 
-	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/logger"
 	"github.com/tantralabs/tradeapi/iex"
+	"github.com/tantralabs/yantra/models"
 )
 
 var barData []*models.Bar
@@ -63,6 +64,15 @@ func UpdateBars(ex iex.IExchange, symbol string, bin string, count int) []*model
 	}
 
 	sort.Slice(barData, func(i, j int) bool { return barData[i].Timestamp < barData[j].Timestamp })
+	return barData
+}
+
+func GetLatestMinuteData(ex iex.IExchange, symbol string, exchange string, dataLength int) []*models.Bar {
+	logger.Info("Fetching", dataLength, "1m Data for symbol:", symbol, "exchange:", exchange, "from our db")
+	barData = GetCandles(symbol, exchange, "1m", dataLength)
+	logger.Info("Fetching", 240, "1m Data for symbol:", symbol, "exchange:", exchange, "from the exchange")
+	exchangeBars := UpdateBars(ex, symbol, "1m", 240) // 4hour buffer
+	UpdateLocalBars(&barData, exchangeBars)
 	return barData
 }
 

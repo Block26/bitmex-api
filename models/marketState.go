@@ -37,7 +37,7 @@ type MarketState struct {
 	BestBid          float64
 	BestAsk          float64
 	Bar              Bar   // The last bar of data for this market
-	OHLCV            OHLCV // Open, High, Low, Close, Volume Data
+	OHLCV            *Data // Open, High, Low, Close, Volume Data
 	Status           MarketStatus
 
 	// Only for options
@@ -63,6 +63,15 @@ type MarketState struct {
 	DeleverageOrderSize float64 // The speed at which the algo exits positions during the RebalanceInterval if it is over leveraged, current leverage is determined by Algo.LeverageTarget or Market.MaxLeverage.
 	ShouldHaveQuantity  float64 // Keeps track of the order sizing when live.
 	MaxLeverage         float64
+}
+
+func (ms *MarketState) GetCurrentWeight() int {
+	if ms.Position > 0 {
+		return 1
+	} else if ms.Position < 0 {
+		return -1
+	}
+	return 0
 }
 
 func NewMarketState(marketInfo MarketInfo, balance float64) MarketState {
