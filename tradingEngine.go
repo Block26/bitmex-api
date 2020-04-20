@@ -76,7 +76,8 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	mockExchange.SetCurrentTime(start)
 	t.Algo.Client = mockExchange
 	t.Algo.Timestamp = start
-	t.endTime = end.AddDate(0, 0, -1)
+	// t.endTime = end.AddDate(0, 0, -1)
+	t.endTime = end
 	setupData(t.Algo)
 	t.Connect("", false, rebalance, setupData, true)
 }
@@ -102,6 +103,9 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 	if !ok {
 		logger.Errorf("Cannot insert new candle for symbol %v (candle=%v)\n", candle.Symbol, candle)
 		return
+	}
+	if candle.Timestamp.After(t.Algo.Timestamp) {
+		t.Algo.Timestamp = candle.Timestamp
 	}
 	// instead of inserting a new bar in the data all the time in a test
 	// just increment the index
@@ -303,7 +307,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			t.aggregateAccountProfit()
 			logger.Debugf("[Trading Engine] trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			channels.TradeBinChanComplete <- nil
-			if t.Algo.Timestamp.After(t.endTime) && t.isTest {
+			if !t.Algo.Timestamp.Before(t.endTime) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, history, startTime)
 				logBacktest(t.Algo)
@@ -516,7 +520,7 @@ func (t *TradingEngine) updateState(algo *models.Algo, symbol string, setupData 
 		Close:     minuteData.Close[lastCandleIndex],
 		Volume:    minuteData.Volume[lastCandleIndex],
 	}
-	algo.Timestamp = time.Unix(marketState.Bar.Timestamp/1000, 0).UTC()
+	// algo.Timestamp = time.Unix(marketState.Bar.Timestamp/1000, 0).UTC()
 	marketState.LastPrice = marketState.Bar.Close
 
 	if !t.isTest {
