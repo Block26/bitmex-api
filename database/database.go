@@ -18,7 +18,7 @@ import (
 
 var (
 	host     = "localhost"
-	port     = 5433
+	port     = 5432
 	user     = "yantrauser"
 	password = "password"
 	dbname   = "tantra"
@@ -132,6 +132,11 @@ func SetupMarketSnapshotTable(db *sqlx.DB) {
 		average_cost double precision,
 		unrealized_profit double precision,
 		realized_profit double precision,
+		open double precision,
+		high double precision,
+		low double precision,
+		close double precision,
+		volume double precision,
 		strike double precision,
 		type text,
 		expiry bigint,
@@ -399,9 +404,10 @@ func getOptionInsertString(market models.MarketHistory) (insertString string) {
 
 func getFutureInsertString(market models.MarketHistory) (insertString string) {
 	insertString = fmt.Sprintf(`
-	(%v, %v, %v, %v, %v, %v, %v)`,
+	(%v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v, %v)`,
 		QuoteI(market.Timestamp), Quote(market.Symbol), QuoteF(market.Balance), QuoteF(market.AverageCost),
-		QuoteF(market.UnrealizedProfit), QuoteF(market.RealizedProfit), QuoteF(market.Position))
+		QuoteF(market.UnrealizedProfit), QuoteF(market.RealizedProfit), QuoteF(market.Position),
+		QuoteF(market.Open), QuoteF(market.High), QuoteF(market.Low), QuoteF(market.Close), QuoteF(market.Volume))
 	return
 }
 
@@ -451,7 +457,7 @@ func InsertMarketHistory(db *sqlx.DB, markets []map[string]models.MarketHistory)
 		}
 	}
 	query = fmt.Sprintf(`
-		insert into market_state_snapshots(timestamp, symbol, balance, average_cost, unrealized_profit, realized_profit, position)
+		insert into market_state_snapshots(timestamp, symbol, balance, average_cost, unrealized_profit, realized_profit, position, open, high, low, close, volume)
 		values %v;`, strings.Join(insertStrings, ","))
 	_, err = db.Exec(query)
 	if err != nil {
