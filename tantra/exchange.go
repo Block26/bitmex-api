@@ -267,7 +267,7 @@ func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount 
 	lastCandle, ok := t.currentCandle[order.Market]
 	if !ok {
 		// This is probably an option order, for now simply check if market order
-		if order.Rate == 0 {
+		if if order.Type == "market" || order.Rate == 0  {
 			option := t.Account.MarketStates[order.Market]
 			if option.Info.MarketType == models.Option {
 				isFilled = true
@@ -284,7 +284,8 @@ func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount 
 		}
 	}
 	// If a future/spot order, check if our current candle fills the high (ask) or low (bid) for the order
-	if order.Type == "market" {
+	// Price (rate) of zero signifies market order for now
+	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
 		fillPrice = lastCandle.Close // TODO implement multiple market order fill types
 		if order.Side == "buy" {
@@ -322,6 +323,7 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 			logger.Errorf("Could not find market state for %v\n", order.Market)
 		}
 		isFilled, fillPrice, fillAmount = t.getFill(order)
+		logger.Debugf("Filled: %v\n", isFilled)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
 			if t.LogBacktest {
@@ -662,7 +664,9 @@ func (t *Tantra) GetMarketPricesByCurrency(currency string) (priceMap map[string
 		option.OptionTheo.CalcTheo(false)
 		priceMap[option.Symbol] = option.OptionTheo.Theo
 	}
-	theoTime += int(time.Now().UnixNano() - theoStart)
+	theoDuration := int(time.Now().UnixNano() - theoStart)
+	logger.Infof("Theo duration: %v\n", theoDuration)
+	theoTime += theoDuration
 	return
 }
 
