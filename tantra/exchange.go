@@ -267,7 +267,7 @@ func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount 
 	lastCandle, ok := t.currentCandle[order.Market]
 	if !ok {
 		// This is probably an option order, for now simply check if market order
-		if if order.Type == "market" || order.Rate == 0  {
+		if order.Type == "market" || order.Rate == 0 {
 			option := t.Account.MarketStates[order.Market]
 			if option.Info.MarketType == models.Option {
 				isFilled = true

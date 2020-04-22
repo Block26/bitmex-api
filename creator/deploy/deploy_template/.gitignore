@@ -1,0 +1,4 @@
+tests/
+tmp/
+ca-certificates.crt
+main

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -440,4 +441,23 @@ func StringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func Copy(fromFile string, toFile string) {
+	from, err := os.Open(fromFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer from.Close()
+
+	to, err := os.OpenFile(toFile, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer to.Close()
+
+	_, err = io.Copy(to, from)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

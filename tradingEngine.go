@@ -190,7 +190,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			}
 		}
 		if underlyingMarket == nil {
-			log.Fatal("Could not find underlying market for options exchange %v\n", t.Algo.Account.ExchangeInfo.Exchange)
+			log.Fatalln("Could not find underlying market for options exchange", t.Algo.Account.ExchangeInfo.Exchange)
 		}
 		t.Algo.Account.MarketStates[underlyingMarket.Symbol] = underlyingMarket
 		logger.Infof("Initialized underlying market: %v\n", underlyingMarket.Symbol)

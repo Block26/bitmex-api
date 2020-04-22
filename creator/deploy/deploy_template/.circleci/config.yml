@@ -1,0 +1,57 @@
+version: 2.1
+orbs:
+  aws-ecr: circleci/aws-ecr@6.2.0
+  aws-ecs: circleci/aws-ecs@0.0.10
+
+jobs:
+  build:
+    docker: 
+      - image: golang:1.13-alpine
+    working_directory: /tmp/project
+    steps:
+      - run: apk add --no-cache git mercurial openssh gcc build-base
+      - checkout
+      - run: printf "[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig
+      - run: go mod download
+      - run: go run .
+      - store_test_results:
+          path: /tmp/project/tests
+      - persist_to_workspace:
+          root: /tmp/project
+          paths: 
+            - ca-certificates.crt
+            - main
+            - config.json
+            - Dockerfile
+
+workflows:
+  build_test_deploy:
+    jobs: 
+      - build:
+          context: AWS-ECS
+      - aws-ecr/build-and-push-image:
+          context: AWS-ECS
+          pre-steps:
+            - attach_workspace:
+                at: ~/project/build
+          requires:
+            - build
+          checkout: false
+          create-repo: true
+          account-url: AWS_ECR_ACCOUNT_URL
+          dockerfile: ~/project/build/Dockerfile
+          path: ~/project/build
+          profile-name: b26
+          repo: ALGO
+          tag: '${CIRCLE_SHA1}'
+      - aws-ecs/deploy-service-update:
+          context: AWS-ECS
+          requires:
+            - aws-ecr/build-and-push-image
+          family: "ALGO-service"
+          cluster-name: "AWS_CLUSTER_NAME"
+          container-image-name-updates: "container=ALGO-Latest,tag=${CIRCLE_SHA1}"
+          verify-revision-is-deployed: true
+
+
+

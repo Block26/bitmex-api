@@ -1,0 +1,9 @@
+{
+    "AWS_SUBNET": "subnet-8ff7cfd4", 
+    "AWS_SECURITY_GROUP": "sg-0544e8b01950cc5ab", 
+    "AWS_ACCOUNT_ID": "911053277385", 
+    "AWS_CLUSTER_NAME": "MM-cluster", 
+    "AWS_REGION_NAME": "us-west-1", 
+    "BRANCH_NAME": "master", 
+    "INSTALL_LOCATION": "/Users/russell/git/go/src/github.com/tantralabs"
+}
