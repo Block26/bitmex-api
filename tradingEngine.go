@@ -657,7 +657,13 @@ func (t *TradingEngine) logTrade(trade iex.Order) {
 		Precision: "us",
 	})
 
-	tags := map[string]string{"algo_name": t.Algo.Name, "commit_hash": t.commitHash, "state_type": stateType, "side": strings.ToLower(trade.Side)}
+	tags := map[string]string{
+		"algo_name":   t.Algo.Name,
+		"symbol":      t.Algo.Account.MarketStates[t.Algo.Name].Symbol,
+		"commit_hash": t.commitHash,
+		"state_type":  stateType,
+		"side":        strings.ToLower(trade.Side),
+	}
 
 	fields := structs.Map(trade)
 	pt, err := client.NewPoint(
@@ -684,7 +690,12 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 		Precision: "us",
 	})
 
-	tags := map[string]string{"algo_name": t.Algo.Name, "commit_hash": t.commitHash, "state_type": stateType, "side": strings.ToLower(trade.Side)}
+	tags := map[string]string{
+		"algo_name":   t.Algo.Name,
+		"symbol":      t.Algo.Account.MarketStates[t.Algo.Name].Symbol,
+		"commit_hash": t.commitHash,
+		"state_type":  stateType, "side": strings.ToLower(trade.Side),
+	}
 
 	fields := structs.Map(trade)
 	pt, err := client.NewPoint(
@@ -716,7 +727,12 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 		Precision: "us",
 	})
 
-	tags := map[string]string{"algo_name": t.Algo.Name, "commit_hash": t.commitHash, "state_type": stateType}
+	tags := map[string]string{
+		"algo_name":   t.Algo.Name,
+		"symbol":      t.Algo.Account.MarketStates[t.Algo.Name].Symbol,
+		"commit_hash": t.commitHash,
+		"state_type":  stateType,
+	}
 
 	fields := structs.Map(marketState)
 
@@ -959,6 +975,7 @@ func logBacktest(algo *models.Algo) {
 	tags := map[string]string{
 		"algo_name": algo.Name,
 		"run_id":    currentRunUUID.String(),
+		"symbol":    algo.Account.MarketStates[algo.Name].Symbol,
 	}
 
 	pt, _ := client.NewPoint(
