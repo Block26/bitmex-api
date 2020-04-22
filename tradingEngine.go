@@ -186,7 +186,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			}
 		}
 		if underlyingMarket == nil {
-			log.Fatal("Could not find underlying market for options exchange %v\n", t.Algo.Account.ExchangeInfo.Exchange)
+			log.Fatal("Could not find underlying market for options exchange\n", t.Algo.Account.ExchangeInfo.Exchange)
 		}
 		t.Algo.Account.MarketStates[underlyingMarket.Symbol] = underlyingMarket
 		logger.Infof("Initialized underlying market: %v\n", underlyingMarket.Symbol)
@@ -659,7 +659,7 @@ func (t *TradingEngine) logTrade(trade iex.Order) {
 
 	tags := map[string]string{
 		"algo_name":   t.Algo.Name,
-		"symbol":      t.Algo.Account.MarketStates[t.Algo.Name].Symbol,
+		"symbol":      trade.Symbol,
 		"commit_hash": t.commitHash,
 		"state_type":  stateType,
 		"side":        strings.ToLower(trade.Side),
@@ -692,7 +692,7 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 
 	tags := map[string]string{
 		"algo_name":   t.Algo.Name,
-		"symbol":      t.Algo.Account.MarketStates[t.Algo.Name].Symbol,
+		"symbol":      trade.Symbol,
 		"commit_hash": t.commitHash,
 		"state_type":  stateType, "side": strings.ToLower(trade.Side),
 	}
@@ -727,51 +727,50 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 		Precision: "us",
 	})
 
-	tags := map[string]string{
-		"algo_name":   t.Algo.Name,
-		"symbol":      t.Algo.Account.MarketStates[t.Algo.Name].Symbol,
-		"commit_hash": t.commitHash,
-		"state_type":  stateType,
-	}
+	for symbol, ms := range t.Algo.Account.MarketStates {
+		tags := map[string]string{
+			"algo_name":   t.Algo.Name,
+			"symbol":      symbol,
+			"commit_hash": t.commitHash,
+			"state_type":  stateType,
+		}
+		fields := structs.Map(ms)
 
-	fields := structs.Map(marketState)
+		//TODO: shouldn't have to manually delete Options param here
+		_, ok := fields["Options"]
+		if ok {
+			delete(fields, "Options")
+		}
 
-	//TODO: shouldn't have to manually delete Options param here
-	_, ok := fields["Options"]
-	if ok {
-		delete(fields, "Options")
-	}
+		fields["Price"] = ms.Bar.Close
+		fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
+		fields["Quantity"] = ms.Position
 
-	fields["Price"] = marketState.Bar.Close
-	fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
-	fields["Quantity"] = marketState.Position
+		pt, _ := client.NewPoint(
+			"market",
+			tags,
+			fields,
+			time.Now(),
+		)
+		bp.AddPoint(pt)
 
-	pt, err := client.NewPoint(
-		"market",
-		tags,
-		fields,
-		time.Now(),
-	)
-	bp.AddPoint(pt)
+		params := t.Algo.Params.GetAllParams()
+		pt, _ = client.NewPoint(
+			"params",
+			tags,
+			params,
+			time.Now(),
+		)
+		bp.AddPoint(pt)
 
-	params := t.Algo.Params.GetAllParams()
-	pt, err = client.NewPoint(
-		"params",
-		tags,
-		params,
-		time.Now(),
-	)
-	bp.AddPoint(pt)
-
-	// LOG Options
-	for symbol, option := range t.Algo.Account.MarketStates {
-		if option.Info.MarketType == models.Option && option.Position != 0 {
+		// LOG Options
+		if ms.Info.MarketType == models.Option && ms.Position != 0 {
 			tmpTags := tags
 			tmpTags["symbol"] = symbol
-			o := structs.Map(option.OptionTheo)
+			o := structs.Map(ms.OptionTheo)
 			// Influxdb seems to interpret pointers as strings, need to dereference here
-			o["CurrentTime"] = utils.TimeToTimestamp(*option.OptionTheo.CurrentTime)
-			o["UnderlyingPrice"] = *option.OptionTheo.UnderlyingPrice
+			o["CurrentTime"] = utils.TimeToTimestamp(*ms.OptionTheo.CurrentTime)
+			o["UnderlyingPrice"] = *ms.OptionTheo.UnderlyingPrice
 			pt1, _ := client.NewPoint(
 				"optionTheo",
 				tmpTags,
@@ -780,10 +779,10 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 			)
 			bp.AddPoint(pt1)
 
-			o = structs.Map(option)
+			o = structs.Map(ms)
 			// Influxdb seems to interpret pointers as strings, need to dereference here
-			o["CurrentTime"] = (*option.OptionTheo.CurrentTime).String()
-			o["UnderlyingPrice"] = *option.OptionTheo.UnderlyingPrice
+			o["CurrentTime"] = (*ms.OptionTheo.CurrentTime).String()
+			o["UnderlyingPrice"] = *ms.OptionTheo.UnderlyingPrice
 			delete(o, "OptionTheo")
 			pt2, _ := client.NewPoint(
 				"options",
@@ -793,38 +792,41 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 			)
 			bp.AddPoint(pt2)
 		}
-	}
 
-	// LOG orders placed
-	marketState.Orders.Range(func(key, value interface{}) bool {
-		order := value.(iex.Order)
-		fields = map[string]interface{}{
-			fmt.Sprintf("%0.2f", order.Rate): order.Amount,
+		// LOG orders placed
+		ms.Orders.Range(func(key, value interface{}) bool {
+			order := value.(iex.Order)
+			if order.Symbol != symbol {
+				return false
+			}
+			fields = map[string]interface{}{
+				fmt.Sprintf("%0.2f", order.Rate): order.Amount,
+			}
+
+			pt, _ = client.NewPoint(
+				"order",
+				tags,
+				fields,
+				time.Now(),
+			)
+			bp.AddPoint(pt)
+			return true
+		})
+
+		if t.Algo.State != nil {
+			pt, err := client.NewPoint(
+				"state",
+				tags,
+				t.Algo.State,
+				time.Now(),
+			)
+			if err != nil {
+				log.Fatal(err)
+			}
+			bp.AddPoint(pt)
 		}
-
-		pt, err = client.NewPoint(
-			"order",
-			tags,
-			fields,
-			time.Now(),
-		)
-		bp.AddPoint(pt)
-		return true
-	})
-
-	if t.Algo.State != nil {
-		pt, err := client.NewPoint(
-			"state",
-			tags,
-			t.Algo.State,
-			time.Now(),
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-		bp.AddPoint(pt)
 	}
-	err = client.Client.Write(influx, bp)
+	err := client.Client.Write(influx, bp)
 	if err != nil {
 		fmt.Println("err", err)
 	}
@@ -971,21 +973,22 @@ func logBacktest(algo *models.Algo) {
 		Precision: "us",
 	})
 
-	// uuid := algo.Name + "-" + uuid.New().String()
-	tags := map[string]string{
-		"algo_name": algo.Name,
-		"run_id":    currentRunUUID.String(),
-		"symbol":    algo.Account.MarketStates[algo.Name].Symbol,
+	for symbol, _ := range algo.Account.MarketStates {
+		// uuid := algo.Name + "-" + uuid.New().String()
+		tags := map[string]string{
+			"algo_name": algo.Name,
+			"run_id":    currentRunUUID.String(),
+			"symbol":    symbol,
+		}
+
+		pt, _ := client.NewPoint(
+			"result",
+			tags,
+			structs.Map(algo.Result),
+			time.Now(),
+		)
+		bp.AddPoint(pt)
 	}
-
-	pt, _ := client.NewPoint(
-		"result",
-		tags,
-		structs.Map(algo.Result),
-		time.Now(),
-	)
-
-	bp.AddPoint(pt)
 
 	err := client.Client.Write(influx, bp)
 	log.Println(algo.Name, err)
