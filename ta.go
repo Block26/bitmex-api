@@ -20,8 +20,8 @@ func GetATR(high []float64, low []float64, close []float64, inTimePeriod int) []
 }
 
 // GetNATR Get the Normalized Average True Range for an index and data length
-func GetNATRVariableLength(high []float64, low []float64, close []float64, index int, length int, natrLength int) []float64 {
-	return talib.Natr(high[index-length-1:index+1], low[index-length-1:index+1], close[index-length-1:index+1], natrLength)
+func GetNATRVariableLength(ohlcv models.OHLCV, index int, datalength int, natrLength int) []float64 {
+	return talib.Natr(ohlcv.High[index-datalength:index], ohlcv.Low[index-datalength:index], ohlcv.Close[index-datalength:index], natrLength)
 }
 
 // CreateNATREMA Create an EMA from the NATR
