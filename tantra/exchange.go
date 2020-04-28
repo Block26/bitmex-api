@@ -13,9 +13,9 @@ import (
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi/global/clients"
 	"github.com/tantralabs/tradeapi/iex"
-	"github.com/tantralabs/utils"
 	"github.com/tantralabs/yantra/database"
 	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/utils"
 )
 
 func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, end time.Time, dataLength int) *Tantra {
@@ -36,12 +36,12 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		Account:               account,
 		orders:                make(map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
-		// db:                    database.NewDB(),
-		LogBacktest: true,
+		db:                    database.NewDB(),
+		LogBacktest:           true,
 	}
 }
 
-const InsertBatchSize = 100
+const InsertBatchSize = 10000
 
 // Tantra represents a mock exchange client
 type Tantra struct {
@@ -112,7 +112,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 		numIndexes = len(candleData)
 		break
 	}
-	logger.Infof("Number of indexes found: %v, warm up period: %v\n", numIndexes)
+	logger.Infof("Number of indexes found: %v (LogBacktest=%v)\n", numIndexes, t.LogBacktest)
 	if t.LogBacktest {
 		t.insertHistoryToDB(false)
 	}
@@ -258,7 +258,7 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 		t.currentCandle[symbol] = candleData[index]
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
-		// log.Println("[Exchange] advanced to", t.CurrentTime)
+		log.Println("[Exchange] advanced to", t.CurrentTime)
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 	}
 }
@@ -267,7 +267,7 @@ func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount 
 	lastCandle, ok := t.currentCandle[order.Market]
 	if !ok {
 		// This is probably an option order, for now simply check if market order
-		if order.Rate == 0 {
+		if order.Type == "market" || order.Rate == 0 {
 			option := t.Account.MarketStates[order.Market]
 			if option.Info.MarketType == models.Option {
 				isFilled = true
@@ -284,7 +284,8 @@ func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount 
 		}
 	}
 	// If a future/spot order, check if our current candle fills the high (ask) or low (bid) for the order
-	if order.Type == "market" {
+	// Price (rate) of zero signifies market order for now
+	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
 		fillPrice = lastCandle.Close // TODO implement multiple market order fill types
 		if order.Side == "buy" {
@@ -322,9 +323,12 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 			logger.Errorf("Could not find market state for %v\n", order.Market)
 		}
 		isFilled, fillPrice, fillAmount = t.getFill(order)
+		logger.Debugf("Filled: %v\n", isFilled)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
-			t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
+			if t.LogBacktest {
+				t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
+			}
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			delete(t.orders, key)
@@ -355,7 +359,7 @@ func (t *Tantra) appendToHistory() {
 }
 
 func (t *Tantra) processTrade(trade models.Trade) {
-	// t.TradeHistory = append(t.TradeHistory, trade)
+	t.TradeHistory = append(t.TradeHistory, trade)
 	logger.Debugf("Processed trade: %v\n", trade)
 }
 
@@ -366,7 +370,8 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	var end int
 	if isLast {
 		// Insert trade history
-		// database.InsertTradeHistory(t.db, t.TradeHistory)
+		logger.Debugf("Inserting trade history [%v records].\n", len(t.TradeHistory))
+		database.InsertTradeHistory(t.db, t.TradeHistory)
 		end = len(t.AccountHistory)
 	} else {
 		if len(t.AccountHistory)-start < InsertBatchSize {
@@ -377,10 +382,14 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	if start == end {
 		return
 	}
+	log.Println("[Exchange] Inserting", end-start, "records...")
 	accounts := t.AccountHistory[start:end]
-	// markets := t.MarketHistory[start:end]
-	// database.InsertAccountHistory(t.db, accounts)
-	// database.InsertMarketHistory(t.db, markets)
+	markets := t.MarketHistory[start:end]
+	database.InsertAccountHistory(t.db, accounts)
+	database.InsertMarketHistory(t.db, markets)
+	logger.Debugf("Inserting trade history [%v records].\n", len(t.TradeHistory))
+	database.InsertTradeHistory(t.db, t.TradeHistory)
+	t.TradeHistory = []models.Trade{}
 	logger.Debugf("Inserted history. [%v records]\n", len(accounts))
 	t.lastInsertIndex = end
 	insertTime += int(time.Now().UnixNano() - insertStart)
@@ -655,7 +664,9 @@ func (t *Tantra) GetMarketPricesByCurrency(currency string) (priceMap map[string
 		option.OptionTheo.CalcTheo(false)
 		priceMap[option.Symbol] = option.OptionTheo.Theo
 	}
-	theoTime += int(time.Now().UnixNano() - theoStart)
+	theoDuration := int(time.Now().UnixNano() - theoStart)
+	logger.Infof("Theo duration: %v\n", theoDuration)
+	theoTime += theoDuration
 	return
 }
 
