@@ -4,6 +4,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,12 +32,35 @@ func Setup(env ...string) {
 	if env != nil && env[0] != ENV {
 		ENV = env[0]
 	}
+	var ok bool
+	var tmp string
+	var err error
 	if ENV == "remote" {
-		host = "tantradb.czzctnxje5ad.us-west-1.rds.amazonaws.com"
-		port = 5432
-		user = "yantrauser"
-		password = "soncdw0csxvpWUHDQNksamsda"
-		dbname = "tantra"
+		host, ok = os.LookupEnv("YANTRA_DATA_DB_HOST")
+		if !ok {
+			host = "tantradb.czzctnxje5ad.us-west-1.rds.amazonaws.com"
+		}
+		tmp, ok = os.LookupEnv("YANTRA_DATA_DB_PORT")
+		if !ok {
+			port = 5432
+		} else {
+			port, err = strconv.Atoi(tmp)
+			if err != nil {
+				logger.Errorf("Error converting YANTRA_DATA_DB_PORT to integer: %v\n", err)
+			}
+		}
+		user, ok = os.LookupEnv("YANTRA_DATA_DB_USER")
+		if !ok {
+			user = "yantrauser"
+		}
+		password, ok = os.LookupEnv("YANTRA_DATA_DB_PASSWORD")
+		if !ok {
+			password = "soncdw0csxvpWUHDQNksamsda"
+		}
+		dbname, ok = os.LookupEnv("YANTRA_DATA_DB_NAME")
+		if !ok {
+			dbname = "tantra"
+		}
 	}
 }
 
