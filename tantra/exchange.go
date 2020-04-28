@@ -212,7 +212,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
 			<-t.channels.TradeBinChanComplete
-			t.insertHistoryToDB(false)
+			if t.LogBacktest {
+				t.insertHistoryToDB(false)
+			}
 			logger.Debugf(`[Exchange] trade time: %v ns
 [Exchange] fill time: %v ns
 [Exchange] position time: %v ns
