@@ -377,6 +377,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	}
 
 	algo.Result = models.Result{
+		Balance:           history[historyLength-1].UBalance,
 		DailyReturn:       history[historyLength-1].UBalance / float64(historyLength),
 		MaxLeverage:       maxLeverage,
 		MaxPositionProfit: maxProfit,
