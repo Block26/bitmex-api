@@ -1,5 +1,7 @@
 package models
 
+import "github.com/tantralabs/logger"
+
 type MarketHistory struct {
 	Timestamp        int
 	Symbol           string
@@ -9,6 +11,11 @@ type MarketHistory struct {
 	UnrealizedProfit float64
 	RealizedProfit   float64
 	Position         float64
+	Open             float64
+	High             float64
+	Low              float64
+	Close            float64
+	Volume           float64
 	Strike           float64
 	Expiry           int
 	OptionType       OptionType
@@ -42,6 +49,31 @@ func NewMarketHistory(market MarketState, timestamp int) MarketHistory {
 			Vega:             market.OptionTheo.Vega,
 			WeightedVega:     market.OptionTheo.WeightedVega,
 			Volatility:       market.OptionTheo.Volatility,
+		}
+	}
+	if market.OHLCV != nil {
+		ohlcv, index := market.OHLCV.GetOHLCVData(1)
+		logger.Errorf("Close: %v\n", ohlcv.Close[index])
+		// lastBar := *barData[len(barData)-1]
+		// logger.Errorf("Last bar: %v, first bar: %v\n", lastBar, *barData[0])
+		// for _, bar := range barData {
+		// 	logger.Errorf("%v, ", bar)
+		// }
+		// logger.Errorf("\n")
+		return MarketHistory{
+			Timestamp:        timestamp,
+			Symbol:           market.Symbol,
+			MarketType:       market.Info.MarketType,
+			Balance:          market.Balance,
+			AverageCost:      market.AverageCost,
+			UnrealizedProfit: market.UnrealizedProfit,
+			RealizedProfit:   market.RealizedProfit,
+			Position:         market.Position,
+			Open:             ohlcv.Open[index],
+			High:             ohlcv.High[index],
+			Low:              ohlcv.Low[index],
+			Close:            ohlcv.Close[index],
+			Volume:           ohlcv.Volume[index],
 		}
 	}
 	return MarketHistory{

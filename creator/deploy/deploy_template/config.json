@@ -1,0 +1,9 @@
+{
+    "algo": "GITHUB_URL",
+    "name": "DEPLOYMENT_NAME",
+    "commit_hash": "COMMIT_HASH",
+    "branch": "BRANCH_NAME",
+    "exchange": "EXCHANGE_NAME",
+    "symbol": "SYMBOL_NAME",
+	"secret": "SECRET_FILE"
+}

@@ -9,6 +9,7 @@ require (
 	github.com/gocarina/gocsv v0.0.0-20200324105150-9eab084b7a45
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/jmoiron/sqlx v1.2.0
@@ -25,4 +26,5 @@ require (
 	github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610
 	github.com/tantralabs/vol-generator v0.0.0-20200323152559-9fb94fa3f702 // indirect
 	gonum.org/v1/gonum v0.7.0
+	gopkg.in/src-d/go-git.v4 v4.13.1 // indirect
 )
