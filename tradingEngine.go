@@ -973,22 +973,19 @@ func logBacktest(algo *models.Algo) {
 		Precision: "us",
 	})
 
-	for symbol, _ := range algo.Account.MarketStates {
-		// uuid := algo.Name + "-" + uuid.New().String()
-		tags := map[string]string{
-			"algo_name": algo.Name,
-			"run_id":    currentRunUUID.String(),
-			"symbol":    symbol,
-		}
-
-		pt, _ := client.NewPoint(
-			"result",
-			tags,
-			structs.Map(algo.Result),
-			time.Now(),
-		)
-		bp.AddPoint(pt)
+	// uuid := algo.Name + "-" + uuid.New().String()
+	tags := map[string]string{
+		"algo_name": algo.Name,
+		"run_id":    currentRunUUID.String(),
 	}
+
+	pt, _ := client.NewPoint(
+		"result",
+		tags,
+		structs.Map(algo.Result),
+		time.Now(),
+	)
+	bp.AddPoint(pt)
 
 	err := client.Client.Write(influx, bp)
 	log.Println(algo.Name, err)
