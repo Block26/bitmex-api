@@ -133,7 +133,7 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 	resampledIndex := int(d.index / resampleInterval)
 	adjuster := 0
 	if resampleInterval == 1 {
-		adjuster = 1
+		adjuster = 0
 	}
 	if val, ok := d.data[resampleInterval]; ok {
 		if len(all) > 0 && all[0] == true {

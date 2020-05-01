@@ -217,6 +217,7 @@ func GetCandlesByTime(symbol string, exchange string, interval string, startTime
 	}
 
 	if len(bars) == 0 {
+		log.Println("cmd:", cmd)
 		log.Fatal("There doesn't seem to be any data for ", exchange, " ", symbol, " on the ", interval, " interval in the database. Maybe it was your start and end dates?")
 	}
 
@@ -268,6 +269,7 @@ func GetCandlesByTimeWithBuffer(symbol string, exchange string, interval string,
 	}
 
 	if len(bars) == 0 {
+		log.Println("cmd:", cmd)
 		log.Fatal("There doesn't seem to be any data for ", exchange, " ", symbol, " on the ", interval, " interval in the database. Maybe it was your start and end dates?")
 	}
 
@@ -301,6 +303,7 @@ func GetCandles(symbol string, exchange string, interval string, numBars int) []
 	}
 
 	if len(bars) == 0 {
+		log.Println("cmd:", cmd)
 		log.Fatal("There doesn't seem to be any data for ", exchange, " ", symbol, " on the ", interval, " interval in the database. Maybe it was your start and end dates?")
 	}
 

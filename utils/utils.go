@@ -8,6 +8,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -463,4 +464,12 @@ func Copy(fromFile string, toFile string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func Run(app string, args ...string) error {
+	log.Println(app, args)
+	cmd := exec.Command(app, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }

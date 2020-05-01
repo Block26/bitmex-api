@@ -18,9 +18,9 @@ func optimizeAlgo() {
 
 func evaluate(X []float64) float64 {
 	// Use a temporary variable _searchParameters to avoid shared memory for concurrent testing
-	_searchParameters := optimize.ConstrainSearchParameters(searchParameters, X)
+	// _searchParameters := optimize.ConstrainSearchParameters(searchParameters, X)
 
-	algo := CreateAlgo("TEMPLATE-opt", "bitmex", symbol)
+	algo := CreateAlgo("TEMPLATE-opt", "bitmex", "XBTUSD")
 
 	tradingEngine := yantra.NewTradingEngine(&algo, -1)
 

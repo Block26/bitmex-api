@@ -4,6 +4,7 @@ import (
 	"github.com/tantralabs/yantra/models"
 )
 
+//This name should start with a capital letter for logging purposes
 const ModuleName = "MY-MOD"
 
 // SetParameters should be used to set custom parameters

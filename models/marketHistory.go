@@ -1,7 +1,5 @@
 package models
 
-import "github.com/tantralabs/logger"
-
 type MarketHistory struct {
 	Timestamp        int
 	Symbol           string
@@ -51,9 +49,9 @@ func NewMarketHistory(market MarketState, timestamp int) MarketHistory {
 			Volatility:       market.OptionTheo.Volatility,
 		}
 	}
-	if market.OHLCV != nil {
-		ohlcv, index := market.OHLCV.GetOHLCVData(1)
-		logger.Errorf("Close: %v\n", ohlcv.Close[index])
+	ohlcv, index := market.OHLCV.GetOHLCVData(1)
+	if market.OHLCV != nil && index > 0 {
+		// logger.Errorf("Close: %v\n", ohlcv.Close[index])
 		// lastBar := *barData[len(barData)-1]
 		// logger.Errorf("Last bar: %v, first bar: %v\n", lastBar, *barData[0])
 		// for _, bar := range barData {

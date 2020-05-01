@@ -9,25 +9,29 @@ import (
 	"github.com/tantralabs/yantra/models"
 )
 
+const di = 15
+
 func TestModule(t *testing.T) {
 	symbol := "XBTUSD"
 
-	algo := yantra.CreateNewAlgo(models.AlgoConfig{
+	config := models.AlgoConfig{
 		Name:            "di-test",
 		Exchange:        "bitmex",
 		Symbol:          symbol,
-		DataLength:      1,
+		DataLength:      60,
 		StartingBalance: 100,
-	})
+	}
+
+	algo := yantra.CreateNewAlgo(config)
 
 	SetParameters(&algo, Params{}, symbol)
 
 	tradingEngine := yantra.NewTradingEngine(&algo, -1)
-	start := time.Date(2019, 01, 01, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2020, 01, 01, 0, 0, 0, 0, time.UTC)
+	start := time.Date(2020, 01, 01, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2020, 03, 01, 0, 0, 0, 0, time.UTC)
 	tradingEngine.RunTest(start, end, rebalance, SetupData)
 
-	expectedScore := 1.785
+	expectedScore := -100.0
 	if algo.Result.Score != expectedScore {
 		t.Error("Sharpe has changed from", expectedScore, "to", algo.Result.Score)
 	}
@@ -37,7 +41,9 @@ func TestModule(t *testing.T) {
 // This rebalance is created to simulate an algo using this module
 func rebalance(algo *models.Algo) {
 	for _, ms := range algo.Account.MarketStates {
-		if ms.Position < 0 {
+		tenMin, tenMinIndex := ms.OHLCV.GetOHLCVData(10)
+		fiveMin, fiveMinIndex := ms.OHLCV.GetOHLCVData(5)
+		if tenMin.Close[tenMinIndex] > fiveMin.Close[fiveMinIndex] {
 			order := iex.Order{
 				Market:   ms.Symbol,
 				Currency: ms.Symbol,
@@ -47,6 +53,19 @@ func rebalance(algo *models.Algo) {
 				Side:     "buy",
 			}
 			algo.Client.PlaceOrder(order)
+		} else {
+			order := iex.Order{
+				Market:   ms.Symbol,
+				Currency: ms.Symbol,
+				Amount:   1,
+				Rate:     ms.LastPrice,
+				Type:     "market",
+				Side:     "sell",
+			}
+			algo.Client.PlaceOrder(order)
 		}
+		// if ms.Position < 0 {
+
+		// }
 	}
 }
