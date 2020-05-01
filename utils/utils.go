@@ -39,10 +39,13 @@ func LoadENV(isSecret bool) {
 }
 
 func getSecret(secretName string) string {
-	// region := "us-west-1"
+	region, ok := os.LookupEnv("AWS_REGION")
+	if !ok {
+		region = "us-west-1"
+	}
 
 	//Create a Secrets Manager client
-	svc := secretsmanager.New(session.New(), aws.NewConfig().WithRegion("us-west-1"))
+	svc := secretsmanager.New(session.New(), aws.NewConfig().WithRegion(region))
 	input := &secretsmanager.GetSecretValueInput{
 		SecretId:     aws.String(secretName),
 		VersionStage: aws.String("AWSCURRENT"), // VersionStage defaults to AWSCURRENT if unspecified
