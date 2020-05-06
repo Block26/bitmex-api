@@ -132,9 +132,6 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 	bars := d.minuteBars
 	resampledIndex := int(d.index / resampleInterval)
 	adjuster := 0
-	if resampleInterval == 1 {
-		adjuster = 0
-	}
 	if val, ok := d.data[resampleInterval]; ok {
 		if len(all) > 0 && all[0] == true {
 			return OHLCV{
@@ -220,17 +217,18 @@ func (d *Data) rebuildOHLCV(resampleInterval int) {
 	} else {
 		startIndex := len(d.data[resampleInterval].Timestamp) - 1
 		length := d.lookbackLength / resampleInterval
-		if resampleInterval == 1 {
-			length -= 1
-		}
 		log.Println(length, "new", resampleInterval, "x min added")
 		ohlcv := d.data[resampleInterval]
+		adjuster := 0
+		if resampleInterval == 1 {
+			adjuster = 1
+		}
 		for i := 1; i <= length; i++ {
 			index := (startIndex * resampleInterval) + (i * resampleInterval)
 
-			ohlcv.Open = append(ohlcv.Open, bars[index-resampleInterval].Open)
-			ohlcv.Close = append(ohlcv.Close, bars[index].Close)
-			ohlcv.Timestamp = append(ohlcv.Timestamp, bars[index].Timestamp)
+			ohlcv.Open = append(ohlcv.Open, bars[index-resampleInterval-adjuster].Open)
+			ohlcv.Close = append(ohlcv.Close, bars[index-adjuster].Close)
+			ohlcv.Timestamp = append(ohlcv.Timestamp, bars[index-adjuster].Timestamp)
 
 			var high, low, volume float64
 			for k := -resampleInterval; k < 0; k++ {

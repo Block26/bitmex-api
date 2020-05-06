@@ -22,7 +22,7 @@ require (
 	github.com/tantralabs/exchanges v0.0.0-20200204190209-ebc589b6dd8e
 	github.com/tantralabs/logger v0.0.0-20200204183402-925e01159ffa
 	github.com/tantralabs/theo-engine v0.0.0-20200319174139-3371856b691a
-	github.com/tantralabs/tradeapi v0.0.0-20200401191321-951f5a66cfdf
+	github.com/tantralabs/tradeapi v0.0.0-20200506124616-f9770cd31b55
 	github.com/tantralabs/vol-generator v0.0.0-20200323152559-9fb94fa3f702 // indirect
 	gonum.org/v1/gonum v0.7.0
 	gopkg.in/src-d/go-git.v4 v4.13.1 // indirect

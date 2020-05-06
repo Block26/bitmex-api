@@ -37,7 +37,7 @@ func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
 		orders:                make(map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
 		db:                    database.NewDB(),
-		LogBacktest:           true,
+		LogBacktest:           false,
 	}
 }
 
@@ -176,15 +176,13 @@ func (t *Tantra) StartWS(config interface{}) error {
 				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
 				balanceStart := time.Now().UnixNano()
 				if lastBalance != currentMarketState.Balance {
-					wallet := iex.WSWallet{
-						Balance: []iex.WSBalance{
-							{
-								Asset:   currentMarketState.Info.BaseSymbol,
-								Balance: currentMarketState.Balance,
-							},
+					wallet := []iex.Balance{
+						{
+							Currency: currentMarketState.Info.BaseSymbol,
+							Balance:  currentMarketState.Balance,
 						},
 					}
-					t.channels.WalletChan <- &wallet
+					t.channels.WalletChan <- wallet
 					<-t.channels.WalletChanComplete
 				}
 				balanceTime += int(time.Now().UnixNano() - balanceStart)
@@ -809,16 +807,18 @@ func (t *Tantra) GetCandles(symbol string, binSize string, amount int) ([]iex.Tr
 	}
 }
 
-func (t *Tantra) GetBalances() (balance []iex.WSBalance, err error) {
-	balance = append(balance, iex.WSBalance{
-		Asset:   t.Account.BaseAsset.Symbol,
-		Balance: t.Account.BaseAsset.Quantity,
-	})
+func (t *Tantra) GetBalances() (balance []iex.Balance, err error) {
+	balance = []iex.Balance{
+		{
+			Currency: t.Account.BaseAsset.Symbol,
+			Balance:  t.Account.BaseAsset.Quantity,
+		},
+	}
 	return
 }
 
 func (t *Tantra) GetBalance(currency string) (balance iex.Balance, err error) {
-	log.Fatalln("not implemented")
+	log.Fatalln("GetBalance not implemented")
 	return
 }
 

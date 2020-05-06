@@ -1,11 +1,13 @@
 package yantra
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/copier"
@@ -230,6 +232,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	for symbol, marketState := range t.Algo.Account.MarketStates {
 		if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
 			//Ordering is important, get wallet and position first then market info
+			logger.Infof("Subscribing to %v channels.\n", symbol)
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_ORDER, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_POSITION, Symbol: symbol})
@@ -237,7 +240,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		}
 	}
 
-	logger.Infof("Subscribing to %v channels.\n", len(subscribeInfos))
+	logger.Infof("Subscribed to %v channels.\n", len(subscribeInfos))
 
 	// Channels for recieving websocket response.
 	channels := &iex.WSChannels{
@@ -245,7 +248,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		PositionChanComplete: make(chan error, 1),
 		TradeBinChan:         make(chan []iex.TradeBin, 1),
 		TradeBinChanComplete: make(chan error, 1),
-		WalletChan:           make(chan *iex.WSWallet, 1),
+		WalletChan:           make(chan []iex.Balance, 1),
 		WalletChanComplete:   make(chan error, 1),
 		OrderChan:            make(chan []iex.Order, 1),
 		OrderChanComplete:    make(chan error, 1),
@@ -253,10 +256,14 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 
 	// Start the websocket.
 
+	ctx := context.TODO()
+	wg := sync.WaitGroup{}
 	err = t.Algo.Client.StartWS(&iex.WsConfig{
 		Host:      t.Algo.Account.ExchangeInfo.WSStream,
 		Streams:   subscribeInfos,
 		Channels:  channels,
+		Ctx:       ctx,
+		Wg:        &wg,
 		ApiSecret: config.APISecret,
 		ApiKey:    config.APIKey,
 	})
@@ -264,6 +271,27 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	if err != nil {
 		msg := fmt.Sprintf("Error starting websockets: %v\n", err)
 		log.Fatal(msg)
+	}
+	for {
+		select {
+		case positions := <-channels.PositionChan:
+			logger.Debugf("Recieved %v new positions updates\n", len(positions))
+			channels.PositionChanComplete <- nil
+		case trades := <-channels.TradeBinChan:
+			logger.Debugf("Recieved %v new trade updates\n", len(trades))
+			channels.TradeBinChanComplete <- nil
+		case newOrders := <-channels.OrderChan:
+			logger.Infof("Recieved %v new order updates\n", len(newOrders))
+			channels.OrderChanComplete <- nil
+		case _ = <-channels.WalletChan:
+			logger.Infof("Recieved new wallet update\n")
+			// t.updateAlgoBalances(t.Algo, update.Balance)
+			channels.WalletChanComplete <- nil
+		}
+		if channels.TradeBinChan == nil {
+			logger.Errorf("Trade bin channel is nil, breaking...\n")
+			break
+		}
 	}
 
 	// All of these channels send themselves back so that the test can wait for each individual to complete
@@ -322,7 +350,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			// logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			channels.OrderChanComplete <- nil
 		case update := <-channels.WalletChan:
-			t.updateAlgoBalances(t.Algo, update.Balance)
+			t.updateAlgoBalances(t.Algo, update)
 			channels.WalletChanComplete <- nil
 		}
 		if channels.TradeBinChan == nil {
@@ -356,7 +384,7 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 		// Add to existing order state
 		for _, newOrder := range orders {
 			if newOrder.OrdStatus != t.Algo.Client.GetPotentialOrderStatus().Cancelled {
-				// logger.Debugf("Processing order update: %v\n", newOrder)
+				logger.Debugf("Processing order update: %v\n", newOrder)
 				marketState, ok := algo.Account.MarketStates[newOrder.Market]
 				if !ok {
 					logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Market)
@@ -474,27 +502,27 @@ func (t *TradingEngine) aggregateAccountProfit() {
 		t.Algo.Account.UnrealizedProfit, t.Algo.Account.RealizedProfit, t.Algo.Account.Profit)
 }
 
-func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.WSBalance) {
+func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
 	for _, updatedBalance := range balances {
-		balance, ok := algo.Account.Balances[updatedBalance.Asset]
+		balance, ok := algo.Account.Balances[updatedBalance.Currency]
 		if ok {
 			balance.Quantity = updatedBalance.Balance
 		} else {
 			// If unknown asset, create a new asset
 			newAsset := models.Asset{
-				Symbol:   updatedBalance.Asset,
+				Symbol:   updatedBalance.Currency,
 				Quantity: updatedBalance.Balance,
 			}
-			algo.Account.Balances[updatedBalance.Asset] = &newAsset
-			logger.Debugf("New balance found: %v\n", algo.Account.Balances[updatedBalance.Asset])
+			algo.Account.Balances[updatedBalance.Currency] = &newAsset
+			logger.Debugf("New balance found: %v\n", algo.Account.Balances[updatedBalance.Currency])
 		}
-		if updatedBalance.Asset == algo.Account.BaseAsset.Symbol {
+		if updatedBalance.Currency == algo.Account.BaseAsset.Symbol {
 			algo.Account.BaseAsset.Quantity = updatedBalance.Balance
 			logger.Debugf("Updated base asset quantity: %v\n", algo.Account.BaseAsset.Quantity)
 		} else if algo.Account.ExchangeInfo.Spot {
 			// This could be a spot position update, in which case we should update the respective market state's position
 			for symbol, marketState := range algo.Account.MarketStates {
-				if marketState.Info.MarketType == models.Spot && marketState.Info.QuoteSymbol == updatedBalance.Asset {
+				if marketState.Info.MarketType == models.Spot && marketState.Info.QuoteSymbol == updatedBalance.Currency {
 					marketState.Position = updatedBalance.Balance
 					logger.Debugf("Updated position for spot market %v: %v\n", symbol, marketState.Position)
 				}
