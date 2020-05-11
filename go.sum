@@ -118,6 +118,10 @@ github.com/tantralabs/theo-engine v0.0.0-20200319174139-3371856b691a/go.mod h1:y
 github.com/tantralabs/tradeapi v0.0.0-20200203232623-51c7d08a9113/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tantralabs/tradeapi v0.0.0-20200401191321-951f5a66cfdf h1:HkahueBuTn2BL0eLSbSFpZFAtHt5GD2KYWS3Y0h7KTk=
 github.com/tantralabs/tradeapi v0.0.0-20200401191321-951f5a66cfdf/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v0.0.0-20200506124616-f9770cd31b55 h1:gjRAfF+RTFvhJwW5E9YvDV39BZD0CnPP93EC66wRrOY=
+github.com/tantralabs/tradeapi v0.0.0-20200506124616-f9770cd31b55/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v0.0.0-20200506131137-58fef3c55a97 h1:KZQs67yVUee8LUD7OaXFq8aOSWPFptkxs04kW62NE3w=
+github.com/tantralabs/tradeapi v0.0.0-20200506131137-58fef3c55a97/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610 h1:4wb3tT/wUpjsdcO7NwnOw4KSzrIaPOHdnpR4d43C6qQ=
 github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610/go.mod h1:QN0aHde2cmzDJcZklDsH9F8MchJ2hDpDgdQwXA+QnGA=
 github.com/tantralabs/vol-generator v0.0.0-20200323152559-9fb94fa3f702 h1:m3iFX10cRCIao+0BR4Ei6plR+qeS5lGRNn8Fmd0aUgU=
