@@ -18,9 +18,9 @@ import (
 	"github.com/tantralabs/yantra/utils"
 )
 
-func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, end time.Time, dataLength int) *Tantra {
+func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, end time.Time, dataLength int, logBacktest bool) *Tantra {
 	logger.Infof("Init new test with start %v and end %v\n", start, end)
-	tantra := New(vars, account)
+	tantra := New(vars, account, logBacktest)
 	tantra.index = dataLength
 	tantra.start = start
 	tantra.end = end
@@ -28,17 +28,22 @@ func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, en
 }
 
 // Mock exchange constructor
-func New(vars iex.ExchangeConf, account *models.Account) *Tantra {
+func New(vars iex.ExchangeConf, account *models.Account, log bool) *Tantra {
 	client := clients.NewClient(vars)
-	return &Tantra{
+	t := &Tantra{
 		client:                client,
 		SimulatedExchangeName: vars.Exchange,
 		Account:               account,
 		orders:                make(map[string]iex.Order),
 		ordersToPublish:       make(map[string]iex.Order),
-		db:                    database.NewDB(),
-		LogBacktest:           false,
 	}
+
+	if log {
+		t.db = database.NewDB()
+		t.LogBacktest = true
+	}
+
+	return t
 }
 
 const InsertBatchSize = 10000

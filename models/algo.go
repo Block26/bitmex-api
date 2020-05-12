@@ -22,7 +22,7 @@ type Algo struct {
 	Result            Result                 // The result of your backtest
 	Stats             Stats                  // The stats of your backtest
 	LogStats          bool                   // Turn logs on or off for stats of your backtest, and exports them to a stats.csv in your local directory
-	LogBacktestToCSV  bool                   // Exports the backtest history to a balance.csv in your local directory
+	LogBacktest       bool                   // Exports the backtest history to a balance.csv in your local directory
 	Signals           map[string][]float64   // Log the signals of your test
 	State             map[string]interface{} // State of the algo, useful for logging live ta indicators.
 	TheoEngine        interface{}            // Daniel's secret sauce
@@ -39,4 +39,5 @@ type AlgoConfig struct {
 	RebalanceInterval string
 	DataLength        int
 	StartingBalance   float64
+	LogBacktest       bool
 }

@@ -23,6 +23,7 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 		Account:           account,
 		DataLength:        config.DataLength,
 		RebalanceInterval: config.RebalanceInterval,
+		LogBacktest:       config.LogBacktest,
 		LogLevel:          logger.LogLevel().Debug,
 		BacktestLogLevel:  logger.LogLevel().Info,
 	}

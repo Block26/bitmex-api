@@ -360,7 +360,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		}
 	}
 
-	if algo.LogBacktestToCSV {
+	if algo.LogBacktest {
 		// Log balance history
 		os.Remove("balance.csv")
 		historyFile, err := os.OpenFile("balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)

@@ -68,7 +68,7 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 		AccountID:      t.Algo.Name,
 		OutputResponse: false,
 	}
-	mockExchange := tantra.NewTest(exchangeVars, &t.Algo.Account, start, end, t.Algo.DataLength)
+	mockExchange := tantra.NewTest(exchangeVars, &t.Algo.Account, start, end, t.Algo.DataLength, t.Algo.LogBacktest)
 	barData := t.LoadBarData(t.Algo, start, end)
 	for symbol, data := range barData {
 		logger.Infof("Loaded %v instances of bar data for %v with start %v and end %v.\n", len(data), symbol, start, end)
@@ -271,27 +271,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	if err != nil {
 		msg := fmt.Sprintf("Error starting websockets: %v\n", err)
 		log.Fatal(msg)
-	}
-	for {
-		select {
-		case positions := <-channels.PositionChan:
-			logger.Debugf("Recieved %v new positions updates\n", len(positions))
-			channels.PositionChanComplete <- nil
-		case trades := <-channels.TradeBinChan:
-			logger.Debugf("Recieved %v new trade updates\n", len(trades))
-			channels.TradeBinChanComplete <- nil
-		case newOrders := <-channels.OrderChan:
-			logger.Infof("Recieved %v new order updates\n", len(newOrders))
-			channels.OrderChanComplete <- nil
-		case _ = <-channels.WalletChan:
-			logger.Infof("Recieved new wallet update\n")
-			// t.updateAlgoBalances(t.Algo, update.Balance)
-			channels.WalletChanComplete <- nil
-		}
-		if channels.TradeBinChan == nil {
-			logger.Errorf("Trade bin channel is nil, breaking...\n")
-			break
-		}
 	}
 
 	// All of these channels send themselves back so that the test can wait for each individual to complete
