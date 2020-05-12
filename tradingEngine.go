@@ -26,9 +26,11 @@ import (
 )
 
 var currentRunUUID time.Time
+var barData map[string][]*models.Bar
 
 type TradingEngine struct {
 	Algo                 *models.Algo
+	reuseData            bool
 	firstTrade           bool
 	firstPositionUpdate  bool
 	isTest               bool
@@ -42,9 +44,14 @@ type TradingEngine struct {
 	contractUpdatePeriod int
 }
 
-func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int) TradingEngine {
+func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...bool) TradingEngine {
 	currentRunUUID = time.Now()
 	//TODO: should theo engine and other vars be initialized here?
+	if reuseData == nil {
+		reuseData = make([]bool, 1)
+		reuseData[0] = false
+	}
+
 	return TradingEngine{
 		Algo:                 algo,
 		firstTrade:           true,
@@ -53,6 +60,7 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int) TradingEngine
 		lastTest:             0,
 		lastWalletSync:       0,
 		startTime:            time.Now(),
+		reuseData:            reuseData[0],
 		theoEngine:           nil,
 		lastContractUpdate:   0,
 		contractUpdatePeriod: contractUpdatePeriod,
@@ -119,16 +127,19 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 }
 
 func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {
-	barData := make(map[string][]*models.Bar)
-	for symbol, marketState := range algo.Account.MarketStates {
-		logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
-		// TODO handle extra bars to account for dataLength here
-		// barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
-		barData[symbol] = database.GetCandlesByTimeWithBuffer(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
-		algo.Index = algo.DataLength
-		marketState.Bar = *barData[symbol][len(barData[symbol])-1]
-		marketState.LastPrice = marketState.Bar.Close
-		logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
+	if barData == nil || !t.reuseData {
+		barData = make(map[string][]*models.Bar)
+		for symbol, marketState := range algo.Account.MarketStates {
+			logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
+			// TODO handle extra bars to account for dataLength here
+			// barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
+			barData[symbol] = database.GetCandlesByTimeWithBuffer(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
+			algo.Index = algo.DataLength
+			marketState.Bar = *barData[symbol][len(barData[symbol])-1]
+			marketState.LastPrice = marketState.Bar.Close
+			logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
+		}
+		return barData
 	}
 	return barData
 }
