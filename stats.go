@@ -324,7 +324,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		} else {
 			percentReturn[i] = utils.CalculateDifference(history[i].UBalance, last)
 			if math.IsNaN(percentReturn[i]) {
-				percentReturn[i] = 0
+				percentReturn[i] = percentReturn[i-1]
 			}
 		}
 		last = history[i].UBalance
