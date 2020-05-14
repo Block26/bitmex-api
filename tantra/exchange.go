@@ -263,7 +263,7 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 		t.currentCandle[symbol] = candleData[index]
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
-		log.Println("[Exchange] advanced to", t.CurrentTime)
+		// log.Println("[Exchange] advanced to", t.CurrentTime)
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 	}
 }

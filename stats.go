@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/gocarina/gocsv"
+	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 	"gonum.org/v1/gonum/stat"
@@ -271,8 +272,8 @@ func getMinMaxStats(history []models.History) (float64, float64, float64, float6
 	var maxProfit float64 = history[0].Profit
 	var minProfit float64 = history[0].Profit
 
-	var maxLeverage float64 = history[0].Leverage
-	var minLeverage float64 = history[0].Leverage
+	var maxLeverage float64 = 0.0
+	var minLeverage float64 = 0.0
 
 	var maxPositionLoss float64 = 0.0
 	var maxPositionProfit float64 = 0.0
@@ -322,6 +323,9 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 			percentReturn[i] = 0
 		} else {
 			percentReturn[i] = utils.CalculateDifference(history[i].UBalance, last)
+			if math.IsNaN(percentReturn[i]) {
+				percentReturn[i] = 0
+			}
 		}
 		last = history[i].UBalance
 	}
@@ -329,11 +333,11 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	mean, std := stat.MeanStdDev(percentReturn, nil)
 	score := mean / std
 	// TODO change the scoring based on 1h / 1m
-	// if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-	score = score * math.Sqrt(365*24*60)
-	// } else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-	// 	score = score * math.Sqrt(365*24*60)
-	// }
+	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
+		score = score * math.Sqrt(365*24)
+	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
+		score = score * math.Sqrt(365*24*60)
+	}
 
 	if math.IsNaN(score) {
 		score = -100
