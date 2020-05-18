@@ -28,6 +28,5 @@ type Stats struct {
 	LongWinRate                       float64
 	ShortWinRate                      float64
 	TotalWinRate                      float64
-	AverageDailyWeightChanges         float64
 	PercentDaysProfitable             float64
 }

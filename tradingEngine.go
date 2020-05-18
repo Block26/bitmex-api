@@ -917,6 +917,7 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 
 	if marketState.Info.MarketType == models.Future {
 		state.UBalance = marketState.Balance + marketState.UnrealizedProfit
+		state.QuoteBalance = (marketState.Balance + marketState.UnrealizedProfit) * marketState.Bar.Close
 	} else {
 		state.UBalance = (algo.Account.BaseAsset.Quantity * marketState.Bar.Close) + marketState.Position
 	}

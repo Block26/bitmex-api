@@ -16,12 +16,9 @@ import (
 )
 
 func getTurnoverStats(history []models.History, algo *models.Algo) models.Stats {
-	var weight int = history[0].Weight
-	var averageDailyWeightChanges float64
 	var previousQuantity float64
 	var previousBalance float64
 
-	var weightChanges []int
 	var profitableDays []float64
 	var longPositions []float64
 	var shortPositions []float64
@@ -38,16 +35,9 @@ func getTurnoverStats(history []models.History, algo *models.Algo) models.Stats 
 	var totalAbsShortProfit float64 = 0.0
 	var totalAbsLongProfit float64 = 0.0
 
-	//Get weight/position/turnover stats
+	//Get position/turnover stats
 	for _, row := range history {
-		if algo.FillType != "limit" {
-			//How many times did weight change
-			if weight != row.Weight {
-				weight = row.Weight
-				weightChanges = append(weightChanges, weight)
-			}
-		}
-		// How many hours are we profitable //
+		// Percent profitability of test //
 		if history[0].Balance < row.Balance {
 			profitableDays = append(profitableDays, 1.0)
 		} else {
@@ -80,26 +70,22 @@ func getTurnoverStats(history []models.History, algo *models.Algo) models.Stats 
 			}
 		}
 		// Create arrays of realized long position profit //
-		// TODO differentiate between abs and percent profit
+		// This is calculated as percent profit
 		if row.Quantity >= 0 && row.Quantity < previousQuantity {
 			totalAbsLongProfit += row.Balance - previousBalance
 			currentLongProfit = append(currentLongProfit, (row.Balance-previousBalance)/previousBalance)
-			// currentLongProfit = append(currentLongProfit, row.PercentProfit)
 		} else {
-			// TODO also calculate exits where we get out over 5 hours, len(currentLongProfit) >= 5
 			if len(currentLongProfit) != 0 {
 				longPositionsProfitArr = append(longPositionsProfitArr, currentLongProfit)
 				currentLongProfit = nil
 			}
 		}
 		//Create arrays of realized short position profit //
-		// TODO differentiate between abs and percent profit
+		// This is calculated as percent profit
 		if row.Quantity <= 0 && row.Quantity > previousQuantity {
 			totalAbsShortProfit += row.Balance - previousBalance
 			currentShortProfit = append(currentShortProfit, (row.Balance-previousBalance)/previousBalance)
-			// currentShortProfit = append(currentShortProfit, row.PercentProfit)
 		} else {
-			// TODO also calculate exits where we get out over 5 hours, len(currentShortProfit) >= 5
 			if len(currentShortProfit) != 0 {
 				shortPositionsProfitArr = append(shortPositionsProfitArr, currentShortProfit)
 				currentShortProfit = nil
@@ -120,7 +106,7 @@ func getTurnoverStats(history []models.History, algo *models.Algo) models.Stats 
 	var shortProfit float64
 	var shortWinRate float64
 
-	// Find Duration of Long Positions, Assumes Rebalance interval is hourly //
+	// Find Duration of Long Positions, based on Rebalance Interval //
 	for _, value := range longPositionsArr {
 		currentLongLength = float64(len(value))
 		longDurationArr = append(longDurationArr, currentLongLength)
@@ -257,11 +243,6 @@ func getTurnoverStats(history []models.History, algo *models.Algo) models.Stats 
 	algo.Stats.TotalWinsNeeded = requiredWinRate
 	algo.Stats.TotalWinRate = (float64(len(winningShortTrade) + len(winningLongTrade))) / float64((len(shortProfitArr) + len(longProfitArr)))
 
-	// Find Average Daily Weight Changes, Assumes Rebalance interval is hourly
-	numberOfDays := float64((len(history) / 24))
-	totalChanges := float64(len(weightChanges))
-	averageDailyWeightChanges = totalChanges / numberOfDays
-	algo.Stats.AverageDailyWeightChanges = averageDailyWeightChanges
 	percentDaysProfitable := utils.SumArr(profitableDays) / float64(len(profitableDays))
 	// fmt.Printf("Percent Days Profitable: %0.4f \n", percentDaysProfitable)
 	algo.Stats.PercentDaysProfitable = percentDaysProfitable
@@ -317,26 +298,33 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	historyLength := len(history)
 	log.Println("historyLength", historyLength, "Start Balance", history[0].UBalance, "End Balance", history[historyLength-1].UBalance)
 	percentReturn := make([]float64, historyLength)
+	downsidePercentReturn := make([]float64, 0)
 	last := 0.0
 	for i := range history {
 		if i == 0 {
 			percentReturn[i] = 0
+			downsidePercentReturn = append(downsidePercentReturn, 0)
 		} else {
 			percentReturn[i] = utils.CalculateDifference(history[i].UBalance, last)
 			if math.IsNaN(percentReturn[i]) {
 				percentReturn[i] = percentReturn[i-1]
 			}
+			downsidePercentReturn = append(downsidePercentReturn, percentReturn[i])
 		}
 		last = history[i].UBalance
 	}
 
 	mean, std := stat.MeanStdDev(percentReturn, nil)
+	_, downsideStd := stat.MeanStdDev(downsidePercentReturn, nil)
 	score := mean / std
+	sortino := mean / downsideStd
 	// TODO change the scoring based on 1h / 1m
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
 		score = score * math.Sqrt(365*24)
+		sortino = sortino * math.Sqrt(365*24)
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
 		score = score * math.Sqrt(365*24*60)
+		sortino = sortino * math.Sqrt(365*24*60)
 	}
 
 	if math.IsNaN(score) {
@@ -350,7 +338,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	for symbol, state := range algo.Account.MarketStates {
 		if state.Info.MarketType != models.Option {
 			kvparams := utils.CreateKeyValuePairs(algo.Params.GetAllParamsForSymbol(symbol), true)
-			log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Sharpe %0.3f \n Params: %s",
+			log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Sharpe %0.3f \n Sortino %0.3f \n Params: %s",
 				history[historyLength-1].Balance,
 				history[historyLength-1].AverageCost,
 				history[historyLength-1].Quantity,
@@ -359,6 +347,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 				maxProfit,
 				minProfit,
 				score,
+				sortino,
 				kvparams,
 			)
 		}
@@ -389,6 +378,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		MaxDD:             drawdown,
 		Params:            utils.CreateKeyValuePairs(algo.Params.GetAllParams(), true),
 		Score:             utils.ToFixed(score, 3),
+		Sortino:           utils.ToFixed(sortino, 3),
 	}
 
 	//Log turnover stats

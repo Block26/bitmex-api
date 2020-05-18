@@ -5,6 +5,7 @@ type History struct {
 	Symbol      string
 	Balance     float64
 	UBalance    float64
+	QuoteBalance    float64
 	Quantity    float64
 	AverageCost float64
 	Leverage    float64

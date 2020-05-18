@@ -8,5 +8,6 @@ type Result struct {
 	MaxPositionDD     float64
 	MaxDD             float64
 	Score             float64
+	Sortino           float64
 	Params            string
 }
