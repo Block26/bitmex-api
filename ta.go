@@ -45,19 +45,23 @@ func GetADX(high []float64, low []float64, close []float64, index int, datalengt
 }
 
 // GetMacd calculates MACD, MACDSignal, & MACDHistogram slices based on data length
-func GetMacd(close []float64, inFastPeriod int, inSlowPeriod int, inSignalPeriod int, index int, datalength int) ([]float64, []float64, []float64) {
-	MACD, MACDSignal, MACDHistogram := talib.Macd(close[index-datalength-1:index], inFastPeriod, inSlowPeriod, inSignalPeriod)
+func GetMacd(ohlcv models.OHLCV, inFastPeriod int, inSlowPeriod int, inSignalPeriod int, index int, datalength int) ([]float64, []float64, []float64) {
+	MACD, MACDSignal, MACDHistogram := talib.Macd(ohlcv.Close[index-datalength-1:index], inFastPeriod, inSlowPeriod, inSignalPeriod)
 	return MACD, MACDSignal, MACDHistogram
 }
 
 // GetStochF calculates fastK and fastD based on HLC, fastKPeriod, fastDPeriod, and fastDMAType (always = 0)
-func GetStochF(high []float64, low []float64, close []float64, fastKPeriod int, fastDPeriod int, fastDMAType talib.MaType) ([]float64, []float64) {
+func GetStochF(ms models.MarketState, dataInterval int, fastKPeriod int, fastDPeriod int, fastDMAType talib.MaType) ([]float64, []float64) {	
+	high := ms.OHLCV.FetchAllData(dataInterval).High
+	low := ms.OHLCV.FetchAllData(dataInterval).Low
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.StochF(high, low, close, fastKPeriod, fastDPeriod, fastDMAType)
 }
 
 // GetRoc calculates rate of change of a certain amount of hours based on close price (we use an EMA instead of close price for each hour)
-func GetRoc(close []float64, inTimePeriod int) []float64 {
-	roc := talib.Roc(close, inTimePeriod)
+func GetRoc(ms models.MarketState, ma []float64, length int) []float64 {
+	// close := ms.OHLCV.FetchAllData(dataInterval).Close
+	roc := talib.Roc(ma, length)
 	return roc
 }
 
