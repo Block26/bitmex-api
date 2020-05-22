@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/tantralabs/logger"
 	"github.com/tantralabs/tradeapi/iex"
 )
 
@@ -80,6 +81,7 @@ func (d *Data) AddData(newBars []*Bar) {
 
 	d.lookbackLength = 0
 	if newBars != nil {
+		log.Println("Adding", len(newBars), "new bars")
 		for y := range newBars {
 			if !containsInt(timestamps, newBars[y].Timestamp) {
 				d.minuteBars = append(d.minuteBars, &Bar{
@@ -96,13 +98,17 @@ func (d *Data) AddData(newBars []*Bar) {
 	}
 
 	for resampleInterval, _ := range d.data {
-		d.rebuildOHLCV(resampleInterval)
+		// TODO Make this function work live
+		// d.rebuildOHLCV(resampleInterval)
+		delete(d.data, resampleInterval)
 	}
 }
 
 func (d *Data) GetOHLCVData(resampleInterval int) (data OHLCV, index int) {
 	data = d.getOHLCV(resampleInterval)
 	index = len(data.Timestamp) - 1
+	logger.Debug("Last Timestamp for", resampleInterval, "min", time.Unix(data.Timestamp[index]/1000, 0).UTC())
+	logger.Debug("2nd to Last Timestamp for", resampleInterval, "min", time.Unix(data.Timestamp[index-1]/1000, 0).UTC())
 	return
 }
 
@@ -130,8 +136,15 @@ func (d *Data) GetFiveMinuteData() OHLCV {
 // getOHLCVBars Break down the bars into open, high, low, close arrays that are easier to manipulate.
 func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 	bars := d.minuteBars
+	// c := math.Ceil(float64(d.index) / float64(resampleInterval))
+	// log.Println("c", c)
 	resampledIndex := int(d.index / resampleInterval)
 	adjuster := 0
+	// log.Println(float64(resampledIndex), ">", float64(d.index)/float64(resampleInterval))
+	// log.Println(d.index, resampleInterval)
+	if float64(resampledIndex) > float64(d.index/resampleInterval) || resampleInterval == 1 {
+		adjuster = 1
+	}
 	if val, ok := d.data[resampleInterval]; ok {
 		if len(all) > 0 && all[0] == true {
 			return OHLCV{
@@ -152,7 +165,7 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 			Volume:    val.Volume[:resampledIndex-adjuster],
 		}
 	} else {
-		length := (len(bars) / resampleInterval) + 1
+		length := resampledIndex
 		ohlcv := OHLCV{
 			Timestamp: make([]int64, length),
 			Open:      make([]float64, length),
@@ -161,31 +174,43 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 			Close:     make([]float64, length),
 			Volume:    make([]float64, length),
 		}
-
-		for i := 1; i < length; i++ {
-			oldIndex := (i * resampleInterval)
-			ohlcv.Open[i] = bars[oldIndex-resampleInterval].Open
-			ohlcv.Close[i] = bars[oldIndex-1].Close
-			ohlcv.Timestamp[i] = bars[oldIndex-1].Timestamp
-			low := ohlcv.Open[i]
-
-			var high, volume float64
-			for j := -resampleInterval; j < 0; j++ {
-				if high < bars[oldIndex+j].High {
-					high = bars[oldIndex+j].High
-				}
-
-				if low > bars[oldIndex+j].Low {
-					low = bars[oldIndex+j].Low
-				}
-				volume += bars[oldIndex+j].Volume
+		if resampleInterval == 1 {
+			for i := 0; i < length-1; i++ {
+				oldIndex := i
+				ohlcv.Open[i] = bars[oldIndex].Open
+				ohlcv.Close[i] = bars[oldIndex].Close
+				ohlcv.Timestamp[i] = bars[oldIndex].Timestamp
+				ohlcv.High[i] = bars[oldIndex].High
+				ohlcv.Low[i] = bars[oldIndex].Low
+				ohlcv.Volume[i] = bars[oldIndex].Volume
 			}
+			d.data[resampleInterval] = ohlcv
+		} else {
+			for i := 0; i < length-adjuster; i++ {
+				oldIndex := (i * resampleInterval) + resampleInterval
+				ohlcv.Open[i] = bars[oldIndex-resampleInterval].Open
+				ohlcv.Close[i] = bars[oldIndex].Close
+				ohlcv.Timestamp[i] = bars[oldIndex].Timestamp
+				low := ohlcv.Open[i]
 
-			ohlcv.High[i] = high
-			ohlcv.Low[i] = low
-			ohlcv.Volume[i] = volume
+				var high, volume float64
+				for j := -resampleInterval; j <= 0; j++ {
+					if high < bars[oldIndex+j].High {
+						high = bars[oldIndex+j].High
+					}
+
+					if low > bars[oldIndex+j].Low {
+						low = bars[oldIndex+j].Low
+					}
+					volume += bars[oldIndex+j].Volume
+				}
+
+				ohlcv.High[i] = high
+				ohlcv.Low[i] = low
+				ohlcv.Volume[i] = volume
+			}
+			d.data[resampleInterval] = ohlcv
 		}
-		d.data[resampleInterval] = ohlcv
 	}
 
 	if len(all) > 0 && all[0] == true {
