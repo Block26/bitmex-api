@@ -53,7 +53,7 @@ func (d *Data) AddDataFromTradeBin(tradeBin iex.TradeBin) {
 	arr := make([]*Bar, 0)
 
 	bar := &Bar{
-		Timestamp:   tradeBin.Timestamp.Unix(),
+		Timestamp:   tradeBin.Timestamp.Unix() * 1000,
 		Open:        tradeBin.Open,
 		High:        tradeBin.High,
 		Low:         tradeBin.Low,
