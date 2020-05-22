@@ -2,6 +2,7 @@ package models
 
 import (
 	"log"
+	"math"
 	"sort"
 	"time"
 
@@ -136,13 +137,10 @@ func (d *Data) GetFiveMinuteData() OHLCV {
 // getOHLCVBars Break down the bars into open, high, low, close arrays that are easier to manipulate.
 func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 	bars := d.minuteBars
-	// c := math.Ceil(float64(d.index) / float64(resampleInterval))
-	// log.Println("c", c)
-	resampledIndex := int(d.index / resampleInterval)
+	resampledIndex := int(math.Ceil(float64(len(bars))/float64(resampleInterval))) - 1
 	adjuster := 0
-	// log.Println(float64(resampledIndex), ">", float64(d.index)/float64(resampleInterval))
-	// log.Println(d.index, resampleInterval)
-	if float64(resampledIndex) > float64(d.index/resampleInterval) || resampleInterval == 1 {
+
+	if float64(resampledIndex) == float64(d.index)/float64(resampleInterval) || resampleInterval == 1 {
 		adjuster = 1
 	}
 	if val, ok := d.data[resampleInterval]; ok {
@@ -156,16 +154,21 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 				Volume:    val.Volume,
 			}
 		}
+		last := resampledIndex - adjuster
 		return OHLCV{
-			Timestamp: val.Timestamp[:resampledIndex-adjuster],
-			Open:      val.Open[:resampledIndex-adjuster],
-			High:      val.High[:resampledIndex-adjuster],
-			Low:       val.Low[:resampledIndex-adjuster],
-			Close:     val.Close[:resampledIndex-adjuster],
-			Volume:    val.Volume[:resampledIndex-adjuster],
+			Timestamp: val.Timestamp[:last],
+			Open:      val.Open[:last],
+			High:      val.High[:last],
+			Low:       val.Low[:last],
+			Close:     val.Close[:last],
+			Volume:    val.Volume[:last],
 		}
 	} else {
 		length := resampledIndex
+		if resampleInterval == 1 {
+			length = len(bars)
+		}
+
 		ohlcv := OHLCV{
 			Timestamp: make([]int64, length),
 			Open:      make([]float64, length),
@@ -175,22 +178,22 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 			Volume:    make([]float64, length),
 		}
 		if resampleInterval == 1 {
-			for i := 0; i < length-1; i++ {
-				oldIndex := i
-				ohlcv.Open[i] = bars[oldIndex].Open
-				ohlcv.Close[i] = bars[oldIndex].Close
-				ohlcv.Timestamp[i] = bars[oldIndex].Timestamp
-				ohlcv.High[i] = bars[oldIndex].High
-				ohlcv.Low[i] = bars[oldIndex].Low
-				ohlcv.Volume[i] = bars[oldIndex].Volume
+			for i := 0; i < length; i++ {
+				ohlcv.Open[i] = bars[i].Open
+				ohlcv.Close[i] = bars[i].Close
+				ohlcv.Timestamp[i] = bars[i].Timestamp
+				ohlcv.High[i] = bars[i].High
+				ohlcv.Low[i] = bars[i].Low
+				ohlcv.Volume[i] = bars[i].Volume
 			}
 			d.data[resampleInterval] = ohlcv
 		} else {
 			for i := 0; i < length-adjuster; i++ {
-				oldIndex := (i * resampleInterval) + resampleInterval
+				oldIndex := resampleInterval * (i + 1)
 				ohlcv.Open[i] = bars[oldIndex-resampleInterval].Open
 				ohlcv.Close[i] = bars[oldIndex].Close
 				ohlcv.Timestamp[i] = bars[oldIndex].Timestamp
+				// fmt.Println("oldIndex", oldIndex, "i", i, "length", length)
 				low := ohlcv.Open[i]
 
 				var high, volume float64
