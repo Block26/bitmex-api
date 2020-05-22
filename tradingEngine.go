@@ -289,7 +289,9 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		select {
 		case positions := <-channels.PositionChan:
 			t.updatePositions(t.Algo, positions)
-			channels.PositionChanComplete <- nil
+			if t.isTest {
+				channels.PositionChanComplete <- nil
+			}
 		case trades := <-channels.TradeBinChan:
 			startTimestamp := time.Now().UnixNano()
 			logger.Debugf("Recieved %v new trade updates: %v\n", len(trades), trades)
@@ -309,9 +311,9 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				if t.Algo.DataLength < len(marketState.OHLCV.GetMinuteData().Timestamp) {
 					t.updateState(t.Algo, trade.Symbol, setupData)
 					rebalance(t.Algo)
-				} else {
-					log.Println("Not enough trade data. (local data length", len(marketState.OHLCV.GetMinuteData().Timestamp), "data length wanted by Algo", t.Algo.DataLength, ")")
-				}
+				} //else {
+				// log.Println("Not enough trade data. (local data length", len(marketState.OHLCV.GetMinuteData().Timestamp), "data length wanted by Algo", t.Algo.DataLength, ")")
+				// }
 			}
 			for _, marketState := range t.Algo.Account.MarketStates {
 				state := logState(t.Algo, marketState)
@@ -324,7 +326,10 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			}
 			t.aggregateAccountProfit()
 			logger.Debugf("[Trading Engine] trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
-			channels.TradeBinChanComplete <- nil
+
+			if t.isTest {
+				channels.TradeBinChanComplete <- nil
+			}
 			if !t.Algo.Timestamp.Before(t.endTime) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, history, startTime)
@@ -338,10 +343,14 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			t.updateOrders(t.Algo, newOrders, true)
 			// TODO callback to order function
 			// logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
-			channels.OrderChanComplete <- nil
+			if t.isTest {
+				channels.OrderChanComplete <- nil
+			}
 		case update := <-channels.WalletChan:
 			t.updateAlgoBalances(t.Algo, update)
-			channels.WalletChanComplete <- nil
+			if t.isTest {
+				channels.WalletChanComplete <- nil
+			}
 		}
 		if channels.TradeBinChan == nil {
 			logger.Errorf("Trade bin channel is nil, breaking...\n")

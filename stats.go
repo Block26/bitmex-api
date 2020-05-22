@@ -339,7 +339,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		if state.Info.MarketType != models.Option {
 			kvparams := utils.CreateKeyValuePairs(algo.Params.GetAllParamsForSymbol(symbol), true)
 			log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Sharpe %0.3f \n Sortino %0.3f \n Params: %s",
-				history[historyLength-1].Balance,
+				history[historyLength-1].UBalance,
 				history[historyLength-1].AverageCost,
 				history[historyLength-1].Quantity,
 				maxLeverage,
