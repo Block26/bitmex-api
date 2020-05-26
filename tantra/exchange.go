@@ -298,21 +298,15 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 		// log.Fatalln(lastCandle.Close, t.Account.MarketStates[order.Market].Bar.Close)
 		if t.Account.ExchangeInfo.DenominatedInQuote {
 			if order.Side == "buy" {
-				// fillAmount = utils.Round((order.Amount / fillPrice), .0001)
-				// fillAmount = order.Amount / fillPrice
 				fillAmount = order.Amount
-
-				if marketState.Position >= 0 {
-					marketState.Balance -= math.Abs(order.Amount) * fillPrice
-				} else {
+				if marketState.Position < 0 {
 					marketState.Balance += math.Abs(order.Amount) * fillPrice
+				} else {
+					marketState.Balance -= math.Abs(order.Amount) * fillPrice
 				}
 			} else if order.Side == "sell" {
-				// fillAmount = utils.Round((-order.Amount / fillPrice), .0001)
-				// fillAmount = -order.Amount / fillPrice
 				fillAmount = -order.Amount
-
-				if marketState.Position >= 0 {
+				if marketState.Position > 0 {
 					marketState.Balance += math.Abs(order.Amount) * fillPrice
 				} else {
 					marketState.Balance -= math.Abs(order.Amount) * fillPrice
@@ -327,27 +321,27 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 		}
 		// log.Println(fillAmount, fillPrice)
 	} else {
-		if t.Account.ExchangeInfo.DenominatedInQuote {
-			if order.Side == "buy" && lastCandle.Low <= order.Rate {
-				isFilled = true
-				fillPrice = order.Rate
-				fillAmount = order.Amount / fillPrice
-			} else if order.Side == "sell" && lastCandle.High >= order.Rate {
-				isFilled = true
-				fillPrice = order.Rate
-				fillAmount = -order.Amount / fillPrice
-			}
-		} else {
-			if order.Side == "buy" && lastCandle.Low <= order.Rate {
-				isFilled = true
-				fillPrice = order.Rate
-				fillAmount = order.Amount
-			} else if order.Side == "sell" && lastCandle.High >= order.Rate {
-				isFilled = true
-				fillPrice = order.Rate
-				fillAmount = -order.Amount
-			}
+		// if t.Account.ExchangeInfo.DenominatedInQuote {
+		// 	if order.Side == "buy" && lastCandle.Low <= order.Rate {
+		// 		isFilled = true
+		// 		fillPrice = order.Rate
+		// 		fillAmount = order.Amount / fillPrice
+		// 	} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+		// 		isFilled = true
+		// 		fillPrice = order.Rate
+		// 		fillAmount = -order.Amount / fillPrice
+		// 	}
+		// } else {
+		if order.Side == "buy" && lastCandle.Low <= order.Rate {
+			isFilled = true
+			fillPrice = order.Rate
+			fillAmount = order.Amount
+		} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+			isFilled = true
+			fillPrice = order.Rate
+			fillAmount = -order.Amount
 		}
+		// }
 	}
 	return
 }
