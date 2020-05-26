@@ -80,6 +80,8 @@ github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610/go.mod h1:QN0aHde
 github.com/tantralabs/vol-generator v0.0.0-20200323152559-9fb94fa3f702 h1:m3iFX10cRCIao+0BR4Ei6plR+qeS5lGRNn8Fmd0aUgU=
 github.com/tantralabs/vol-generator v0.0.0-20200323152559-9fb94fa3f702/go.mod h1:254X/8JtgM/vZ6bcO6Ox8fhiE5lrlrieATR12Vh8E14=
 github.com/tantralabs/yantra v0.3.0/go.mod h1:RUcqo8gIPzAU0FXtTUukuCY7HzvkFQOokYu/wIOr4n4=
+github.com/tantralabs/yantra v0.3.7/go.mod h1:hRgCDJ7jpC+hu6/OrggY5HgA0iM0chJ98FOi60PjmdE=
+github.com/tantralabs/yantra v0.3.8-0.20200526032547-65ac8c89e51f/go.mod h1:wlOXvI0voYl5mZqrerdCJHBRPbYJc6Axarf/uOYHDAM=
 github.com/tidwall/gjson v1.3.2 h1:+7p3qQFaH3fOMXAJSrdZwGKcOO/lYdGS0HqGhPqDdTI=
 github.com/tidwall/gjson v1.3.2/go.mod h1:P256ACg0Mn+j1RXIDXoss50DeIABTYK1PULOJHhxOls=
 github.com/tidwall/gjson v1.5.0 h1:QCssIUI7J0RStkzIcI4A7O6P8rDA5wi5IPf70uqKSxg=

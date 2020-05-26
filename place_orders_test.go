@@ -44,8 +44,8 @@ func TestBinanceFuturesOrders(t *testing.T) {
 	// tradingEngine.SetupTest(start, end, Rebalance, SetupData)
 	tradingEngine.RunTest(start, end, PlaceOrder, SetupData)
 
-	expectedBTCPosition := 6.800676676384579e-06
-	expectedUSDTBalance := 100.04884538418077
+	expectedBTCPosition := 0.005
+	expectedUSDTBalance := 64.12294999999999
 	if algo.Account.MarketStates[symbol].Position != expectedBTCPosition || algo.Account.MarketStates[symbol].Balance != expectedUSDTBalance {
 		if algo.Account.MarketStates[symbol].Position != expectedBTCPosition {
 			t.Error("Position has changed from", expectedBTCPosition, "to", algo.Account.MarketStates[symbol].Position)
@@ -113,7 +113,7 @@ func PlaceOrder(algo *models.Algo) {
 		order := iex.Order{
 			Market:   symbol,
 			Currency: symbol,
-			Amount:   .01,
+			Amount:   .005,
 			// Rate:     orderPrice,
 			Type: "market",
 			Side: "sell",
@@ -129,7 +129,7 @@ func PlaceOrder(algo *models.Algo) {
 			Amount:   .01,
 			// Rate:     orderPrice,
 			Type: "market",
-			Side: "sell",
+			Side: "buy",
 		}
 		log.Println("--------New Trade--------")
 		log.Printf("Placing order %v\n", order)
@@ -142,7 +142,7 @@ func PlaceOrder(algo *models.Algo) {
 func PlaceAopOrder(algo *models.Algo) {
 	aopParams := aop.GetParameters(algo, symbol)
 	if algo.Account.MarketStates[symbol].Leverage > .02 {
-		weight := -1
+		weight := 1
 		leverageTarget := aopParams.BaseLeverage
 		t := aop.Targets{
 			Weight:              weight,
@@ -154,7 +154,7 @@ func PlaceAopOrder(algo *models.Algo) {
 		log.Println("--------New Trade--------")
 		aop.PlaceOrders(algo, symbol, t)
 	} else {
-		weight := 1
+		weight := -1
 		leverageTarget := aopParams.BaseLeverage
 		t := aop.Targets{
 			Weight:              weight,

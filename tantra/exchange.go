@@ -302,7 +302,7 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 				// fillAmount = order.Amount / fillPrice
 				fillAmount = order.Amount
 
-				if marketState.Position > 0 {
+				if marketState.Position >= 0 {
 					marketState.Balance -= math.Abs(order.Amount) * fillPrice
 				} else {
 					marketState.Balance += math.Abs(order.Amount) * fillPrice
@@ -312,7 +312,7 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 				// fillAmount = -order.Amount / fillPrice
 				fillAmount = -order.Amount
 
-				if marketState.Position > 0 {
+				if marketState.Position >= 0 {
 					marketState.Balance += math.Abs(order.Amount) * fillPrice
 				} else {
 					marketState.Balance -= math.Abs(order.Amount) * fillPrice

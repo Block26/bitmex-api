@@ -20,6 +20,5 @@ require (
 	github.com/tantralabs/logger v0.0.0-20200204183402-925e01159ffa
 	github.com/tantralabs/theo-engine v0.0.0-20200319174139-3371856b691a
 	github.com/tantralabs/tradeapi v0.0.0-20200506131137-58fef3c55a97
-	github.com/tantralabs/vol-generator v0.0.0-20200323152559-9fb94fa3f702 // indirect
 	gonum.org/v1/gonum v0.7.0
 )
