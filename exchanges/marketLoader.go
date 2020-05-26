@@ -81,7 +81,7 @@ func LoadExchangeInfo(exchange string) (exchangeInfo models.ExchangeInfo, err er
 			Exchange:            exchange,
 			MaxLeverage:         1,
 			MinimumOrderSize:    0.002,
-			QuantityPrecision:   1,
+			QuantityPrecision:   1.,
 			PricePrecision:      0.00000100,
 			MaxOrders:           20,
 			Slippage:            0.0,

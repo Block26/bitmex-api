@@ -68,6 +68,11 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 }
 
 func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
+	t.SetupTest(start, end, rebalance, setupData)
+	t.Connect("", false, rebalance, setupData, true)
+}
+
+func (t *TradingEngine) SetupTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
 	t.isTest = true
 	logger.SetLogLevel(t.Algo.BacktestLogLevel)
 	exchangeVars := iex.ExchangeConf{
@@ -89,7 +94,6 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	// t.endTime = end.AddDate(0, 0, -1)
 	t.endTime = end
 	setupData(t.Algo)
-	t.Connect("", false, rebalance, setupData, true)
 }
 
 func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
@@ -460,6 +464,7 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 	marketState.Position = position.CurrentQty
 	if math.Abs(marketState.Position) > 0 && position.AvgCostPrice > 0 {
 		marketState.AverageCost = position.AvgCostPrice
+
 	} else if position.CurrentQty == 0 {
 		marketState.AverageCost = 0
 	}
@@ -472,8 +477,17 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 
 	var balance float64
 	if marketState.Info.MarketType == models.Future {
-		balance = algo.Account.BaseAsset.Quantity
-		marketState.Leverage = math.Abs(marketState.Position) / (marketState.Bar.Close * balance)
+		if algo.Account.ExchangeInfo.DenominatedInQuote {
+			position := (math.Abs(marketState.Position) * marketState.Bar.Close)
+			marketState.Leverage = (position / (marketState.Balance + position))
+			balance = (math.Abs(marketState.Position) * marketState.Bar.Close) + algo.Account.BaseAsset.Quantity
+			// marketState.Leverage = balance / marketState.Balance
+			log.Println("BTC Position", marketState.Position, "USDT Balance", marketState.Balance, "UBalance", balance, "Leverage", marketState.Leverage, "Price", marketState.Bar.Close)
+		} else {
+			balance = algo.Account.BaseAsset.Quantity
+			marketState.Leverage = math.Abs(marketState.Position) / (marketState.Bar.Close * balance)
+		}
+
 	} else {
 		if marketState.AverageCost == 0 {
 			marketState.AverageCost = marketState.Bar.Close
@@ -890,21 +904,39 @@ func getCurrentProfit(marketState *models.MarketState, price float64) float64 {
 
 func getPositionAbsLoss(algo *models.Algo, marketState *models.MarketState) float64 {
 	positionLoss := 0.0
-	if marketState.Position < 0 {
-		positionLoss = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+	if algo.Account.ExchangeInfo.DenominatedInQuote {
+		if marketState.Position < 0 {
+			positionLoss = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+		} else {
+			positionLoss = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+		}
 	} else {
-		positionLoss = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+		if marketState.Position < 0 {
+			positionLoss = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+		} else {
+			positionLoss = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+		}
 	}
+
 	return positionLoss
 }
 
 func getPositionAbsProfit(algo *models.Algo, marketState *models.MarketState) float64 {
 	positionProfit := 0.0
-	if marketState.Position > 0 {
-		positionProfit = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+	if algo.Account.ExchangeInfo.DenominatedInQuote {
+		if marketState.Position > 0 {
+			positionProfit = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+		} else {
+			positionProfit = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+		}
 	} else {
-		positionProfit = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+		if marketState.Position > 0 {
+			positionProfit = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+		} else {
+			positionProfit = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+		}
 	}
+
 	return positionProfit
 }
 
@@ -925,8 +957,14 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 	}
 
 	if marketState.Info.MarketType == models.Future {
-		state.UBalance = marketState.Balance + marketState.UnrealizedProfit
-		state.QuoteBalance = (marketState.Balance + marketState.UnrealizedProfit) * marketState.Bar.Close
+		if algo.Account.ExchangeInfo.DenominatedInQuote {
+			state.UBalance = (math.Abs(marketState.Position) * marketState.Bar.Close) + marketState.Balance
+			// state.UBalance = marketState.Balance + marketState.UnrealizedProfit
+			state.QuoteBalance = marketState.Position
+		} else {
+			state.UBalance = marketState.Balance + marketState.UnrealizedProfit
+			state.QuoteBalance = (marketState.Balance + marketState.UnrealizedProfit) * marketState.Bar.Close
+		}
 	} else {
 		state.UBalance = (algo.Account.BaseAsset.Quantity * marketState.Bar.Close) + marketState.Position
 	}

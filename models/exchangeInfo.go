@@ -12,11 +12,12 @@ type ExchangeInfo struct {
 	TakerFee                float64
 	Slippage                float64
 	PricePrecision          float64
-	QuantityPrecision       int
+	QuantityPrecision       float64
 	MinimumOrderSize        float64
 	MaxLeverage             float64
 	BulkCancelSupported     bool
 	DenominatedInUnderlying bool
+	DenominatedInQuote      bool
 
 	// Supported symbols for the exchange
 	Symbols map[string]bool

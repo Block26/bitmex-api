@@ -53,11 +53,12 @@ type MarketInfo struct {
 	TakerFee                float64
 	Slippage                float64
 	PricePrecision          float64
-	QuantityPrecision       int
+	QuantityPrecision       float64
 	MinimumOrderSize        float64
 	MaxLeverage             float64
 	BulkCancelSupported     bool
 	DenominatedInUnderlying bool
+	DenominatedInQuote      bool
 
 	// Only used for options
 	Strike           float64
@@ -82,6 +83,7 @@ func NewMarketInfo(symbol string, exchangeInfo ExchangeInfo) MarketInfo {
 		MaxLeverage:             exchangeInfo.MaxLeverage,
 		BulkCancelSupported:     exchangeInfo.BulkCancelSupported,
 		DenominatedInUnderlying: exchangeInfo.DenominatedInUnderlying,
+		DenominatedInQuote:      exchangeInfo.DenominatedInQuote,
 	}
 }
 
@@ -97,13 +99,14 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				MarketType:          Future,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
-				QuantityPrecision:   1,
+				QuantityPrecision:   1.,
 				PricePrecision:      .5,
 				MaxOrders:           20,
 				Slippage:            0.0,
 				MakerFee:            -0.00025,
 				TakerFee:            0.00075,
 				BulkCancelSupported: true,
+				DenominatedInQuote:  false,
 			}, nil
 		case "ETHUSD":
 			return MarketInfo{
@@ -114,7 +117,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				MarketType:          Future,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
-				QuantityPrecision:   1,
+				QuantityPrecision:   1.,
 				PricePrecision:      2,
 				MaxOrders:           20,
 				Slippage:            0.0,
@@ -136,7 +139,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				MarketType:          Future,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
-				QuantityPrecision:   1,
+				QuantityPrecision:   1.,
 				PricePrecision:      .5,
 				MaxOrders:           20,
 				Slippage:            0.0,
@@ -153,7 +156,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				MarketType:          Future,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
-				QuantityPrecision:   0,
+				QuantityPrecision:   0.,
 				PricePrecision:      2,
 				MaxOrders:           20,
 				Slippage:            0.0,
@@ -177,7 +180,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				MarketType:          Future,
 				MaxLeverage:         1,
 				MinimumOrderSize:    0.002,
-				QuantityPrecision:   1,
+				QuantityPrecision:   0.0000001,
 				PricePrecision:      0.00000100,
 				MaxOrders:           20,
 				Slippage:            0.0,
