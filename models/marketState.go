@@ -19,26 +19,27 @@ var marketStatuses = [...]string{
 	"Closed",
 }
 
-// Representation of the state of a given market.
+// Representation of the state of a given market. It contains static market information as well as
+// dynamic state that changes with market data.
 type MarketState struct {
-	Symbol           string
-	Info             MarketInfo
-	Position         float64
-	AverageCost      float64
+	Symbol           string     // symbol of a given market
+	Info             MarketInfo // static information about the underlying contract
+	Position         float64    // our current position (can be positive or negative)
+	AverageCost      float64    // average cost of our current position (zero if no position)
 	UnrealizedProfit float64
 	RealizedProfit   float64
-	Profit           float64
+	Profit           float64 // unrealized profit + realized profit
 	Leverage         float64
-	Weight           int
-	Balance          float64  // We want this balance to track the account balance automatically
-	Orders           sync.Map // [orderId]Order
-	LastPrice        float64
-	MidMarketPrice   float64
-	BestBid          float64
-	BestAsk          float64
-	Bar              Bar   // The last bar of data for this market
-	OHLCV            *Data // Open, High, Low, Close, Volume Data
-	Status           MarketStatus
+	Weight           int          // sign of desired position (SHOULD BE MOVED)
+	Balance          float64      // balance assigned to the given market (total account balance if using cross margin)
+	Orders           sync.Map     // [orderId]Order
+	LastPrice        float64      // the last trade price observed in the given market
+	MidMarketPrice   float64      // average of bid and ask (not yet tracked)
+	BestBid          float64      // (not yet tracked)
+	BestAsk          float64      // (not yet tracked)
+	Bar              Bar          // the last bar of data for this market
+	OHLCV            *Data        // Open, High, Low, Close, Volume Data
+	Status           MarketStatus // is this market, open, closed, or expired?
 
 	// Only for options
 	OptionTheo *OptionTheo
@@ -65,6 +66,7 @@ type MarketState struct {
 	MaxLeverage         float64
 }
 
+// Returns the current sign of the position for this market.
 func (ms *MarketState) GetCurrentWeight() int {
 	if ms.Position > 0 {
 		return 1
@@ -74,16 +76,7 @@ func (ms *MarketState) GetCurrentWeight() int {
 	return 0
 }
 
-func NewMarketState(marketInfo MarketInfo, balance float64) MarketState {
-	var syncMap sync.Map
-	return MarketState{
-		Symbol:  marketInfo.Symbol,
-		Info:    marketInfo,
-		Balance: balance,
-		Orders:  syncMap,
-	}
-}
-
+// COnstructor for a new market state given a symbol and general exchange information.
 func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balance float64) MarketState {
 	marketInfo, err := LoadMarketInfo(exchangeInfo.Exchange, symbol)
 	if err != nil {
@@ -98,6 +91,7 @@ func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balanc
 	}
 }
 
+// Constructor for a new market state given static market information and a base account balance.
 func NewMarketStateFromInfo(marketInfo MarketInfo, balance float64) MarketState {
 	var syncMap sync.Map
 	return MarketState{

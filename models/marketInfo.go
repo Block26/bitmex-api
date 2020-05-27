@@ -13,7 +13,10 @@ const (
 	Binance        = "binance"
 )
 
+// Enum for a market's type (spot, future, or option)
 type MarketType int
+
+// How do we want the mock exchange to fill our order?
 type FillType int
 
 const (
@@ -60,24 +63,24 @@ var OptionTypes = [...]string{
 
 // Stateless market information.
 type MarketInfo struct {
-	Symbol                  string
-	BaseSymbol              string
-	QuoteSymbol             string
-	MarketType              MarketType
-	FillType                FillType
-	Exchange                string
-	ExchangeURL             string
-	WSStream                string
-	MaxOrders               int
-	MakerFee                float64
-	TakerFee                float64
-	Slippage                float64
-	PricePrecision          float64
-	QuantityPrecision       int
-	MinimumOrderSize        float64
-	MaxLeverage             float64
-	BulkCancelSupported     bool
-	DenominatedInUnderlying bool
+	Symbol                  string     // a string representing the entire market (i.e. XBTUSD)
+	BaseSymbol              string     // string representing base asset (i.e. XBT)
+	QuoteSymbol             string     // string representing quote asset (i.e. USD)
+	MarketType              MarketType // spot, future, or option
+	FillType                FillType   // how we want the exchange to fill our orders
+	Exchange                string     // the exchange hosting this market
+	ExchangeURL             string     // REST API endpoint
+	WSStream                string     // Websocket API endpoint
+	MaxOrders               int        // maximum number of outstanding orders for this market
+	MakerFee                float64    // maker fee as decimal (i.e. -.00025 is .025% rebate)
+	TakerFee                float64    // taker fee as decimal
+	Slippage                float64    // expected slippage for this market, as decimal
+	PricePrecision          float64    // minimum granularity of order price
+	QuantityPrecision       int        // minimum granularity of order amount
+	MinimumOrderSize        float64    // absolute minimum size of order
+	MaxLeverage             float64    // max leverage as ratio (i.e. 100x = 100.)
+	BulkCancelSupported     bool       // can we cancel multiple orders in one REST API call?
+	DenominatedInUnderlying bool       // is this market amount quoted in terms of base asset?
 
 	// Only used for options
 	Strike           float64
@@ -86,6 +89,7 @@ type MarketInfo struct {
 	UnderlyingSymbol string
 }
 
+// Returns a new market info struct given a symbol and exchange information.
 func NewMarketInfo(symbol string, exchangeInfo ExchangeInfo) MarketInfo {
 	return MarketInfo{
 		Symbol:                  symbol,
@@ -105,6 +109,7 @@ func NewMarketInfo(symbol string, exchangeInfo ExchangeInfo) MarketInfo {
 	}
 }
 
+// Constructs new market info given an exchange and market symbol. Throw an error if the pair is not recognized.
 func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err error) {
 	if exchange == Bitmex {
 		switch m := market; m {
