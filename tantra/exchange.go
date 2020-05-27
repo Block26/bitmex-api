@@ -261,6 +261,19 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 	//TODO update marketState.Bar here?
 	if len(candleData) >= index {
 		t.currentCandle[symbol] = candleData[index]
+		// TODO initialize vwap, quote volume?
+		// minuteData := marketState.OHLCV.GetMinuteData()
+		t.Account.MarketStates[symbol].Bar = models.Bar{
+			Timestamp: int64(utils.TimeToTimestamp(candleData[index].Timestamp)),
+			Open:      candleData[index].Open,
+			High:      candleData[index].High,
+			Low:       candleData[index].Low,
+			Close:     candleData[index].Close,
+			Volume:    candleData[index].Volume,
+		}
+		// algo.Timestamp = time.Unix(marketState.Bar.Timestamp/1000, 0).UTC()
+		t.Account.MarketStates[symbol].LastPrice = t.Account.MarketStates[symbol].Bar.Close
+		// t.Account.MarketStates[symbol].Bar = candleData[index]
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
 		// log.Println("[Exchange] advanced to", t.CurrentTime)

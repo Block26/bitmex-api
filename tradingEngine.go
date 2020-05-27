@@ -536,20 +536,6 @@ func (t *TradingEngine) updateState(algo *models.Algo, symbol string, setupData 
 		logger.Errorf("Cannot update state for %v (could not find market state).\n", symbol)
 		return
 	}
-	lastCandleIndex := len(marketState.OHLCV.GetMinuteData().Timestamp) - 1
-	// TODO initialize vwap, quote volume?
-	minuteData := marketState.OHLCV.GetMinuteData()
-	marketState.Bar = models.Bar{
-		Timestamp: minuteData.Timestamp[lastCandleIndex],
-		Open:      minuteData.Open[lastCandleIndex],
-		High:      minuteData.High[lastCandleIndex],
-		Low:       minuteData.Low[lastCandleIndex],
-		Close:     minuteData.Close[lastCandleIndex],
-		Volume:    minuteData.Volume[lastCandleIndex],
-	}
-	// algo.Timestamp = time.Unix(marketState.Bar.Timestamp/1000, 0).UTC()
-	marketState.LastPrice = marketState.Bar.Close
-
 	if !t.isTest {
 		setupData(algo)
 	}
