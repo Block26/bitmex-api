@@ -473,3 +473,31 @@ func Run(app string, args ...string) error {
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
+
+func GetFillPrice(marketState *models.MarketState, candle iex.TradeBin) float64 {
+	var fillPrice float64
+	// log.Fatal(marketState.Info.FillType)
+	if marketState.Info.FillType == 2 {
+		// log.Fatal("This worked")
+		if marketState.Weight > 0 && marketState.Position > 0 {
+			fillPrice = candle.High
+		} else if marketState.Weight < 0 && marketState.Position < 0 {
+			fillPrice = candle.Low
+		} else if marketState.Weight != 1 && marketState.Position > 0 {
+			fillPrice = candle.Low
+		} else if marketState.Weight != -1 && marketState.Position < 0 {
+			fillPrice = candle.High
+		} else {
+			fillPrice = candle.Close
+		}
+	} else if marketState.Info.FillType == 1 {
+		fillPrice = candle.Close
+		// 	// } else if algo.FillType == exchanges.FillType().Open {
+		// 	// 	fillPrice = marketState.Bar.Open
+	} else if marketState.Info.FillType == 3 {
+		fillPrice = (candle.Open + candle.Close) / 2
+	} else if marketState.Info.FillType == 4 {
+		fillPrice = (candle.High + candle.Low) / 2
+	}
+	return fillPrice
+}

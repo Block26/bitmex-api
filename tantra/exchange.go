@@ -245,7 +245,7 @@ func (t *Tantra) SetTheoEngine(theoEngine *te.TheoEngine) {
 	volDataStart := utils.TimeToTimestamp(t.start)
 	volDataEnd := utils.TimeToTimestamp(t.end)
 	t.theoEngine.InsertVolData(volDataStart, volDataEnd)
-	logger.Infof("Inserted vol data with start %v and end %v.\n", volDataStart, volDataEnd)
+	// logger.Infof("Inserted vol data with start %v and end %v.\n", volDataStart, volDataEnd)
 }
 
 func (t *Tantra) SetCurrentTime(currentTime time.Time) {
@@ -268,7 +268,7 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 	}
 }
 
-func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount float64) {
+func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFilled bool, fillPrice, fillAmount float64) {
 	lastCandle, ok := t.currentCandle[order.Market]
 	if !ok {
 		// This is probably an option order, for now simply check if market order
@@ -292,7 +292,12 @@ func (t *Tantra) getFill(order iex.Order) (isFilled bool, fillPrice, fillAmount 
 	// Price (rate) of zero signifies market order for now
 	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
-		fillPrice = utils.AdjustForSlippage(lastCandle.Close, order.Side, t.Account.ExchangeInfo.Slippage)
+		log.Println("candle ", lastCandle)
+		log.Println("open candle ", lastCandle.Open)
+		log.Println("Close market ", marketState.Bar.Close, marketState.Bar.Timestamp)
+		log.Fatal("Open market ", marketState.Bar.Open, marketState.Bar.Timestamp)
+		fillPrice = utils.GetFillPrice(marketState, lastCandle)
+		fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
 		// fillPrice = lastCandle.Close // TODO implement multiple market order fill types
 		if order.Side == "buy" {
 			fillAmount = order.Amount
@@ -328,7 +333,7 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 		if !ok {
 			logger.Errorf("Could not find market state for %v\n", order.Market)
 		}
-		isFilled, fillPrice, fillAmount = t.getFill(order)
+		isFilled, fillPrice, fillAmount = t.getFill(order, marketState)
 		logger.Debugf("Filled: %v\n", isFilled)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
@@ -388,7 +393,7 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	if start == end {
 		return
 	}
-	log.Println("[Exchange] Inserting", end-start, "records...")
+	// log.Println("[Exchange] Inserting", end-start, "records...")
 	accounts := t.AccountHistory[start:end]
 	markets := t.MarketHistory[start:end]
 	database.InsertAccountHistory(t.db, accounts)
