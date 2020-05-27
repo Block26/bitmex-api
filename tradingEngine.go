@@ -99,10 +99,10 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 			logger.Errorf("Cannot set bar data for market state %v.\n", symbol)
 		}
 		if t.isTest {
-			d := models.SetupDataModel(data, t.Algo.DataLength)
+			d := models.SetupDataModel(data, t.Algo.DataLength, t.isTest)
 			marketState.OHLCV = &d
 		} else {
-			d := models.SetupDataModel(data, len(data))
+			d := models.SetupDataModel(data, len(data), t.isTest)
 			marketState.OHLCV = &d
 		}
 	}

@@ -16,6 +16,7 @@ type Data struct {
 	index          int
 	data           map[int]OHLCV
 	lookbackLength int
+	isTest         bool
 }
 
 const (
@@ -23,7 +24,7 @@ const (
 )
 
 // SetupDataModel is always passed minute level data
-func SetupDataModel(minuteBars []*Bar, initialIndex int) Data {
+func SetupDataModel(minuteBars []*Bar, initialIndex int, isTest bool) Data {
 	// Sort the data where index 0 is the start and index -1 is the end
 	sort.Slice(minuteBars, func(i, j int) bool { return minuteBars[i].Timestamp < minuteBars[j].Timestamp })
 	// Remove from the start of the dataset and pin to the start of an hour
@@ -42,6 +43,7 @@ func SetupDataModel(minuteBars []*Bar, initialIndex int) Data {
 		index:      initialIndex - firstHourIndex,
 		minuteBars: minuteBars,
 		data:       make(map[int]OHLCV),
+		isTest:     isTest,
 	}
 }
 
@@ -126,23 +128,20 @@ func (d *Data) GetMinuteData() OHLCV {
 	return d.getOHLCV(1)
 }
 
-func (d *Data) GetHourData() OHLCV {
-	return d.getOHLCV(60)
-}
-
-func (d *Data) GetFiveMinuteData() OHLCV {
-	return d.getOHLCV(5)
-}
-
 // getOHLCVBars Break down the bars into open, high, low, close arrays that are easier to manipulate.
 func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 	bars := d.minuteBars
-	resampledIndex := int(math.Ceil(float64(len(bars))/float64(resampleInterval))) - 1
 	adjuster := 0
-
+	resampledIndex := int(math.Ceil(float64(d.index)/float64(resampleInterval))) - 1
 	if float64(resampledIndex) == float64(d.index)/float64(resampleInterval) || resampleInterval == 1 {
 		adjuster = 1
 	}
+
+	length := resampledIndex
+	if d.isTest {
+		length = (len(bars) / resampleInterval) + 1
+	}
+	// Check to see if we have already cached the data
 	if val, ok := d.data[resampleInterval]; ok {
 		if len(all) > 0 && all[0] == true {
 			return OHLCV{
@@ -164,11 +163,10 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 			Volume:    val.Volume[:last],
 		}
 	} else {
-		length := resampledIndex
+		// We want to preprocess all the data and cache it for the test to use and index later
 		if resampleInterval == 1 {
 			length = len(bars)
 		}
-
 		ohlcv := OHLCV{
 			Timestamp: make([]int64, length),
 			Open:      make([]float64, length),
@@ -190,10 +188,12 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 		} else {
 			for i := 0; i < length-adjuster; i++ {
 				oldIndex := resampleInterval * (i + 1)
+				if oldIndex == len(bars) {
+					break
+				}
 				ohlcv.Open[i] = bars[oldIndex-resampleInterval].Open
 				ohlcv.Close[i] = bars[oldIndex].Close
 				ohlcv.Timestamp[i] = bars[oldIndex].Timestamp
-				// fmt.Println("oldIndex", oldIndex, "i", i, "length", length)
 				low := ohlcv.Open[i]
 
 				var high, volume float64
