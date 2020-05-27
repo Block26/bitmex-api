@@ -292,12 +292,14 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 	// Price (rate) of zero signifies market order for now
 	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
-		log.Println("candle ", lastCandle)
-		log.Println("open candle ", lastCandle.Open)
-		log.Println("Close market ", marketState.Bar.Close, marketState.Bar.Timestamp)
-		log.Fatal("Open market ", marketState.Bar.Open, marketState.Bar.Timestamp)
+		// log.Println("candle ", lastCandle)
+		// log.Println("open candle ", lastCandle.Open)
+		// log.Println("Close market ", marketState.Bar.Close, marketState.Bar.Timestamp)
+		// log.Fatal("Open market ", marketState.Bar.Open, marketState.Bar.Timestamp)
 		fillPrice = utils.GetFillPrice(marketState, lastCandle)
 		fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
+		// log.Println("fillPrice", fillPrice, "lastCandle.Close", lastCandle.Close, "lastCandle.High", lastCandle.High, "lastCandle.Low", lastCandle.Low)
+
 		// fillPrice = lastCandle.Close // TODO implement multiple market order fill types
 		if order.Side == "buy" {
 			fillAmount = order.Amount
@@ -333,6 +335,7 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 		if !ok {
 			logger.Errorf("Could not find market state for %v\n", order.Market)
 		}
+		marketState.Weight = utils.GetCurrentWeight(order.Side, marketState)
 		isFilled, fillPrice, fillAmount = t.getFill(order, marketState)
 		logger.Debugf("Filled: %v\n", isFilled)
 		if isFilled {
