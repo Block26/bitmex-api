@@ -56,7 +56,8 @@ const InsertBatchSize = 10000 // The number of historical data entries to accumu
 
 // Tantra represents the mock exchange client.
 type Tantra struct {
-	client                *clients.Client                   // an endpoint to hit for raw API calls (should only be used in edge cases)
+	client *clients.Client // an endpoint to hit for raw API calls (should only be used in edge cases)
+	iex.IExchange
 	channels              *iex.WSChannels                   // series of go channels used to implement mock exchange websockets
 	SimulatedExchangeName string                            // name of the exchange to be simulated, i.e. "bitmex"
 	MarketInfos           map[string]models.MarketInfo      // map of symbol to market information
