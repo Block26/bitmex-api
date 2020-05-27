@@ -14,6 +14,7 @@ const (
 )
 
 type MarketType int
+type FillType int
 
 const (
 	Future MarketType = iota
@@ -25,6 +26,24 @@ var marketTypes = [...]string{
 	"Future",
 	"Option",
 	"Spot",
+}
+
+const (
+	Limit FillType = iota
+	// Open
+	Close
+	Worst
+	MeanOC
+	MeanHL
+)
+
+var fillTypes = [...]string{
+	"limit",
+	// "open",
+	"close",
+	"worst",
+	"meanOC",
+	"meanHL",
 }
 
 type OptionType int
@@ -45,6 +64,7 @@ type MarketInfo struct {
 	BaseSymbol              string
 	QuoteSymbol             string
 	MarketType              MarketType
+	FillType                FillType
 	Exchange                string
 	ExchangeURL             string
 	WSStream                string
@@ -95,6 +115,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BaseSymbol:          "XBT",
 				QuoteSymbol:         "USD",
 				MarketType:          Future,
+				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
 				QuantityPrecision:   1,
@@ -112,6 +133,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BaseSymbol:          "ETH",
 				QuoteSymbol:         "USD",
 				MarketType:          Future,
+				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
 				QuantityPrecision:   1,
@@ -134,6 +156,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BaseSymbol:          "XBT",
 				QuoteSymbol:         "USD",
 				MarketType:          Future,
+				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
 				QuantityPrecision:   1,
@@ -151,6 +174,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BaseSymbol:          "ETH",
 				QuoteSymbol:         "USD",
 				MarketType:          Future,
+				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
 				QuantityPrecision:   0,
@@ -174,7 +198,8 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				WSStream:            "stream.binance.us:9443",
 				BaseSymbol:          "BTC",
 				QuoteSymbol:         "USDT",
-				MarketType:          Future,
+				MarketType:          Spot,
+				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    0.002,
 				QuantityPrecision:   1,
@@ -193,7 +218,8 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				WSStream:            "stream.binance.us:9443",
 				BaseSymbol:          "BNB",
 				QuoteSymbol:         "BTC",
-				MarketType:          Future,
+				MarketType:          Spot,
+				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    0.002,
 				QuantityPrecision:   1,
@@ -212,7 +238,8 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				WSStream:            "stream.binance.us:9443",
 				BaseSymbol:          "ETH",
 				QuoteSymbol:         "USDT",
-				MarketType:          Future,
+				MarketType:          Spot,
+				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    0.002,
 				QuantityPrecision:   1,
@@ -232,6 +259,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BaseSymbol:          "EOS",
 				QuoteSymbol:         "USDT",
 				MarketType:          Spot,
+				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    0.002,
 				QuantityPrecision:   1,
@@ -254,6 +282,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BaseSymbol:              "BTC",
 				QuoteSymbol:             "USD",
 				MarketType:              Future,
+				FillType:                Close,
 				MinimumOrderSize:        10,
 				QuantityPrecision:       10,
 				PricePrecision:          .5,
@@ -272,6 +301,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BaseSymbol:              "ETH",
 				QuoteSymbol:             "USD",
 				MarketType:              Future,
+				FillType:                Close,
 				MinimumOrderSize:        10,
 				QuantityPrecision:       10,
 				PricePrecision:          .5,
@@ -296,6 +326,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BaseSymbol:          "BTC",
 				QuoteSymbol:         "USD",
 				MarketType:          Future,
+				FillType:            Close,
 				MinimumOrderSize:    10,
 				QuantityPrecision:   10,
 				PricePrecision:      .5,
