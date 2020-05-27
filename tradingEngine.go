@@ -1,3 +1,6 @@
+// The yantra package contains all base layer components of the Tantra Labs algorithmic trading platform.
+// The primary compenent is a trading engine used for interfacing with exchanges and managing requests in both
+// backtesting and live environments.
 package yantra
 
 import (
@@ -11,7 +14,6 @@ import (
 	"time"
 
 	"github.com/jinzhu/copier"
-	"github.com/tantralabs/exchanges"
 	"github.com/tantralabs/logger"
 	te "github.com/tantralabs/theo-engine"
 	"github.com/tantralabs/tradeapi"
@@ -28,6 +30,7 @@ import (
 var currentRunUUID time.Time
 var barData map[string][]*models.Bar
 
+// The trading engine is responsible for managing communication between algos and other modules and the exchange.
 type TradingEngine struct {
 	Algo                 *models.Algo
 	reuseData            bool
@@ -44,6 +47,7 @@ type TradingEngine struct {
 	contractUpdatePeriod int
 }
 
+// Construct a new trading engine given an algo and other configurations.
 func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...bool) TradingEngine {
 	currentRunUUID = time.Now()
 	//TODO: should theo engine and other vars be initialized here?
@@ -67,6 +71,10 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 	}
 }
 
+// Run a backtest given a start and end time.
+// Provide a rebalance function to be called at every data interval and performs trading logic.
+// Optionally, provide a setup data to be called before rebalance to precompute relevant data and metrics for the algo.
+// This is the trading engine's entry point for a new backtest.
 func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
 	t.isTest = true
 	logger.SetLogLevel(t.Algo.BacktestLogLevel)
@@ -92,6 +100,7 @@ func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*
 	t.Connect("", false, rebalance, setupData, true)
 }
 
+// Set the candle data for the trading engine and format it according to the algo's configuration.
 func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 	for symbol, data := range candleData {
 		marketState, ok := t.Algo.Account.MarketStates[symbol]
@@ -108,6 +117,7 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 	}
 }
 
+// Given a new instance of candle data, inject it into the relevant market state for access by the algo's trading logic.
 func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 	marketState, ok := t.Algo.Account.MarketStates[candle.Symbol]
 	if !ok {
@@ -126,6 +136,8 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 	}
 }
 
+// Given an algo and a start and end time, load relevant candle data from the database.
+// The data is returned as a map of symbol to pointers of Bar structs.
 func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {
 	if barData == nil || !t.reuseData {
 		barData = make(map[string][]*models.Bar)
@@ -360,9 +372,13 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	logger.Infof("Reached end of connect.\n")
 }
 
+const walletHistoryPeriod = 60 * 60 * 60
+
+// Get the wallet history from the exchange and log it to the db.
+// Don't log this data if we have already logged within walletHistoryPeriod seconds.
 func (t *TradingEngine) checkWalletHistory(algo *models.Algo, settingsFileName string) {
 	timeSinceLastSync := database.GetBars()[algo.Index].Timestamp - t.lastWalletSync
-	if timeSinceLastSync > (60 * 60 * 60) {
+	if timeSinceLastSync > (walletHistoryPeriod) {
 		logger.Info("It has been", timeSinceLastSync, "seconds since the last wallet history download, fetching latest deposits and withdrawals.")
 		t.lastWalletSync = database.GetBars()[algo.Index].Timestamp
 		walletHistory, err := algo.Client.GetWalletHistory(algo.Account.BaseAsset.Symbol)
@@ -376,7 +392,7 @@ func (t *TradingEngine) checkWalletHistory(algo *models.Algo, settingsFileName s
 	}
 }
 
-// Inject orders directly into market state upon update
+// Inject orders directly into market state upon update.
 func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUpdate bool) {
 	// logger.Infof("Processing %v order updates.\n", len(orders))
 	if isUpdate {
@@ -417,7 +433,8 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 	}
 }
 
-// TODO do we just want to do a tantra test here?
+// Run a new backtest. This private function is meant to be called while the trading engine is running live, as a means
+// of making sure that the current state is similar to the expected state (a safety mechanism).
 func (t *TradingEngine) runTest(algo *models.Algo, setupData func(*models.Algo), rebalance func(*models.Algo)) {
 	if t.lastTest != database.GetBars()[algo.Index].Timestamp {
 		t.lastTest = database.GetBars()[algo.Index].Timestamp
@@ -437,6 +454,7 @@ func (t *TradingEngine) runTest(algo *models.Algo, setupData func(*models.Algo),
 	}
 }
 
+// Given a set of websocket position updates, update all relevant market states.
 func (t *TradingEngine) updatePositions(algo *models.Algo, positions []iex.WsPosition) {
 	logger.Debug("Position Update:", positions)
 	if len(positions) > 0 {
@@ -452,6 +470,7 @@ func (t *TradingEngine) updatePositions(algo *models.Algo, positions []iex.WsPos
 	t.firstPositionUpdate = false
 }
 
+// Update a single market's position given a websocket position update.
 func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPosition) {
 	marketState, ok := algo.Account.MarketStates[position.Symbol]
 	if !ok {
@@ -486,6 +505,7 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 
 }
 
+// Iterate through all visible market states and calculate unrealized, realized, and total profits across all markets.
 func (t *TradingEngine) aggregateAccountProfit() {
 	totalUnrealizedProfit := 0.
 	totalRealizedProfit := 0.
@@ -501,6 +521,7 @@ func (t *TradingEngine) aggregateAccountProfit() {
 		t.Algo.Account.UnrealizedProfit, t.Algo.Account.RealizedProfit, t.Algo.Account.Profit)
 }
 
+// Update all balances contained by the trading engine given a slice of websocket balance updates from the exchange.
 func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
 	for _, updatedBalance := range balances {
 		balance, ok := algo.Account.Balances[updatedBalance.Currency]
@@ -530,6 +551,7 @@ func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Bal
 	}
 }
 
+// Setup data for a given market, and log the state of the algo to the db if necessary.
 func (t *TradingEngine) updateState(algo *models.Algo, symbol string, setupData func(*models.Algo)) {
 	marketState, ok := algo.Account.MarketStates[symbol]
 	if !ok {
@@ -546,6 +568,9 @@ func (t *TradingEngine) updateState(algo *models.Algo, symbol string, setupData 
 	}
 }
 
+// Get new contracts from the exchange and remove all expired ones. Don't do anything
+// if enough time has not passed (contractUpdatePeriod).
+// This method is really only useful for options, or other deriviatives with expirations.
 func (t *TradingEngine) UpdateActiveContracts() {
 	logger.Infof("Updating active contracts at %v\n", t.Algo.Timestamp)
 	updateTime := t.lastContractUpdate + t.contractUpdatePeriod
@@ -575,6 +600,7 @@ func (t *TradingEngine) UpdateActiveContracts() {
 	t.lastContractUpdate = currentTimestamp
 }
 
+// Get a map of all currently open option contracts on the exchange.
 func (t *TradingEngine) GetActiveOptions() map[string]models.MarketState {
 	logger.Infof("Generating active contracts at %v\n", t.Algo.Timestamp)
 	liveContracts := make(map[string]models.MarketState)
@@ -629,6 +655,7 @@ func (t *TradingEngine) GetActiveOptions() map[string]models.MarketState {
 	return liveContracts
 }
 
+// Update the mid market prices of all tradable contracts. Mostly only useful for options.
 func (t *TradingEngine) UpdateMidMarketPrices() {
 	if t.Algo.Account.ExchangeInfo.Options {
 		logger.Debugf("Updating mid markets at %v with currency %v\n", t.Algo.Timestamp, t.Algo.Account.BaseAsset.Symbol)
@@ -648,7 +675,7 @@ func (t *TradingEngine) UpdateMidMarketPrices() {
 	}
 }
 
-// Delete all expired options without profit values to conserve time and space resources
+// Delete all expired options without profit values to conserve time and space resources.
 func (t *TradingEngine) RemoveExpiredOptions() {
 	numOptions := len(t.theoEngine.Options)
 	for symbol, option := range t.theoEngine.Options {
@@ -665,6 +692,7 @@ func (t *TradingEngine) RemoveExpiredOptions() {
 	t.theoEngine.UpdateOptionIndexes()
 }
 
+// Log a new trade to the remote influx database. Should only be used in live trading for now.
 func (t *TradingEngine) logTrade(trade iex.Order) {
 	stateType := "live"
 	influx := getInfluxClient()
@@ -698,6 +726,7 @@ func (t *TradingEngine) logTrade(trade iex.Order) {
 	influx.Close()
 }
 
+// Log a new filled trade to the remote influx database. SShould only be used in live trading for now.
 func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 	stateType := "live"
 	influx := getInfluxClient()
@@ -730,7 +759,7 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 	influx.Close()
 }
 
-//Log the state of the Algo to influx db
+// Log the state of the Algo to influx db. Should only be called when live trading for now.
 func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bool) {
 	stateType := "live"
 	if test != nil {
@@ -874,6 +903,7 @@ func getCurrentProfit(marketState *models.MarketState, price float64) float64 {
 	}
 }
 
+// Get the worst-case PNL on the position for a given market state.
 func getPositionAbsLoss(algo *models.Algo, marketState *models.MarketState) float64 {
 	positionLoss := 0.0
 	if marketState.Position < 0 {
@@ -884,6 +914,7 @@ func getPositionAbsLoss(algo *models.Algo, marketState *models.MarketState) floa
 	return positionLoss
 }
 
+// Get the best-case PNL on the position for a given market state.
 func getPositionAbsProfit(algo *models.Algo, marketState *models.MarketState) float64 {
 	positionProfit := 0.0
 	if marketState.Position > 0 {
@@ -894,7 +925,7 @@ func getPositionAbsProfit(algo *models.Algo, marketState *models.MarketState) fl
 	return positionProfit
 }
 
-//Log the state of the Algo and update variables like leverage
+// Log the state of the Algo and update variables like leverage.
 func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...time.Time) (state models.History) {
 	state = models.History{
 		Timestamp:   algo.Timestamp,
@@ -922,32 +953,7 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 	return
 }
 
-func getFillPrice(algo *models.Algo, marketState *models.MarketState) float64 {
-	var fillPrice float64
-	if algo.FillType == exchanges.FillType().Worst {
-		if marketState.Weight > 0 && marketState.Position > 0 {
-			fillPrice = marketState.Bar.High
-		} else if marketState.Weight < 0 && marketState.Position < 0 {
-			fillPrice = marketState.Bar.Low
-		} else if marketState.Weight != 1 && marketState.Position > 0 {
-			fillPrice = marketState.Bar.Low
-		} else if marketState.Weight != -1 && marketState.Position < 0 {
-			fillPrice = marketState.Bar.High
-		} else {
-			fillPrice = marketState.Bar.Close
-		}
-	} else if algo.FillType == exchanges.FillType().Close {
-		fillPrice = marketState.Bar.Close
-	} else if algo.FillType == exchanges.FillType().Open {
-		fillPrice = marketState.Bar.Open
-	} else if algo.FillType == exchanges.FillType().MeanOC {
-		fillPrice = (marketState.Bar.Open + marketState.Bar.Close) / 2
-	} else if algo.FillType == exchanges.FillType().MeanHL {
-		fillPrice = (marketState.Bar.High + marketState.Bar.Low) / 2
-	}
-	return fillPrice
-}
-
+// Get the remote influx db client for logging live trading data.
 func getInfluxClient() client.Client {
 	influxURL := os.Getenv("YANTRA_LIVE_DB_URL")
 	if influxURL == "" {
@@ -970,6 +976,7 @@ func getInfluxClient() client.Client {
 	return influx
 }
 
+// Log live backtest results for a given algo.
 func logBacktest(algo *models.Algo) {
 	influxURL := os.Getenv("YANTRA_BACKTEST_DB_URL")
 	if influxURL == "" {
@@ -1011,7 +1018,7 @@ func logBacktest(algo *models.Algo) {
 	influx.Close()
 }
 
-// CreateSpread Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
+// Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
 func CreateSpread(algo *models.Algo, marketState *models.MarketState, weight int32, confidence float64, price float64, spread float64) models.OrderArray {
 	tickSize := marketState.Info.PricePrecision
 	maxOrders := marketState.Info.MaxOrders
