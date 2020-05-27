@@ -1,3 +1,7 @@
+// The tantra package provides a mock exchange implementation for interacting with API calls
+// in a local environment. This allows for the most realistic backtesting environment possible
+// while allowing algos to step through time rapidly. The exchange is implemented as a REST API client interface, abstracting away
+// any logic that may differ between backtesting and live execution.
 package tantra
 
 import (
@@ -18,6 +22,8 @@ import (
 	"github.com/tantralabs/yantra/utils"
 )
 
+// Construct a new test given an exchange configuration and account. Provide a start and end time for the test. Database should already
+// be populated with data for the given time range. Returns a pointer to a mock exchange implementation.
 func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, end time.Time, dataLength int, logBacktest bool) *Tantra {
 	logger.Infof("Init new test with start %v and end %v\n", start, end)
 	tantra := New(vars, account, logBacktest)
@@ -27,7 +33,7 @@ func NewTest(vars iex.ExchangeConf, account *models.Account, start time.Time, en
 	return tantra
 }
 
-// Mock exchange constructor
+// Generic mock exchange constructor. Requires exchange configuration and preconstructed account struct. Returns pointer to mock exchange implementation.
 func New(vars iex.ExchangeConf, account *models.Account, log bool) *Tantra {
 	client := clients.NewClient(vars)
 	t := &Tantra{
@@ -46,36 +52,35 @@ func New(vars iex.ExchangeConf, account *models.Account, log bool) *Tantra {
 	return t
 }
 
-const InsertBatchSize = 10000
+const InsertBatchSize = 10000 // The number of historical data entries to accumulate before inserting into the database.
 
-// Tantra represents a mock exchange client
+// Tantra represents the mock exchange client.
 type Tantra struct {
-	client *clients.Client
-	iex.IExchange
-	marketType            string
-	channels              *iex.WSChannels
-	SimulatedExchangeName string
-	MarketInfos           map[string]models.MarketInfo
-	Account               *models.Account
-	AccountHistory        []models.AccountHistory
-	MarketHistory         []map[string]models.MarketHistory
-	TradeHistory          []models.Trade
-	PreviousMarketStates  map[string]models.MarketHistory
+	client                *clients.Client                   // an endpoint to hit for raw API calls (should only be used in edge cases)
+	channels              *iex.WSChannels                   // series of go channels used to implement mock exchange websockets
+	SimulatedExchangeName string                            // name of the exchange to be simulated, i.e. "bitmex"
+	MarketInfos           map[string]models.MarketInfo      // map of symbol to market information
+	Account               *models.Account                   // the account belonging to any algos interacting with the exchange
+	AccountHistory        []models.AccountHistory           // rolling record of account information to be inserted into db for analysis
+	MarketHistory         []map[string]models.MarketHistory // rolling record of market histories
+	TradeHistory          []models.Trade                    // rolling record of trade histories
+	PreviousMarketStates  map[string]models.MarketHistory   // the last observed snapshot of each market state
 	CurrentTime           time.Time
-	orders                map[string]iex.Order
-	ordersToPublish       map[string]iex.Order
-	index                 int
-	candleData            map[string][]iex.TradeBin
-	currentCandle         map[string]iex.TradeBin
-	sequenceNumber        int
-	start                 time.Time
-	end                   time.Time
-	theoEngine            *te.TheoEngine
-	db                    *sqlx.DB
-	lastInsertIndex       int
-	LogBacktest           bool
+	orders                map[string]iex.Order      // all outstanding limit orders on the exchange
+	ordersToPublish       map[string]iex.Order      // all orders received by exchange but not yet pushed out to clients
+	index                 int                       // candle data index
+	candleData            map[string][]iex.TradeBin // map of symbol to the respective candle data
+	currentCandle         map[string]iex.TradeBin   // map of symbol to current candle
+	sequenceNumber        int                       // index that is incremented with the processing of each additional order
+	start                 time.Time                 // backtest start time
+	end                   time.Time                 // backtest end time
+	theoEngine            *te.TheoEngine            // optional theo engine for use with option trading
+	db                    *sqlx.DB                  // db used for logging various histories
+	lastInsertIndex       int                       // the index of the last entry inserted into db
+	LogBacktest           bool                      // should history data be inserted into the db? (if yes, backtest will be slower)
 }
 
+// Assign a set of candle data to be run locally on the exchange.
 func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
 	t.candleData = make(map[string][]iex.TradeBin)
 	t.currentCandle = make(map[string]iex.TradeBin)
@@ -101,6 +106,8 @@ func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
 	logger.Debugf("Set candle data for %v symbols.\n", len(t.candleData))
 }
 
+// Given a websocket configuration, start the exchange websockets by feeding pre-loaded candle data into channels, one at a time.
+// This is the entry point for a backtest.
 func (t *Tantra) StartWS(config interface{}) error {
 	logger.Infof("Starting mock exchange websockets...\n")
 	conf, ok := config.(*iex.WsConfig)
@@ -239,6 +246,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 	return nil
 }
 
+// Assign a theo engine to the exchange if options trading is supported. Theo engine defaults to nil.
 func (t *Tantra) SetTheoEngine(theoEngine *te.TheoEngine) {
 	t.theoEngine = theoEngine
 	logger.Infof("Set theo engine for mock exchange.\n")
@@ -248,11 +256,13 @@ func (t *Tantra) SetTheoEngine(theoEngine *te.TheoEngine) {
 	// logger.Infof("Inserted vol data with start %v and end %v.\n", volDataStart, volDataEnd)
 }
 
+// Update the current time viewed by the exchange.
 func (t *Tantra) SetCurrentTime(currentTime time.Time) {
 	t.CurrentTime = currentTime.UTC()
 	logger.Infof("Set current timestamp: %v\n", t.CurrentTime)
 }
 
+// Update the current candle given a candle index and symbol.
 func (t *Tantra) updateCandle(index int, symbol string) {
 	candleData, ok := t.candleData[symbol]
 	if !ok {
@@ -281,6 +291,10 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 	}
 }
 
+// Given a new order, determine whether the order should be filled.
+// If the order is filled, return the fill price and fill amount, otherwise return zero.
+// Custom fill logic should go here- for now we assume a limit order is filled if candle wicks through limit price.
+// Assume market orders are filled at the last close, adjusted for fees and slippage.
 func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFilled bool, fillPrice, fillAmount float64) {
 	lastCandle, ok := t.currentCandle[order.Market]
 	if !ok {
@@ -336,7 +350,7 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 var fillTime = 0
 var insertTime = 0
 
-// Find any orders that should be filled, and update local positions/balances. Then, publish these updates to clients
+// Find any orders that should be filled, and update local positions/balances. Then, publish these updates to clients via go channels.
 func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 	// Only iterate through current open orders
 	filledSymbols = make(map[string]bool)
@@ -371,6 +385,7 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 
 var appendTime = 0
 
+// Construct account and market histories, then store them in memory.
 func (t *Tantra) appendToHistory() {
 	appendStart := time.Now().UnixNano()
 	timestamp := utils.TimeToTimestamp(t.CurrentTime)
@@ -385,11 +400,15 @@ func (t *Tantra) appendToHistory() {
 	appendTime += int(time.Now().UnixNano() - appendStart)
 }
 
+// Given a trade generated by the exchange, record the trade in memory.
 func (t *Tantra) processTrade(trade models.Trade) {
 	t.TradeHistory = append(t.TradeHistory, trade)
 	logger.Debugf("Processed trade: %v\n", trade)
 }
 
+// Insert account, market, and trade histories to the db. If this is the last call in the backtest,
+// store all remaining history. Otherwise, store only the number of histories indicated in InsertBatchSize.
+// Once the data is inserted, flush it from memory.
 func (t *Tantra) insertHistoryToDB(isLast bool) {
 	insertStart := time.Now().UnixNano()
 	start := t.lastInsertIndex
@@ -423,6 +442,7 @@ func (t *Tantra) insertHistoryToDB(isLast bool) {
 	t.flushHistory()
 }
 
+// Drop all history data from memory. Should be called only after all relevant data is inserted into the db.
 func (t *Tantra) flushHistory() {
 	start := t.lastInsertIndex
 	end := len(t.AccountHistory) - 1
@@ -438,6 +458,7 @@ func (t *Tantra) flushHistory() {
 	logger.Debugf("Flushed history (last=%v)\n", end)
 }
 
+// Take all processed, but unpublished, orders and send them to clients via go channels.
 func (t *Tantra) publishOrderUpdates() {
 	logger.Debugf("Publishing %v order updates.\n", len(t.ordersToPublish))
 	// t.channels.OrderChan <- t.ordersToPublish
@@ -450,6 +471,9 @@ func (t *Tantra) publishOrderUpdates() {
 	t.ordersToPublish = make(map[string]iex.Order)
 }
 
+// Compute the PNL and various other statistics for a given market state. Calculations vary depending on the type of market being processed.
+// Since balance, position, and average cost are pointers, we update them in-place.
+// This method should be called whenever a position changes or refreshed PNL data is desired.
 func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *float64, averageCost *float64, fillPrice float64, fillAmount float64, marketState *models.MarketState) {
 	logger.Debugf("Updating balance with current base balance %v, current position %v, avg cost %v, fill price %v, fill amount %v\n",
 		*currentBaseBalance, *currentPosition, *averageCost, fillPrice, fillAmount)
@@ -552,6 +576,7 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *flo
 	}
 }
 
+// Get a set of all expiries for options contained by the theo engine.
 func (t *Tantra) getExpirys() map[int]bool {
 	expirys := make(map[int]bool)
 	for _, option := range t.theoEngine.Options {
@@ -560,6 +585,10 @@ func (t *Tantra) getExpirys() map[int]bool {
 	return expirys
 }
 
+// Get the list of markets supported by the exchange given a currency (base asset).
+// Indicate whether mid-market prices should be returned.
+// Optionally, index the response by market type.
+// This method is primarily useful for the setup of the theo engine.
 func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...string) ([]*iex.Contract, error) {
 	logger.Infof("[Tantra] Getting markets for %v\n", currency)
 	getOptions := false
@@ -676,6 +705,8 @@ func (t *Tantra) GetMarkets(currency string, getMidMarket bool, marketType ...st
 
 var theoTime = 0
 
+// Get mid market prices for option prices supported by the exchange. This method is meant to override
+// the direct API call provided by deribit.
 func (t *Tantra) GetMarketPricesByCurrency(currency string) (priceMap map[string]float64, err error) {
 	priceMap = make(map[string]float64)
 	if t.theoEngine == nil {
@@ -697,7 +728,8 @@ func (t *Tantra) GetMarketPricesByCurrency(currency string) (priceMap map[string
 	return
 }
 
-// This should be done on the client side as well
+// Remove all expired options on the exchange.
+// This should be done on the client side as well, since we don't have direct access to the theo engine maps.
 func (t *Tantra) removeExpiredOptions() {
 	currentTimestamp := utils.TimeToTimestamp(t.CurrentTime)
 	for symbol, option := range t.theoEngine.Options {
@@ -709,6 +741,7 @@ func (t *Tantra) removeExpiredOptions() {
 	}
 }
 
+// Construct option models from the raw objects returned from deribit's GetMarkets API call.
 func (t *Tantra) parseOptionContracts(contracts []*iex.Contract) {
 	var marketInfo models.MarketInfo
 	var optionType models.OptionType
@@ -735,6 +768,7 @@ func (t *Tantra) parseOptionContracts(contracts []*iex.Contract) {
 	logger.Infof("Parsed %v contracts.\n", len(contracts))
 }
 
+// Get the total PNL from all outstanding option positions on the exchange.
 func (t *Tantra) CurrentOptionProfit() float64 {
 	currentProfit := 0.
 	for _, option := range t.Account.MarketStates {
@@ -746,6 +780,7 @@ func (t *Tantra) CurrentOptionProfit() float64 {
 	return currentProfit
 }
 
+// Given an order, prepare it for publishing. The status of an order can be "new", "amend", or "cancel".
 func (t *Tantra) prepareOrderUpdate(order iex.Order, status string) {
 	o := order // make a copy so we can delete it
 	o.OrdStatus = status
@@ -753,6 +788,8 @@ func (t *Tantra) prepareOrderUpdate(order iex.Order, status string) {
 	t.ordersToPublish[o.OrderID] = order
 }
 
+// Handle a new order on the exchange. Throw an error if the order is invalid.
+// If the order is valid, we add it to memory and return the generated order id.
 func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	if newOrder.Amount <= 0 || newOrder.Rate < 0 {
 		logger.Errorf("Invalid order: %v\n", newOrder)
@@ -772,6 +809,7 @@ func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	return
 }
 
+// Remove a given order from memory. Throw an error if the order does not exist.
 func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 	// It wasn't making a copy so I am just reconstructing the order
 	canceledOrder := iex.Order{
@@ -790,6 +828,7 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 	return
 }
 
+// Return an enum for order status. TODO: this should be reworked as an enum that utilizes iota and consts.
 func (t *Tantra) GetPotentialOrderStatus() iex.OrderStatus {
 	return iex.OrderStatus{
 		Filled:    "Filled",
@@ -798,10 +837,13 @@ func (t *Tantra) GetPotentialOrderStatus() iex.OrderStatus {
 	}
 }
 
+// Get the current time viewed by the exchange.
 func (t *Tantra) GetLastTimestamp() time.Time {
 	return t.CurrentTime
 }
 
+// Meant to override API call for getting candle from exchange client. Return a slice of candle data models
+// given a desired symbol, interval, and number of candles. Throw an error if the data is not present.
 func (t *Tantra) GetCandles(symbol string, binSize string, amount int) ([]iex.TradeBin, error) {
 	// only fetch data the first time
 	candleData, ok := t.candleData[symbol]
@@ -834,6 +876,7 @@ func (t *Tantra) GetCandles(symbol string, binSize string, amount int) ([]iex.Tr
 	}
 }
 
+// Return all the balances for each base asset on the exchange.
 func (t *Tantra) GetBalances() (balance []iex.Balance, err error) {
 	balance = []iex.Balance{
 		{
@@ -844,11 +887,13 @@ func (t *Tantra) GetBalances() (balance []iex.Balance, err error) {
 	return
 }
 
+// Get the balance for a given currency (not yet implemented).
 func (t *Tantra) GetBalance(currency string) (balance iex.Balance, err error) {
 	log.Fatalln("GetBalance not implemented")
 	return
 }
 
+// Get all positions for a given currency.
 func (t *Tantra) GetPositions(currency string) (positions []iex.WsPosition, err error) {
 	var pos iex.WsPosition
 
@@ -865,26 +910,32 @@ func (t *Tantra) GetPositions(currency string) (positions []iex.WsPosition, err 
 	return
 }
 
+// Get various market information given a symbol and currency (not yet implemented)
 func (t *Tantra) GetMarketSummary(symbol string, currency string) (market iex.Market, err error) {
 	log.Fatalln("not implemented")
 	return
 }
 
+// Get various market information given a symbol and currency (not yet implemented)
 func (t *Tantra) GetMarketSummaryByCurrency(currency string) (markets []iex.Market, err error) {
 	log.Fatalln("not implemented")
 	return
 }
 
+// Get various order book data given a symbol and currency (not yet implemented)
 func (t *Tantra) GetOrderBook(symbol string, currency string) (orderbook iex.OrderBook, err error) {
 	log.Fatalln("not implemented")
 	return
 }
 
+// Simulate a withdrawal from the exchange (not yet implemented)
 func (t *Tantra) Withdraw(address, currency string, quantity float64, additionInfo ...string) (res iex.WithdrawResponse, err error) {
 	log.Fatalln("not implemented")
 	return
 }
 
+// Get a slice of all open limit order son the exchange.
+// We use a sync map to make sure there are no concurrent read/writes on the map of open orders.
 // TODO can keep a non/synced copy of order map for quick queries
 func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err error) {
 	// TODO this should return currently open orders
@@ -895,22 +946,25 @@ func (t *Tantra) GetOpenOrders(vars iex.OpenOrderF) (orders []iex.Order, err err
 	return oo, nil
 }
 
-//WalletHistory not available for this exchange
+// Get the wallet history for the exchange (not yet implemented).
 func (t *Tantra) GetWalletHistory(currency string) (res []iex.WalletHistoryItem, err error) {
 	err = errors.New(":error: WalletHistory not available for this exchange yet")
 	return
 }
 
+// Get all open orders on the exchange given an order interface (not yet implemented).
 func (t *Tantra) OpenOrders(f iex.OpenOrderF) (orders iex.OpenOrders, err error) {
 	log.Fatalln("not implemented")
 	return
 }
 
+// Given a market pair, return a formatted string (not yet implemented).
 func (t *Tantra) FormatMarketPair(pair iex.MarketPair) (res string, err error) {
 	log.Fatalln("not implemented")
 	return
 }
 
+// Prepare a given http request (not yet implemented).
 func (t *Tantra) PrepareRequest(r *http.Request) (err error) {
 	log.Fatalln("not implemented")
 	return
