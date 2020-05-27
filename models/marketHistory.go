@@ -49,8 +49,8 @@ func NewMarketHistory(market MarketState, timestamp int) MarketHistory {
 			Volatility:       market.OptionTheo.Volatility,
 		}
 	}
-	ohlcv, index := market.OHLCV.GetOHLCVData(1)
-	if market.OHLCV != nil && index > 0 {
+	// ohlcv, index := market.OHLCV.GetOHLCVData(1)
+	if market.OHLCV != nil {
 		// logger.Errorf("Close: %v\n", ohlcv.Close[index])
 		// lastBar := *barData[len(barData)-1]
 		// logger.Errorf("Last bar: %v, first bar: %v\n", lastBar, *barData[0])
@@ -67,11 +67,11 @@ func NewMarketHistory(market MarketState, timestamp int) MarketHistory {
 			UnrealizedProfit: market.UnrealizedProfit,
 			RealizedProfit:   market.RealizedProfit,
 			Position:         market.Position,
-			Open:             ohlcv.Open[index],
-			High:             ohlcv.High[index],
-			Low:              ohlcv.Low[index],
-			Close:            ohlcv.Close[index],
-			Volume:           ohlcv.Volume[index],
+			// Open:             ohlcv.Open[index],
+			// High:             ohlcv.High[index],
+			// Low:              ohlcv.Low[index],
+			// Close:            ohlcv.Close[index],
+			// Volume:           ohlcv.Volume[index],
 		}
 	}
 	return MarketHistory{

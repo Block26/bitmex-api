@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/gocarina/gocsv"
+	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
@@ -353,6 +354,8 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		}
 	}
 
+	logCloudBacktest(algo, history)
+
 	if algo.LogBacktest {
 		// Log balance history
 		os.Remove("balance.csv")
@@ -394,5 +397,114 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	elapsed := time.Since(startTime)
 	fmt.Println("-------------------------------")
 	log.Printf("Execution Speed: %v \n", elapsed)
+}
 
+func logCloudBacktest(algo *models.Algo, history []models.History) {
+	if algo.LogCloudBacktest {
+
+		influxURL := os.Getenv("YANTRA_BACKTEST_DB_URL")
+		if influxURL == "" {
+			log.Fatalln("You need to set the `YANTRA_BACKTEST_DB_URL` env variable")
+		}
+
+		influxUser := os.Getenv("YANTRA_BACKTEST_DB_USER")
+		influxPassword := os.Getenv("YANTRA_BACKTEST_DB_PASSWORD")
+
+		influx, _ := client.NewHTTPClient(client.HTTPConfig{
+			Addr:     influxURL,
+			Username: influxUser,
+			Password: influxPassword,
+			Timeout:  (time.Millisecond * 1000 * 10),
+		})
+
+		// uuid := algo.Name + "-" + uuid.New().String()
+
+		log.Println("LogCloudBacktest")
+		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+			Database:  "cloudtest",
+			Precision: "us",
+		})
+
+		// upsampleReturns(algo, bp, history)
+		tags := map[string]string{
+			"algo_name": algo.Name,
+			"run_id":    currentRunUUID.String(),
+		}
+		tags["currency"] = algo.Account.BaseAsset.Symbol
+		if algo.RebalanceInterval == "1m" {
+			day := 1440
+			lDay := 0.
+			for i, row := range history {
+				if i%day == 0 {
+					tags["sample_format"] = "daily"
+					fmt.Println("Hour", i/(60*24), history[i].Balance)
+					pct := utils.CalculateDifference(row.UBalance, lDay)
+					pt, _ := client.NewPoint(
+						"results",
+						tags,
+						map[string]interface{}{"pct_change": pct},
+						row.Timestamp,
+					)
+					fmt.Println(lDay, row.UBalance, pct)
+					lDay = history[i].UBalance
+					bp.AddPoint(pt)
+				}
+			}
+		}
+		err := client.Client.Write(influx, bp)
+		log.Println(algo.Name, err)
+	}
+}
+
+func upsampleReturns(algo *models.Algo, bp client.BatchPoints, history []models.History) {
+	tags := map[string]string{
+		"algo_name": algo.Name,
+		"run_id":    currentRunUUID.String(),
+	}
+	tags["currency"] = algo.Account.BaseAsset.Symbol
+	if algo.RebalanceInterval == "1m" {
+		day := 1440
+		for i, row := range history {
+			if i%day == 0 {
+				tags["sample_format"] = "daily"
+				pt, _ := client.NewPoint(
+					"balance",
+					tags,
+					map[string]interface{}{"balance": row.UBalance},
+					row.Timestamp,
+				)
+				bp.AddPoint(pt)
+
+			}
+
+			// if i%(day*7) == 0 {
+			// 	weekly = append(weekly, models.BalanceHistory{Timestamp: row.Timestamp, UBalance: row.UBalance})
+			// 	bp.AddPoint(pt)
+
+			// }
+
+			// if i%(day*30) == 0 {
+			// 	monthly = append(monthly, models.BalanceHistory{Timestamp: row.Timestamp, UBalance: row.UBalance})
+			// 	bp.AddPoint(pt)
+
+			// }
+		}
+	}
+	// else if algo.RebalanceInterval == "1h" {
+	// 	day := 24
+	// 	for i, row := range history {
+	// 		if i%day == 0 {
+	// 			daily = append(daily, models.BalanceHistory{Timestamp: row.Timestamp, UBalance: row.UBalance})
+	// 		}
+
+	// 		if i%(day*7) == 0 {
+	// 			weekly = append(weekly, models.BalanceHistory{Timestamp: row.Timestamp, UBalance: row.UBalance})
+	// 		}
+
+	// 		if i%(day*30) == 0 {
+	// 			monthly = append(monthly, models.BalanceHistory{Timestamp: row.Timestamp, UBalance: row.UBalance})
+	// 		}
+	// 	}
+	// }
+	return
 }

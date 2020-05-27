@@ -911,7 +911,7 @@ func getPositionAbsProfit(algo *models.Algo, marketState *models.MarketState) fl
 //Log the state of the Algo and update variables like leverage
 func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...time.Time) (state models.History) {
 	state = models.History{
-		Timestamp:   algo.Timestamp.String(),
+		Timestamp:   algo.Timestamp,
 		Symbol:      marketState.Symbol,
 		Balance:     marketState.Balance,
 		Quantity:    marketState.Position,
@@ -1021,6 +1021,7 @@ func logBacktest(algo *models.Algo) {
 
 	err := client.Client.Write(influx, bp)
 	log.Println(algo.Name, err)
+
 	influx.Close()
 }
 

@@ -24,6 +24,7 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 		DataLength:        config.DataLength,
 		RebalanceInterval: config.RebalanceInterval,
 		LogBacktest:       config.LogBacktest,
+		LogCloudBacktest:  config.LogCloudBacktest,
 		LogLevel:          logger.LogLevel().Debug,
 		BacktestLogLevel:  logger.LogLevel().Info,
 	}
