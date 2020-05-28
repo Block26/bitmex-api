@@ -2,8 +2,6 @@ module github.com/tantralabs/yantra
 
 go 1.13
 
-replace github.com/tantralabs/auto-order-placement => ../auto-order-placement
-
 require (
 	github.com/aws/aws-sdk-go v1.29.29
 	github.com/chobie/go-gaussian v0.0.0-20150107165016-53c09d90eeaf
@@ -14,7 +12,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.3.0
 	github.com/markcheno/go-talib v0.0.0-20190307022042-cd53a9264d70
-	github.com/tantralabs/auto-order-placement v0.0.0-20200526023341-f2ea2e8de6d0
+	github.com/tantralabs/auto-order-placement v0.0.0-20200528003425-653852cb8fc2
 	github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441
 	github.com/tantralabs/exchanges v0.0.0-20200204190209-ebc589b6dd8e
 	github.com/tantralabs/logger v0.0.0-20200204183402-925e01159ffa

@@ -59,6 +59,8 @@ github.com/tantralabs/auto-order-placement v0.0.0-20200515173632-f709b37abfe1 h1
 github.com/tantralabs/auto-order-placement v0.0.0-20200515173632-f709b37abfe1/go.mod h1:rD1/2nr69SoJMHBYtz/5EpiRTJuIW469zCHtTZe3EgQ=
 github.com/tantralabs/auto-order-placement v0.0.0-20200526023341-f2ea2e8de6d0 h1:5WOMofszNjtnIAm9R1F1rtvx+PkEHgxq8EL0CR84/0k=
 github.com/tantralabs/auto-order-placement v0.0.0-20200526023341-f2ea2e8de6d0/go.mod h1:rD1/2nr69SoJMHBYtz/5EpiRTJuIW469zCHtTZe3EgQ=
+github.com/tantralabs/auto-order-placement v0.0.0-20200528003425-653852cb8fc2 h1:wqHsyJJ+HkUZWG4hb1w7j+HJBkgHYihPoqwizQX4DbA=
+github.com/tantralabs/auto-order-placement v0.0.0-20200528003425-653852cb8fc2/go.mod h1:A3iE2gIakS3DcOCE11DefeVzFgFvQvb9mTHL5h1cFEc=
 github.com/tantralabs/database v0.0.0-20200204183143-0da0f0e5aa3c h1:RMtWxHq2eItiG0nzLupcJXH16wO1jHkK75t+/2VPsW0=
 github.com/tantralabs/database v0.0.0-20200204183143-0da0f0e5aa3c/go.mod h1:whSydCr8xhYkq8dPv8s9qFpmb6mN2Osjb1nbHQ2g4FQ=
 github.com/tantralabs/eaopt v0.0.0-20200117031806-b5ae12d20441 h1:4LLUBP40oa/AcX8gRnYYc34yx9UDDTYtbPFKIMsSDzE=
@@ -82,6 +84,8 @@ github.com/tantralabs/vol-generator v0.0.0-20200323152559-9fb94fa3f702/go.mod h1
 github.com/tantralabs/yantra v0.3.0/go.mod h1:RUcqo8gIPzAU0FXtTUukuCY7HzvkFQOokYu/wIOr4n4=
 github.com/tantralabs/yantra v0.3.7/go.mod h1:hRgCDJ7jpC+hu6/OrggY5HgA0iM0chJ98FOi60PjmdE=
 github.com/tantralabs/yantra v0.3.8-0.20200526032547-65ac8c89e51f/go.mod h1:wlOXvI0voYl5mZqrerdCJHBRPbYJc6Axarf/uOYHDAM=
+github.com/tantralabs/yantra v0.3.8-0.20200526154927-6cebb9395377/go.mod h1:TyiaQpfZ9bDL7NasV1gKZ4sgXGBHrU/MAGxzWtNy/cQ=
+github.com/tantralabs/yantra v0.3.8-0.20200528003253-da007c70107a/go.mod h1:TyiaQpfZ9bDL7NasV1gKZ4sgXGBHrU/MAGxzWtNy/cQ=
 github.com/tidwall/gjson v1.3.2 h1:+7p3qQFaH3fOMXAJSrdZwGKcOO/lYdGS0HqGhPqDdTI=
 github.com/tidwall/gjson v1.3.2/go.mod h1:P256ACg0Mn+j1RXIDXoss50DeIABTYK1PULOJHhxOls=
 github.com/tidwall/gjson v1.5.0 h1:QCssIUI7J0RStkzIcI4A7O6P8rDA5wi5IPf70uqKSxg=
@@ -103,6 +107,7 @@ golang.org/x/net v0.0.0-20200202094626-16171245cfb2/go.mod h1:z5CRVTTTmAJ677TzLL
 golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e h1:vcxGaoTs7kV8m5Np9uUNQin4BrLOthgV7252N8V+FwY=
 golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
