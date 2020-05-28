@@ -293,9 +293,6 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
 		fillPrice = utils.AdjustForSlippage(lastCandle.Close, order.Side, t.Account.ExchangeInfo.Slippage)
-
-		// fillPrice = lastCandle.Close // TODO implement multiple market order fill types
-		// log.Fatalln(lastCandle.Close, t.Account.MarketStates[order.Market].Bar.Close)
 		if t.Account.ExchangeInfo.DenominatedInQuote {
 			if order.Side == "buy" {
 				fillAmount = order.Amount
@@ -319,29 +316,28 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 				fillAmount = -order.Amount
 			}
 		}
-		// log.Println(fillAmount, fillPrice)
 	} else {
-		// if t.Account.ExchangeInfo.DenominatedInQuote {
-		// 	if order.Side == "buy" && lastCandle.Low <= order.Rate {
-		// 		isFilled = true
-		// 		fillPrice = order.Rate
-		// 		fillAmount = order.Amount / fillPrice
-		// 	} else if order.Side == "sell" && lastCandle.High >= order.Rate {
-		// 		isFilled = true
-		// 		fillPrice = order.Rate
-		// 		fillAmount = -order.Amount / fillPrice
-		// 	}
-		// } else {
-		if order.Side == "buy" && lastCandle.Low <= order.Rate {
-			isFilled = true
-			fillPrice = order.Rate
-			fillAmount = order.Amount
-		} else if order.Side == "sell" && lastCandle.High >= order.Rate {
-			isFilled = true
-			fillPrice = order.Rate
-			fillAmount = -order.Amount
+		if t.Account.ExchangeInfo.DenominatedInQuote {
+			if order.Side == "buy" && lastCandle.Low <= order.Rate {
+				isFilled = true
+				fillPrice = order.Rate
+				fillAmount = order.Amount
+			} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+				isFilled = true
+				fillPrice = order.Rate
+				fillAmount = -order.Amount
+			}
+		} else {
+			if order.Side == "buy" && lastCandle.Low <= order.Rate {
+				isFilled = true
+				fillPrice = order.Rate
+				fillAmount = order.Amount
+			} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+				isFilled = true
+				fillPrice = order.Rate
+				fillAmount = -order.Amount
+			}
 		}
-		// }
 	}
 	return
 }

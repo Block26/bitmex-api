@@ -22,7 +22,7 @@ func TestBinanceFuturesOrders(t *testing.T) {
 	/// All futures orders placed must be denominated in a btc amount.
 	startingBalance := 100.
 	exchangeInfo, _ := exchanges.LoadExchangeInfo(exchange)
-	exchangeInfo.QuantityPrecision = 0.0000001
+	// exchangeInfo.QuantityPrecision = 0.0000001
 	exchangeInfo.Spot = false
 	exchangeInfo.Futures = true
 	exchangeInfo.DenominatedInQuote = true
@@ -92,8 +92,8 @@ func TestBinanceFuturesAopOrders(t *testing.T) {
 	// tradingEngine.SetupTest(start, end, Rebalance, SetupData)
 	tradingEngine.RunTest(start, end, PlaceAopOrder, SetupData)
 
-	expectedBTCPosition := 6.800676676384579e-06
-	expectedUSDTBalance := 100.04884538418077
+	expectedBTCPosition := -0.0097234
+	expectedUSDTBalance := 9930.145606744314
 	if algo.Account.MarketStates[symbol].Position != expectedBTCPosition || algo.Account.MarketStates[symbol].Balance != expectedUSDTBalance {
 		if algo.Account.MarketStates[symbol].Position != expectedBTCPosition {
 			t.Error("Position has changed from", expectedBTCPosition, "to", algo.Account.MarketStates[symbol].Position)
