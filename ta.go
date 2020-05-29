@@ -118,13 +118,17 @@ func GetRsi(ms models.MarketState, dataInterval int, inTimePeriod int) []float64
 }
 
 // GetUltOsc measures price momentum, similar to RSI, except uses 3 different time signals (7, 14, & 28). Above 70 is overbought, and below 30 is oversold (typically).
-func GetUltOsc(high []float64, low []float64, close []float64, inTimePeriod1 int, inTimePeriod2 int, inTimePeriod3 int) []float64 {
+func GetUltOsc(ms models.MarketState, dataInterval int, inTimePeriod1 int, inTimePeriod2 int, inTimePeriod3 int) []float64 {
+	high := ms.OHLCV.FetchAllData(dataInterval).High
+	low := ms.OHLCV.FetchAllData(dataInterval).Low
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	UltOsc := talib.UltOsc(high, low, close, inTimePeriod1, inTimePeriod2, inTimePeriod3)
 	return UltOsc
 }
 
 // GetBBands calculates an upper band, middle band, and lower band based on a given time period, upper STD, & lower STD (is the same as the upper but talib makes it negative for you)
-func GetBBands(close []float64, inTimePeriod int, inNbDevUp float64, inNbDevDn float64, inMAType talib.MaType) ([]float64, []float64, []float64) {
+func GetBBands(ms models.MarketState, dataInterval int, inTimePeriod int, inNbDevUp float64, inNbDevDn float64, inMAType talib.MaType) ([]float64, []float64, []float64) {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	UpperBand, MiddleBand, LowerBand := talib.BBands(close, inTimePeriod, inNbDevUp, inNbDevDn, inMAType)
 	return UpperBand, MiddleBand, LowerBand
 }
@@ -152,12 +156,18 @@ func CreateEMA(ms models.MarketState, dataInterval int, length int) []float64 {
 }
 
 //HeikinashiCandles - from candle values extracts heikinashi candle values.
-func GetHeikinashiCandles(highs []float64, opens []float64, closes []float64, lows []float64) ([]float64, []float64, []float64, []float64) {
+func GetHeikinashiCandles(ms models.MarketState, dataInterval int) ([]float64, []float64, []float64, []float64) {
+	highs := ms.OHLCV.FetchAllData(dataInterval).High
+	opens := ms.OHLCV.FetchAllData(dataInterval).Open
+	lows := ms.OHLCV.FetchAllData(dataInterval).Low
+	closes := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.HeikinashiCandles(highs, opens, closes, lows)
 }
 
 // GetSar calculates the parabolic sar (stop and reverse)
-func GetSar(high []float64, low []float64, inAcceleration float64, inMaximum float64) []float64 {
+func GetSar(ms models.MarketState, dataInterval int, inAcceleration float64, inMaximum float64) []float64 {
+	high := ms.OHLCV.FetchAllData(dataInterval).High
+	low := ms.OHLCV.FetchAllData(dataInterval).Open
 	return talib.Sar(high, low, inAcceleration, inMaximum)
 }
 
@@ -174,7 +184,11 @@ func GetMom(ms models.MarketState, dataInterval int, inTimePeriod int) []float64
 }
 
 //Money Flow - calculates money flow index (works similar to RSI but incorporates volume)
-func GetMfi(high []float64, low []float64, close []float64, volume []float64, TimePeriod int) []float64 {
+func GetMfi(ms models.MarketState, dataInterval int, TimePeriod int) []float64 {
+	high := ms.OHLCV.FetchAllData(dataInterval).High
+	low := ms.OHLCV.FetchAllData(dataInterval).Low
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
+	volume := ms.OHLCV.FetchAllData(dataInterval).Volume
 	return talib.Mfi(high, low, close, volume, TimePeriod)
 }
 
