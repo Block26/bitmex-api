@@ -320,29 +320,51 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 	// Price (rate) of zero signifies market order for now
 	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
-		// log.Println("candle ", lastCandle)
-		// log.Println("open candle ", lastCandle.Open)
-		// log.Println("Close market ", marketState.Bar.Close, marketState.Bar.Timestamp)
-		// log.Fatal("Open market ", marketState.Bar.Open, marketState.Bar.Timestamp)
-		fillPrice = utils.GetFillPrice(marketState, lastCandle)
-		fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
-		// log.Println("fillPrice", fillPrice, "lastCandle.Close", lastCandle.Close, "lastCandle.High", lastCandle.High, "lastCandle.Low", lastCandle.Low)
-
-		// fillPrice = lastCandle.Close // TODO implement multiple market order fill types
-		if order.Side == "buy" {
-			fillAmount = order.Amount
-		} else if order.Side == "sell" {
-			fillAmount = -order.Amount
+		fillPrice = utils.AdjustForSlippage(lastCandle.Close, order.Side, t.Account.ExchangeInfo.Slippage)
+		if t.Account.ExchangeInfo.DenominatedInQuote {
+			if order.Side == "buy" {
+				fillAmount = order.Amount
+				if marketState.Position < 0 {
+					marketState.Balance += math.Abs(order.Amount) * fillPrice
+				} else {
+					marketState.Balance -= math.Abs(order.Amount) * fillPrice
+				}
+			} else if order.Side == "sell" {
+				fillAmount = -order.Amount
+				if marketState.Position > 0 {
+					marketState.Balance += math.Abs(order.Amount) * fillPrice
+				} else {
+					marketState.Balance -= math.Abs(order.Amount) * fillPrice
+				}
+			}
+		} else {
+			if order.Side == "buy" {
+				fillAmount = order.Amount
+			} else if order.Side == "sell" {
+				fillAmount = -order.Amount
+			}
 		}
 	} else {
-		if order.Side == "buy" && lastCandle.Low <= order.Rate {
-			isFilled = true
-			fillPrice = order.Rate
-			fillAmount = order.Amount
-		} else if order.Side == "sell" && lastCandle.High >= order.Rate {
-			isFilled = true
-			fillPrice = order.Rate
-			fillAmount = -order.Amount
+		if t.Account.ExchangeInfo.DenominatedInQuote {
+			if order.Side == "buy" && lastCandle.Low <= order.Rate {
+				isFilled = true
+				fillPrice = order.Rate
+				fillAmount = order.Amount
+			} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+				isFilled = true
+				fillPrice = order.Rate
+				fillAmount = -order.Amount
+			}
+		} else {
+			if order.Side == "buy" && lastCandle.Low <= order.Rate {
+				isFilled = true
+				fillPrice = order.Rate
+				fillAmount = order.Amount
+			} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+				isFilled = true
+				fillPrice = order.Rate
+				fillAmount = -order.Amount
+			}
 		}
 	}
 	return
@@ -363,14 +385,15 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 		if !ok {
 			logger.Errorf("Could not find market state for %v\n", order.Market)
 		}
-		marketState.Weight = utils.GetCurrentWeight(order.Side, marketState)
 		isFilled, fillPrice, fillAmount = t.getFill(order, marketState)
+		marketState.Weight = utils.GetCurrentWeight(order.Side, marketState)
 		logger.Debugf("Filled: %v\n", isFilled)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
 			if t.LogBacktest {
 				t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
 			}
+			log.Println("Balance after fill", marketState.Balance, "Previous Position", marketState.Position, "AC", marketState.AverageCost, "fillPrice", fillPrice, "amount", fillAmount)
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			delete(t.orders, key)
@@ -497,11 +520,18 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *flo
 				} else {
 					diff = utils.CalculateDifference(fillPrice, *averageCost)
 				}
-				// Only use the remaining position that was filled to calculate cost
+
 				portionFillQuantity := math.Abs(*currentPosition)
-				logger.Debugf("Updating current base balance w bb %v, portionFillQuantity %v, diff %v, avgcost %v\n", currentBaseBalance, portionFillQuantity, diff, averageCost)
-				*currentBaseBalance = *currentBaseBalance + ((portionFillQuantity * diff) / *averageCost)
+				// Only use the remaining position that was filled to calculate cost
+				// log.Fatal(*currentBaseBalance, portionFillQuantity, diff, *averageCost)
+				if t.Account.ExchangeInfo.DenominatedInQuote {
+					*currentBaseBalance = *currentBaseBalance + ((portionFillQuantity * diff) / *averageCost)
+				} else {
+					*currentBaseBalance = *currentBaseBalance + ((portionFillQuantity * diff) / *averageCost)
+				}
 				*averageCost = fillPrice
+				logger.Debugf("Updating current base balance w bb %v, portionFillQuantity %v, diff %v, avgcost %v\n", currentBaseBalance, portionFillQuantity, diff, averageCost)
+
 			} else {
 				//Leaving Position
 				var diff float64
@@ -515,10 +545,15 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *flo
 				} else {
 					diff = utils.CalculateDifference(fillPrice, *averageCost)
 				}
-				logger.Debugf("Updating full fill quantity with baq %v, fillAmount %v, diff %v, avg cost %v\n", currentBaseBalance, fillAmount, diff, averageCost)
-				*currentBaseBalance += ((math.Abs(fillAmount) * diff) / *averageCost)
+				if t.Account.ExchangeInfo.DenominatedInQuote {
+					*currentBaseBalance += (math.Abs(fillAmount) * *averageCost) * diff
+					// log.Fatal(*currentBaseBalance, diff)
+				} else {
+					*currentBaseBalance += ((math.Abs(fillAmount) * diff) / *averageCost)
+				}
 			}
 			*currentPosition += fillAmount
+			log.Println("Position after fill", *currentPosition, "Average cost", *averageCost)
 			if *currentPosition == 0 {
 				*averageCost = 0
 			}
@@ -537,13 +572,13 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *flo
 		} else if marketState.Info.MarketType == models.Option {
 			totalQuantity := *currentPosition + fillAmount
 			newCost := fillPrice * fillAmount
-			var denomPrice float64
+			var optionsDenomPrice float64
 			if marketState.Info.MarketType == models.Option {
-				denomPrice = *marketState.OptionTheo.UnderlyingPrice
+				optionsDenomPrice = *marketState.OptionTheo.UnderlyingPrice
 			} else {
-				denomPrice = t.currentCandle[marketState.Symbol].Close
+				optionsDenomPrice = t.currentCandle[marketState.Symbol].Close
 			}
-			logger.Debugf("Got denom price for %v: %v\n", marketState.Symbol, denomPrice)
+			logger.Debugf("Got denom price for %v: %v\n", marketState.Symbol, optionsDenomPrice)
 			if (fillAmount >= 0 && *currentPosition >= 0) || (fillAmount <= 0 && *currentPosition <= 0) {
 				//Adding to position
 				*averageCost = (math.Abs(newCost) + math.Abs(currentCost)) / math.Abs(totalQuantity)
@@ -554,10 +589,10 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *flo
 				if marketState.Info.DenominatedInUnderlying {
 					balanceChange = *currentPosition * (fillPrice - *averageCost)
 				} else {
-					balanceChange = *currentPosition * (fillPrice - *averageCost) / denomPrice
+					balanceChange = *currentPosition * (fillPrice - *averageCost) / optionsDenomPrice
 				}
 				logger.Debugf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v, denom price %v\n",
-					currentBaseBalance, balanceChange, fillPrice, averageCost, denomPrice)
+					currentBaseBalance, balanceChange, fillPrice, averageCost, optionsDenomPrice)
 				*currentBaseBalance += +balanceChange
 				*averageCost = fillPrice
 			} else {
@@ -566,10 +601,10 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *flo
 				if marketState.Info.DenominatedInUnderlying {
 					balanceChange = fillAmount * (fillPrice - *averageCost)
 				} else {
-					balanceChange = fillAmount * (fillPrice - *averageCost) / denomPrice
+					balanceChange = fillAmount * (fillPrice - *averageCost) / optionsDenomPrice
 				}
 				logger.Debugf("Updating current base balance w bb %v, balancechange %v, fillprice %v, avgcost %v, denom price %v\n",
-					currentBaseBalance, balanceChange, fillPrice, averageCost, denomPrice)
+					currentBaseBalance, balanceChange, fillPrice, averageCost, optionsDenomPrice)
 				*currentBaseBalance += balanceChange
 			}
 			*currentPosition += fillAmount
