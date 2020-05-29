@@ -320,7 +320,7 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 	// Price (rate) of zero signifies market order for now
 	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
-		fillPrice = utils.AdjustForSlippage(lastCandle.Close, order.Side, t.Account.ExchangeInfo.Slippage)
+		fillPrice = getFillPrice(marketState, lastCandle) //utils.AdjustForSlippage(lastCandle.Close, order.Side, t.Account.ExchangeInfo.Slippage)
 		if t.Account.ExchangeInfo.DenominatedInQuote {
 			if order.Side == "buy" {
 				fillAmount = order.Amount
@@ -345,6 +345,7 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 			}
 		}
 	} else {
+		// TODO Apply slippage to these prices
 		if t.Account.ExchangeInfo.DenominatedInQuote {
 			if order.Side == "buy" && lastCandle.Low <= order.Rate {
 				isFilled = true
@@ -428,6 +429,37 @@ func (t *Tantra) appendToHistory() {
 func (t *Tantra) processTrade(trade models.Trade) {
 	t.TradeHistory = append(t.TradeHistory, trade)
 	logger.Debugf("Processed trade: %v\n", trade)
+}
+
+func getFillPrice(marketState *models.MarketState, candle iex.TradeBin) float64 {
+	var fillPrice float64
+	// log.Fatal(marketState.Info.FillType)
+	if marketState.Info.FillType == 2 {
+		// log.Println(marketState.Weight, marketState.Position)
+		// log.Fatal("This worked")
+		if marketState.Weight > 0 && marketState.Position >= 0 {
+			fillPrice = candle.High
+		} else if marketState.Weight < 0 && marketState.Position <= 0 {
+			fillPrice = candle.Low
+		} else if marketState.Weight != 1 && marketState.Position > 0 {
+			fillPrice = candle.Low
+		} else if marketState.Weight != -1 && marketState.Position < 0 {
+			fillPrice = candle.High
+		} else {
+			fillPrice = candle.Close
+		}
+	} else if marketState.Info.FillType == 1 {
+		fillPrice = candle.Close
+		// 	// } else if algo.FillType == exchanges.FillType().Open {
+		// 	// 	fillPrice = marketState.Bar.Open
+	} else if marketState.Info.FillType == 3 {
+		fillPrice = (candle.Open + candle.Close) / 2
+	} else if marketState.Info.FillType == 4 {
+		fillPrice = (candle.High + candle.Low) / 2
+	} else {
+		log.Fatalln("FillType is not supported")
+	}
+	return fillPrice
 }
 
 // Insert account, market, and trade histories to the db. If this is the last call in the backtest,

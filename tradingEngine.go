@@ -19,7 +19,6 @@ import (
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/database"
-	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/tantra"
 	"github.com/tantralabs/yantra/utils"
@@ -992,32 +991,6 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 		fmt.Print(fmt.Sprintf("Portfolio Value %0.2f | Delta %0.2f | Base %0.2f | Quote %.2f | Price %.5f - Cost %.5f \n", algo.Account.BaseAsset.Quantity*marketState.Bar.Close+(marketState.Position), 0.0, algo.Account.BaseAsset.Quantity, marketState.Position, marketState.Bar.Close, marketState.AverageCost))
 	}
 	return
-}
-
-func getFillPrice(algo *models.Algo, marketState *models.MarketState) float64 {
-	var fillPrice float64
-	if algo.FillType == exchanges.FillType().Worst {
-		if marketState.Weight > 0 && marketState.Position > 0 {
-			fillPrice = marketState.Bar.High
-		} else if marketState.Weight < 0 && marketState.Position < 0 {
-			fillPrice = marketState.Bar.Low
-		} else if marketState.Weight != 1 && marketState.Position > 0 {
-			fillPrice = marketState.Bar.Low
-		} else if marketState.Weight != -1 && marketState.Position < 0 {
-			fillPrice = marketState.Bar.High
-		} else {
-			fillPrice = marketState.Bar.Close
-		}
-	} else if algo.FillType == exchanges.FillType().Close {
-		fillPrice = marketState.Bar.Close
-	} else if algo.FillType == exchanges.FillType().Open {
-		fillPrice = marketState.Bar.Open
-	} else if algo.FillType == exchanges.FillType().MeanOC {
-		fillPrice = (marketState.Bar.Open + marketState.Bar.Close) / 2
-	} else if algo.FillType == exchanges.FillType().MeanHL {
-		fillPrice = (marketState.Bar.High + marketState.Bar.Low) / 2
-	}
-	return fillPrice
 }
 
 // Get the remote influx db client for logging live trading data.
