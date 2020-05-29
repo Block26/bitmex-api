@@ -16,10 +16,8 @@ func GetNATR(high []float64, low []float64, close []float64, index int, length i
 
 // GetNATR Get the Average True Range for an index and data length
 func GetATR(ms models.MarketState, dataInterval int, inTimePeriod int) []float64 {
-	high := ms.OHLCV.FetchAllData(dataInterval).High
-	low := ms.OHLCV.FetchAllData(dataInterval).Low
-	close := ms.OHLCV.FetchAllData(dataInterval).Close
-	return talib.Atr(high, low, close, inTimePeriod)
+	data := ms.OHLCV.FetchAllData(dataInterval)
+	return talib.Atr(data.High, data.Low, data.Close, inTimePeriod)
 }
 
 // GetNATR Get the Normalized Average True Range for an index and data length
@@ -55,10 +53,8 @@ func GetMacd(ohlcv models.OHLCV, inFastPeriod int, inSlowPeriod int, inSignalPer
 
 // GetStochF calculates fastK and fastD based on HLC, fastKPeriod, fastDPeriod, and fastDMAType (always = 0)
 func GetStochF(ms models.MarketState, dataInterval int, fastKPeriod int, fastDPeriod int, fastDMAType talib.MaType) ([]float64, []float64) {
-	high := ms.OHLCV.FetchAllData(dataInterval).High
-	low := ms.OHLCV.FetchAllData(dataInterval).Low
-	close := ms.OHLCV.FetchAllData(dataInterval).Close
-	return talib.StochF(high, low, close, fastKPeriod, fastDPeriod, fastDMAType)
+	data := ms.OHLCV.FetchAllData(dataInterval)
+	return talib.StochF(data.High, data.Low, data.Close, fastKPeriod, fastDPeriod, fastDMAType)
 }
 
 // GetRoc calculates rate of change of a certain amount of hours based on close price (we use an EMA instead of close price for each hour)
@@ -119,10 +115,8 @@ func GetRsi(ms models.MarketState, dataInterval int, inTimePeriod int) []float64
 
 // GetUltOsc measures price momentum, similar to RSI, except uses 3 different time signals (7, 14, & 28). Above 70 is overbought, and below 30 is oversold (typically).
 func GetUltOsc(ms models.MarketState, dataInterval int, inTimePeriod1 int, inTimePeriod2 int, inTimePeriod3 int) []float64 {
-	high := ms.OHLCV.FetchAllData(dataInterval).High
-	low := ms.OHLCV.FetchAllData(dataInterval).Low
-	close := ms.OHLCV.FetchAllData(dataInterval).Close
-	UltOsc := talib.UltOsc(high, low, close, inTimePeriod1, inTimePeriod2, inTimePeriod3)
+	data := ms.OHLCV.FetchAllData(dataInterval)
+	UltOsc := talib.UltOsc(data.High, data.Low, data.Close, inTimePeriod1, inTimePeriod2, inTimePeriod3)
 	return UltOsc
 }
 
@@ -157,18 +151,14 @@ func CreateEMA(ms models.MarketState, dataInterval int, length int) []float64 {
 
 //HeikinashiCandles - from candle values extracts heikinashi candle values.
 func GetHeikinashiCandles(ms models.MarketState, dataInterval int) ([]float64, []float64, []float64, []float64) {
-	highs := ms.OHLCV.FetchAllData(dataInterval).High
-	opens := ms.OHLCV.FetchAllData(dataInterval).Open
-	lows := ms.OHLCV.FetchAllData(dataInterval).Low
-	closes := ms.OHLCV.FetchAllData(dataInterval).Close
-	return talib.HeikinashiCandles(highs, opens, closes, lows)
+	data := ms.OHLCV.FetchAllData(dataInterval)
+	return talib.HeikinashiCandles(data.High, data.Open, data.Close, data.Low)
 }
 
 // GetSar calculates the parabolic sar (stop and reverse)
 func GetSar(ms models.MarketState, dataInterval int, inAcceleration float64, inMaximum float64) []float64 {
-	high := ms.OHLCV.FetchAllData(dataInterval).High
-	low := ms.OHLCV.FetchAllData(dataInterval).Open
-	return talib.Sar(high, low, inAcceleration, inMaximum)
+	data := ms.OHLCV.FetchAllData(dataInterval)
+	return talib.Sar(data.High, data.Low, inAcceleration, inMaximum)
 }
 
 // GetSma calculates the Simple Moving Average based on the close price and a given time period.
@@ -185,17 +175,12 @@ func GetMom(ms models.MarketState, dataInterval int, inTimePeriod int) []float64
 
 //Money Flow - calculates money flow index (works similar to RSI but incorporates volume)
 func GetMfi(ms models.MarketState, dataInterval int, TimePeriod int) []float64 {
-	high := ms.OHLCV.FetchAllData(dataInterval).High
-	low := ms.OHLCV.FetchAllData(dataInterval).Low
-	close := ms.OHLCV.FetchAllData(dataInterval).Close
-	volume := ms.OHLCV.FetchAllData(dataInterval).Volume
-	return talib.Mfi(high, low, close, volume, TimePeriod)
+	data := ms.OHLCV.FetchAllData(dataInterval)
+	return talib.Mfi(data.High, data.Low, data.Close, data.Volume, TimePeriod)
 }
 
 //Commodity Channel Index measures the difference between the current price and the historical average price. (can be positive and negative)
 func GetCci(ms models.MarketState, dataInterval int, TimePeriod int) []float64 {
-	high := ms.OHLCV.FetchAllData(dataInterval).High
-	low := ms.OHLCV.FetchAllData(dataInterval).Low
-	close := ms.OHLCV.FetchAllData(dataInterval).Close
-	return talib.Cci(high, low, close, TimePeriod)
+	data := ms.OHLCV.FetchAllData(dataInterval)
+	return talib.Cci(data.High, data.Low, data.Close, TimePeriod)
 }
