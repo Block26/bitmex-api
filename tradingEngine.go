@@ -695,7 +695,7 @@ func (t *TradingEngine) RemoveExpiredOptions() {
 // Log a new trade to the remote influx database. Should only be used in live trading for now.
 func (t *TradingEngine) logTrade(trade iex.Order) {
 	stateType := "live"
-	influx := getInfluxClient()
+	influx := GetInfluxClient()
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  "algos",
@@ -729,7 +729,7 @@ func (t *TradingEngine) logTrade(trade iex.Order) {
 // Log a new filled trade to the remote influx database. SShould only be used in live trading for now.
 func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 	stateType := "live"
-	influx := getInfluxClient()
+	influx := GetInfluxClient()
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  "algos",
@@ -766,7 +766,7 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 		stateType = "test"
 	}
 
-	influx := getInfluxClient()
+	influx := GetInfluxClient()
 
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  "algos",
@@ -953,8 +953,34 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 	return
 }
 
+func getFillPrice(algo *models.Algo, marketState *models.MarketState) float64 {
+	var fillPrice float64
+	if algo.FillType == exchanges.FillType().Worst {
+		if marketState.Weight > 0 && marketState.Position > 0 {
+			fillPrice = marketState.Bar.High
+		} else if marketState.Weight < 0 && marketState.Position < 0 {
+			fillPrice = marketState.Bar.Low
+		} else if marketState.Weight != 1 && marketState.Position > 0 {
+			fillPrice = marketState.Bar.Low
+		} else if marketState.Weight != -1 && marketState.Position < 0 {
+			fillPrice = marketState.Bar.High
+		} else {
+			fillPrice = marketState.Bar.Close
+		}
+	} else if algo.FillType == exchanges.FillType().Close {
+		fillPrice = marketState.Bar.Close
+	} else if algo.FillType == exchanges.FillType().Open {
+		fillPrice = marketState.Bar.Open
+	} else if algo.FillType == exchanges.FillType().MeanOC {
+		fillPrice = (marketState.Bar.Open + marketState.Bar.Close) / 2
+	} else if algo.FillType == exchanges.FillType().MeanHL {
+		fillPrice = (marketState.Bar.High + marketState.Bar.Low) / 2
+	}
+	return fillPrice
+}
+
+func GetInfluxClient() client.Client {
 // Get the remote influx db client for logging live trading data.
-func getInfluxClient() client.Client {
 	influxURL := os.Getenv("YANTRA_LIVE_DB_URL")
 	if influxURL == "" {
 		log.Fatalln("You need to set the `YANTRA_LIVE_DB_URL` env variable")
