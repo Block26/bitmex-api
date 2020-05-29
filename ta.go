@@ -15,7 +15,10 @@ func GetNATR(high []float64, low []float64, close []float64, index int, length i
 }
 
 // GetNATR Get the Average True Range for an index and data length
-func GetATR(high []float64, low []float64, close []float64, inTimePeriod int) []float64 {
+func GetATR(ms models.MarketState, dataInterval int, inTimePeriod int) []float64 {
+	high := ms.OHLCV.FetchAllData(dataInterval).High
+	low := ms.OHLCV.FetchAllData(dataInterval).Low
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.Atr(high, low, close, inTimePeriod)
 }
 
@@ -39,9 +42,9 @@ func GetDX(ohlcv models.OHLCV, index int, datalength int, length int) []float64 
 }
 
 // GetADX Calculate an ADX slice based on a data length and DX length. OHLC lengths > data length > length
-func GetADX(high []float64, low []float64, close []float64, index int, datalength int, length int) []float64 {
+func GetADX(ohlcv models.OHLCV, index int, datalength int, length int) []float64 {
 	//TODO check live
-	return talib.Adx(high[index-datalength-1:index], low[index-datalength-1:index], close[index-datalength-1:index], length)
+	return talib.Dx(ohlcv.High[index-datalength:index], ohlcv.Low[index-datalength:index], ohlcv.Close[index-datalength:index], length)
 }
 
 // GetMacd calculates MACD, MACDSignal, & MACDHistogram slices based on data length
@@ -51,7 +54,7 @@ func GetMacd(ohlcv models.OHLCV, inFastPeriod int, inSlowPeriod int, inSignalPer
 }
 
 // GetStochF calculates fastK and fastD based on HLC, fastKPeriod, fastDPeriod, and fastDMAType (always = 0)
-func GetStochF(ms models.MarketState, dataInterval int, fastKPeriod int, fastDPeriod int, fastDMAType talib.MaType) ([]float64, []float64) {	
+func GetStochF(ms models.MarketState, dataInterval int, fastKPeriod int, fastDPeriod int, fastDMAType talib.MaType) ([]float64, []float64) {
 	high := ms.OHLCV.FetchAllData(dataInterval).High
 	low := ms.OHLCV.FetchAllData(dataInterval).Low
 	close := ms.OHLCV.FetchAllData(dataInterval).Close
@@ -66,37 +69,43 @@ func GetRoc(ms models.MarketState, ma []float64, length int) []float64 {
 }
 
 // GetLinearReg calculates the linear regression of the close priced based on a given time period
-func GetLinearReg(close []float64, inTimePeriod int) []float64 {
+func GetLinearReg(ms models.MarketState, dataInterval int, inTimePeriod int) []float64 {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.LinearReg(close, inTimePeriod)
 }
 
 // GetDema calculates the Double EMA based on the close price and a given time period (less lag than EMA)
-func GetDema(close []float64, inTimePeriod int) []float64 {
+func GetDema(ms models.MarketState, dataInterval int, inTimePeriod int) []float64 {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.Dema(close, inTimePeriod)
 }
 
 // GetMama calculates Mesa Adaptive Moving Average (Mama) & Following Adaptive Moving Average (Fama) using Hilbert Transform (Similar to Fourier Transform)
-func GetMama(close []float64, inFastLimit float64, inSlowLimit float64) ([]float64, []float64) {
+func GetMama(ms models.MarketState, dataInterval int, inFastLimit float64, inSlowLimit float64) ([]float64, []float64) {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	Mama, Fama := talib.Mama(close, inFastLimit, inSlowLimit)
 	return Mama, Fama
 }
 
 // GetT3 calculates Triple MA using close price, given time period, and VFactor (between 0 & 1) where 1 is the Dema and 0 is an EMA
-func GetT3(close []float64, inTimePeriod int, inVFactor float64) []float64 {
+func GetT3(ms models.MarketState, dataInterval int, inTimePeriod int, inVFactor float64) []float64 {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.T3(close, inTimePeriod, inVFactor)
 }
 
 // GetKama Create a Kama
-func GetKAMA(close []float64, length int) []float64 {
+func GetKAMA(ms models.MarketState, dataInterval int, length int) []float64 {
 	if length <= 1 {
 		log.Fatal("Length of the ema must be greater than 1")
 	}
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	kama := talib.Kama(close, length)
 	return kama
 }
 
 // GetHTTrendline Create a Trendline
-func GetHTTrendline(close []float64) []float64 {
+func GetHTTrendline(ms models.MarketState, dataInterval int) []float64 {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	trendline := talib.HtTrendline(close)
 	return trendline
 }
@@ -121,12 +130,14 @@ func GetBBands(close []float64, inTimePeriod int, inNbDevUp float64, inNbDevDn f
 }
 
 // GetTrima calculates triangular moving average, which is similar to an MA but is averaged twice. It is given a time period.
-func GetTrima(close []float64, inTimePeriod int) []float64 {
+func GetTrima(ms models.MarketState, dataInterval int, inTimePeriod int) []float64 {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.Trima(close, inTimePeriod)
 }
 
 // Get Wma calculates a weighted moving average given a time period, giving more weight to more recent data as opposed to older data
-func GetWma(close []float64, inTimePeriod int) []float64 {
+func GetWma(ms models.MarketState, dataInterval int, inTimePeriod int) []float64 {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.Wma(close, inTimePeriod)
 }
 
@@ -151,13 +162,15 @@ func GetSar(high []float64, low []float64, inAcceleration float64, inMaximum flo
 }
 
 // GetSma calculates the Simple Moving Average based on the close price and a given time period.
-func GetSma(close []float64, inTimePeriod int) []float64 {
+func GetSma(ms models.MarketState, dataInterval int, inTimePeriod int) []float64 {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.Sma(close, inTimePeriod)
 }
 
 //Momentum measures the speed the price changes.
-func GetMom(close []float64, TimePeriod int) []float64 {
-	return talib.Mom(close, TimePeriod)
+func GetMom(ms models.MarketState, dataInterval int, inTimePeriod int) []float64 {
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
+	return talib.Mom(close, inTimePeriod)
 }
 
 //Money Flow - calculates money flow index (works similar to RSI but incorporates volume)
@@ -166,6 +179,9 @@ func GetMfi(high []float64, low []float64, close []float64, volume []float64, Ti
 }
 
 //Commodity Channel Index measures the difference between the current price and the historical average price. (can be positive and negative)
-func GetCci(high []float64, low []float64, close []float64, TimePeriod int) []float64 {
+func GetCci(ms models.MarketState, dataInterval int, TimePeriod int) []float64 {
+	high := ms.OHLCV.FetchAllData(dataInterval).High
+	low := ms.OHLCV.FetchAllData(dataInterval).Low
+	close := ms.OHLCV.FetchAllData(dataInterval).Close
 	return talib.Cci(high, low, close, TimePeriod)
 }
