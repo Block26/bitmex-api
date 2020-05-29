@@ -19,6 +19,7 @@ import (
 	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/database"
+	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/tantra"
 	"github.com/tantralabs/yantra/utils"
@@ -979,8 +980,8 @@ func getFillPrice(algo *models.Algo, marketState *models.MarketState) float64 {
 	return fillPrice
 }
 
-func GetInfluxClient() client.Client {
 // Get the remote influx db client for logging live trading data.
+func GetInfluxClient() client.Client {
 	influxURL := os.Getenv("YANTRA_LIVE_DB_URL")
 	if influxURL == "" {
 		log.Fatalln("You need to set the `YANTRA_LIVE_DB_URL` env variable")
