@@ -106,6 +106,7 @@ func LoadExchangeInfo(exchange string) (exchangeInfo models.ExchangeInfo, err er
 			MakerFee:                -0.00025,
 			TakerFee:                0.00075,
 			BulkCancelSupported:     false,
+			DenominatedInQuote:      false,
 			DenominatedInUnderlying: true,
 			Futures:                 true,
 			Options:                 false,

@@ -138,6 +138,8 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 		marketState.OHLCV.IncrementIndex()
 	} else {
 		marketState.OHLCV.AddDataFromTradeBin(candle)
+		b := marketState.OHLCV.GetBarData()
+		marketState.Bar = *b[len(b)-1]
 	}
 }
 

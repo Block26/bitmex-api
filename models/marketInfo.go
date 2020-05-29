@@ -76,7 +76,7 @@ type MarketInfo struct {
 	TakerFee                float64    // taker fee as decimal
 	Slippage                float64    // expected slippage for this market, as decimal
 	PricePrecision          float64    // minimum granularity of order price
-	QuantityPrecision       int        // minimum granularity of order amount
+	QuantityPrecision       float64    // minimum granularity of order amount
 	MinimumOrderSize        float64    // absolute minimum size of order
 	MaxLeverage             float64    // max leverage as ratio (i.e. 100x = 100.)
 	BulkCancelSupported     bool       // can we cancel multiple orders in one REST API call?

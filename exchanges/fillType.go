@@ -1,8 +1,8 @@
 package exchanges
 
 type fillType struct {
-	Limit string
-	// Open   string
+	Limit  string
+	Open   string
 	Close  string
 	Worst  string
 	MeanOC string
@@ -13,7 +13,7 @@ type fillType struct {
 func FillType() fillType {
 	r := fillType{}
 	r.Limit = "limit"
-	// r.Open = "open"
+	r.Open = "open"
 	r.Close = "close"
 	r.Worst = "worst"
 	r.MeanOC = "meanOC"
