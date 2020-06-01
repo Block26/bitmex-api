@@ -30,7 +30,7 @@ func TestBinanceFuturesOrders(t *testing.T) {
 	algo := models.Algo{
 		Name:              "binance-orders-test",
 		Account:           account,
-		DataLength:        1,
+		DataLength:        60,
 		RebalanceInterval: "1m",
 		LogBacktest:       false,
 		LogLevel:          logger.LogLevel().Debug,
@@ -40,12 +40,12 @@ func TestBinanceFuturesOrders(t *testing.T) {
 	algo.Account.MarketStates[symbol].Info.MarketType = 0 // Futures
 	tradingEngine := NewTradingEngine(&algo, -1)
 	start := time.Date(2020, 01, 01, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2020, 01, 01, 0, 03, 0, 0, time.UTC)
+	end := time.Date(2020, 01, 01, 0, 04, 0, 0, time.UTC)
 	// tradingEngine.SetupTest(start, end, Rebalance, SetupData)
 	tradingEngine.RunTest(start, end, PlaceOrder, SetupData)
 
 	expectedBTCPosition := 0.005
-	expectedUSDTBalance := 64.12294999999999
+	expectedUSDTBalance := 64.0087
 	if algo.Account.MarketStates[symbol].Position != expectedBTCPosition || algo.Account.MarketStates[symbol].Balance != expectedUSDTBalance {
 		if algo.Account.MarketStates[symbol].Position != expectedBTCPosition {
 			t.Error("Position has changed from", expectedBTCPosition, "to", algo.Account.MarketStates[symbol].Position)
@@ -69,17 +69,18 @@ func TestBinanceFuturesAopOrders(t *testing.T) {
 	algo := models.Algo{
 		Name:              "binance-aop-test",
 		Account:           account,
-		DataLength:        1,
+		DataLength:        60,
 		RebalanceInterval: "1m",
 		LogBacktest:       false,
 		LogLevel:          logger.LogLevel().Debug,
 		BacktestLogLevel:  logger.LogLevel().Info,
 	}
+	algo.LogBacktest = true
 
 	aopParams := aop.Params{
 		DataInterval:            di,
 		BaseLeverage:            1, // The base leverage for the Algo, 1 would be 100%, 0.5 would be 50% of the MaxLeverage defined by Market.
-		BaseEntryOrderSize:      0.20,
+		BaseEntryOrderSize:      0.25,
 		BaseExitOrderSize:       1,
 		BaseDeleverageOrderSize: 0.05,
 	}
@@ -88,12 +89,12 @@ func TestBinanceFuturesAopOrders(t *testing.T) {
 	algo.Account.MarketStates[symbol].Info.MarketType = 0 // Futures
 	tradingEngine := NewTradingEngine(&algo, -1)
 	start := time.Date(2020, 01, 01, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2020, 01, 01, 00, 15, 0, 0, time.UTC)
+	end := time.Date(2020, 01, 01, 0, 15, 0, 0, time.UTC)
 	// tradingEngine.SetupTest(start, end, Rebalance, SetupData)
 	tradingEngine.RunTest(start, end, PlaceAopOrder, SetupData)
 
-	expectedBTCPosition := -0.0097234
-	expectedUSDTBalance := 9930.145606744314
+	expectedBTCPosition := -0.0178059
+	expectedUSDTBalance := 9872.085166104496
 	if algo.Account.MarketStates[symbol].Position != expectedBTCPosition || algo.Account.MarketStates[symbol].Balance != expectedUSDTBalance {
 		if algo.Account.MarketStates[symbol].Position != expectedBTCPosition {
 			t.Error("Position has changed from", expectedBTCPosition, "to", algo.Account.MarketStates[symbol].Position)

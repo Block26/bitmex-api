@@ -920,43 +920,55 @@ func getCurrentProfit(marketState *models.MarketState, price float64) float64 {
 }
 
 // Get the worst-case PNL on the position for a given market state.
-func getPositionAbsLoss(algo *models.Algo, marketState *models.MarketState) float64 {
-	positionLoss := 0.0
+func getMaxPositionAbsLoss(algo *models.Algo, marketState *models.MarketState) float64 {
+	maxPositionLoss := 0.0
 	if algo.Account.ExchangeInfo.DenominatedInQuote {
 		if marketState.Position < 0 {
-			positionLoss = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+			maxPositionLoss = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
 		} else {
-			positionLoss = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+			maxPositionLoss = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
 		}
 	} else {
 		if marketState.Position < 0 {
-			positionLoss = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+			maxPositionLoss = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
 		} else {
-			positionLoss = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+			maxPositionLoss = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
 		}
 	}
 
-	return positionLoss
+	return maxPositionLoss
 }
 
-// Get the best-case PNL on the position for a given market state.
+// Get the PNL on the position for a given market state at close price.
 func getPositionAbsProfit(algo *models.Algo, marketState *models.MarketState) float64 {
 	positionProfit := 0.0
 	if algo.Account.ExchangeInfo.DenominatedInQuote {
-		if marketState.Position > 0 {
-			positionProfit = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
-		} else {
-			positionProfit = (marketState.Position * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
-		}
+		positionProfit = ((math.Abs(marketState.Position) * marketState.Bar.Close) * (getCurrentProfit(marketState, marketState.Bar.Close) * marketState.Leverage))
 	} else {
-		if marketState.Position > 0 {
-			positionProfit = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
-		} else {
-			positionProfit = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
-		}
+		positionProfit = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Close) * marketState.Leverage))
 	}
 
 	return positionProfit
+}
+
+// Get the best-case PNL on the position for a given market state.
+func getMaxPositionAbsProfit(algo *models.Algo, marketState *models.MarketState) float64 {
+	maxPositionProfit := 0.0
+	if algo.Account.ExchangeInfo.DenominatedInQuote {
+		if marketState.Position > 0 {
+			maxPositionProfit = (math.Abs(marketState.Position) * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+		} else {
+			maxPositionProfit = (math.Abs(marketState.Position) * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+		}
+	} else {
+		if marketState.Position > 0 {
+			maxPositionProfit = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.High) * marketState.Leverage))
+		} else {
+			maxPositionProfit = (algo.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Low) * marketState.Leverage))
+		}
+	}
+
+	return maxPositionProfit
 }
 
 // Log the state of the Algo and update variables like leverage.
@@ -970,16 +982,15 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 		Leverage:    marketState.Leverage,
 		Profit:      marketState.Profit,
 		Weight:      int(marketState.Weight),
-		MaxLoss:     getPositionAbsLoss(algo, marketState),
-		MaxProfit:   getPositionAbsProfit(algo, marketState),
+		MaxLoss:     getMaxPositionAbsLoss(algo, marketState),
+		MaxProfit:   getMaxPositionAbsProfit(algo, marketState),
 		Price:       marketState.Bar.Close,
 	}
 
 	if marketState.Info.MarketType == models.Future {
 		if algo.Account.ExchangeInfo.DenominatedInQuote {
-			state.UBalance = (math.Abs(marketState.Position) * marketState.Bar.Close) + marketState.Balance
-			// state.UBalance = marketState.Balance + marketState.UnrealizedProfit
-			state.QuoteBalance = marketState.Position
+			state.UBalance = ((math.Abs(marketState.Position) * marketState.AverageCost) + marketState.UnrealizedProfit) + marketState.Balance
+			state.QuoteBalance = marketState.Balance
 		} else {
 			state.UBalance = marketState.Balance + marketState.UnrealizedProfit
 			state.QuoteBalance = (marketState.Balance + marketState.UnrealizedProfit) * marketState.Bar.Close
