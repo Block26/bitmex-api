@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 )
 
+// The Config struct contains metadata for an algorithm including its live cloud environment.
 type Config struct {
 	Algo          string `json:"algo"`
 	Name          string `json:"name"`
@@ -21,6 +22,7 @@ type Config struct {
 	Status        int    `json:"status"`
 }
 
+// Loads a config from a file.
 func LoadConfig(fileName string) (config Config) {
 	file, _ := ioutil.ReadFile(fileName)
 	_ = json.Unmarshal([]byte(file), &config)

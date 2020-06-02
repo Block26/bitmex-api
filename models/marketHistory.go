@@ -1,5 +1,6 @@
 package models
 
+// Summarizes the state of a market at a given point in time, including PNL statistics.
 type MarketHistory struct {
 	Timestamp        int
 	Symbol           string
@@ -26,6 +27,7 @@ type MarketHistory struct {
 	Volatility       float64
 }
 
+// Constructs new market history state given a timestamp.
 func NewMarketHistory(market MarketState, timestamp int) MarketHistory {
 	if market.Info.MarketType == Option {
 		return MarketHistory{

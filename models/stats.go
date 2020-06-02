@@ -1,5 +1,6 @@
 package models
 
+// Various descriptive statistics for a backtest run.
 type Stats struct {
 	TotalLongPositions                int
 	TotalShortPositions               int

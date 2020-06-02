@@ -29,6 +29,9 @@ var optionModels = [...]string{
 
 func (optionModel OptionModel) String() string { return optionModels[optionModel] }
 
+// The OptionTheo struct contains various information and state about an option contract,
+// including theoretical values and greek risk parameters. It is meant to be updated in real time
+// by the theo engine.
 type OptionTheo struct {
 	Strike                  float64     // Strike price
 	UnderlyingPrice         *float64    // Underlying price
@@ -48,6 +51,7 @@ type OptionTheo struct {
 	CurrentTime             *time.Time  // The algo.Timestamp from parent algo (should be updated from base layer)
 }
 
+// Constructs a new option theo given a strike, underlying price, expiry, type, and timestamp.
 func NewOptionTheo(strike float64, underlying *float64, expiry int, optionType string, denom bool, currentTime *time.Time) OptionTheo {
 	optionTheo := OptionTheo{
 		Strike:                  strike,
@@ -71,6 +75,7 @@ func NewOptionTheo(strike float64, underlying *float64, expiry int, optionType s
 	return optionTheo
 }
 
+// Get a summary of this option theo as a string.
 func (o *OptionTheo) String() string {
 	expiryTime := time.Unix(int64(o.Expiry/1000), 0)
 	year := strconv.Itoa(expiryTime.Year())[2:4]
@@ -79,10 +84,12 @@ func (o *OptionTheo) String() string {
 	return strconv.Itoa(int(o.Strike)) + "-" + day + month + year + "-" + strings.ToUpper(o.OptionType)
 }
 
+// Get the expiry of this option in a string representation.
 func (o *OptionTheo) getExpiryString() string {
 	return time.Unix(int64(o.Expiry/1000), 0).UTC().String()
 }
 
+// Get the time left in this option contract (in years).
 func (o *OptionTheo) GetTimeLeft() float64 {
 	currentTimestamp := int((*o.CurrentTime).UnixNano() / 1000000)
 	o.TimeLeft = float64(o.Expiry-currentTimestamp) / float64(1000*Day*365)
@@ -100,10 +107,13 @@ func (o *OptionTheo) calcD2(volatility float64) float64 {
 	return o.calcD1(volatility) - (volatility * math.Sqrt(o.GetTimeLeft()))
 }
 
+// Black-scholes parameter
 func (o *OptionTheo) calcPhi(d1 float64) float64 {
 	return math.Exp(-math.Pow(d1, 2)/2) / math.Sqrt(2*PI)
 }
 
+// Calculate the theoretical value of this option. Calculate greeks in the process if specified.
+// The theoretical value calculation will depend on the underlying model (default Black-Scholes).
 func (o *OptionTheo) CalcTheo(calcGreeks bool) {
 	if o.OptionModel == BlackScholes {
 		o.CalcBlackScholesTheo(calcGreeks)
@@ -225,6 +235,7 @@ func (o *OptionTheo) CalcVol(price float64) {
 	}
 }
 
+// Calculate delta given a gaussian distribution and d1 parameter.
 func (o *OptionTheo) CalcDelta(d1 float64, dist *gaussian.Gaussian) {
 	if o.OptionType == "call" {
 		o.Delta = dist.Cdf(d1)
@@ -233,15 +244,18 @@ func (o *OptionTheo) CalcDelta(d1 float64, dist *gaussian.Gaussian) {
 	}
 }
 
+// Calculate gamma given a gaussian distribution and d1 parameter.
 func (o *OptionTheo) CalcGamma(phi float64) {
 	o.Gamma = (phi / (*o.UnderlyingPrice * o.Volatility * math.Sqrt(o.GetTimeLeft())))
 }
 
+// Calculate theta given a gaussian distribution and d1 parameter.
 func (o *OptionTheo) CalcTheta(phi float64, d2 float64, dist *gaussian.Gaussian) {
 	o.Theta = (((-(*o.UnderlyingPrice) * phi * o.Volatility) / (2 * math.Sqrt(o.GetTimeLeft()))) -
 		(o.InterestRate * o.Strike * math.Exp(-o.InterestRate*o.GetTimeLeft()) * dist.Cdf(d2))) / 365
 }
 
+// Calculate vega given a gaussian distribution and d1 parameter.
 func (o *OptionTheo) CalcVega(phi float64) {
 	o.Vega = *o.UnderlyingPrice * phi * math.Sqrt(o.GetTimeLeft())
 }

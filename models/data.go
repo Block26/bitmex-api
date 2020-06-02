@@ -10,6 +10,8 @@ import (
 	"github.com/tantralabs/tradeapi/iex"
 )
 
+// The Data struct includes historical bar data for a given asset. It has the ability to configure and display
+// the data at arbitrary intervals/sampling frequencies.
 type Data struct {
 	minuteBars     []*Bar
 	lastIndex      time.Time
@@ -23,7 +25,7 @@ const (
 	hour int64 = 3600000
 )
 
-// SetupDataModel is always passed minute level data
+// SetupDataModel is always passed minute level data.
 func SetupDataModel(minuteBars []*Bar, initialIndex int, isTest bool) Data {
 	// Sort the data where index 0 is the start and index -1 is the end
 	sort.Slice(minuteBars, func(i, j int) bool { return minuteBars[i].Timestamp < minuteBars[j].Timestamp })
@@ -47,10 +49,12 @@ func SetupDataModel(minuteBars []*Bar, initialIndex int, isTest bool) Data {
 	}
 }
 
+// Return minute bar data as a slice of Bar structs.
 func (d *Data) GetBarData() []*Bar {
 	return d.minuteBars
 }
 
+// Serialize raw TradeBin data into the data model.
 func (d *Data) AddDataFromTradeBin(tradeBin iex.TradeBin) {
 	arr := make([]*Bar, 0)
 
@@ -68,10 +72,12 @@ func (d *Data) AddDataFromTradeBin(tradeBin iex.TradeBin) {
 	d.AddData(arr)
 }
 
+// Update the new index of this data (usually called when we receive new data from the exchange API).
 func (d *Data) IncrementIndex() {
 	d.index += 1
 }
 
+// Add new data to the dataset.
 func (d *Data) AddData(newBars []*Bar) {
 	// Sort the new data
 	sort.Slice(newBars, func(i, j int) bool { return newBars[i].Timestamp < newBars[j].Timestamp })
@@ -107,6 +113,7 @@ func (d *Data) AddData(newBars []*Bar) {
 	}
 }
 
+// Get OHLCV data from the data model with a given resampling interval.
 func (d *Data) GetOHLCVData(resampleInterval int) (data OHLCV, index int) {
 	data = d.getOHLCV(resampleInterval)
 	index = len(data.Timestamp) - 1
@@ -115,15 +122,18 @@ func (d *Data) GetOHLCVData(resampleInterval int) (data OHLCV, index int) {
 	return
 }
 
+// Get all data with a given resample interval.
 func (d *Data) FetchAllData(resampleInterval int) (data OHLCV) {
 	data = d.getOHLCV(resampleInterval, true)
 	return
 }
 
+// Get the current index in the data model.
 func (d *Data) GetCurrentIndex(resampleInterval int) int {
 	return int(d.index / resampleInterval)
 }
 
+// Get all minute data as a single OHLCV struct.
 func (d *Data) GetMinuteData() OHLCV {
 	return d.getOHLCV(1)
 }
@@ -238,6 +248,7 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 
 }
 
+// Reconstruct the underlying OHLCV data with a given resample interval.
 func (d *Data) rebuildOHLCV(resampleInterval int) {
 	bars := d.minuteBars
 	if _, ok := d.data[resampleInterval]; !ok {
@@ -279,6 +290,7 @@ func (d *Data) rebuildOHLCV(resampleInterval int) {
 	}
 }
 
+// Determine whether a slice of ints contains a certain value (TODO: this should be a utils function).
 func containsInt(s []int64, e int64) bool {
 	for _, a := range s {
 		if a == e {

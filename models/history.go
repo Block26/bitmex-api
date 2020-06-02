@@ -2,6 +2,7 @@ package models
 
 import "time"
 
+// Generic History struct for summarizing the state of the algo at a given point in time.
 type History struct {
 	Timestamp    time.Time
 	Symbol       string
@@ -18,6 +19,7 @@ type History struct {
 	Price        float64
 }
 
+// Represents the state of account balances at a given point in time.
 type BalanceHistory struct {
 	Timestamp string  `csv:"timestamp"`
 	Balance   float64 `csv:"balance"`

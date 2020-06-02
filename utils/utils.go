@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
+// Load necessary environment variables, including secret file.
 func LoadENV(isSecret bool) {
 	if isSecret {
 		secretFile := getSecret("ENVIRONMENT_VARIABLES")
@@ -39,6 +40,7 @@ func LoadENV(isSecret bool) {
 	}
 }
 
+// Get AWS secret, given the relevant environment variable exists.
 func getSecret(secretName string) string {
 	region, ok := os.LookupEnv("AWS_REGION")
 	if !ok {
@@ -129,6 +131,7 @@ func LoadSecret(file string, cloud bool) models.Secret {
 	}
 }
 
+// Converts a slice of TradeBin structs (raw from exchange API) to generalized Bar structs.
 func ConvertTradeBinsToBars(bins []iex.TradeBin) (bars []*models.Bar) {
 	bars = make([]*models.Bar, len(bins))
 	for i, _ := range bins {
@@ -138,6 +141,7 @@ func ConvertTradeBinsToBars(bins []iex.TradeBin) (bars []*models.Bar) {
 	return
 }
 
+// Convert a single TradeBin struct (raw from exchange API) to generalized Bar struct.
 func ConvertTradeBinToBar(bin iex.TradeBin) models.Bar {
 	return models.Bar{
 		Timestamp: bin.Timestamp.Unix() * 1000,
@@ -173,6 +177,7 @@ func GetOHLCV(bars []*models.Bar) (ohlcv models.OHLCV) {
 	return
 }
 
+// Convert a string representation of a timestamp to an integer timestamp (ms).
 func ToIntTimestamp(timeString string) int {
 	layout := "2006-01-02 15:04:05"
 	// if strings.Contains(timeString, "+0000 UTC") {
@@ -187,6 +192,7 @@ func ToIntTimestamp(timeString string) int {
 	return int(currentTime.UnixNano() / int64(time.Millisecond))
 }
 
+// Convert a string representation of a timestamp into a time object.
 func ToTimeObject(timeString string) time.Time {
 	layout := "2006-01-02 15:04:05"
 	// if strings.Contains(timeString, "+0000 UTC") {
@@ -201,6 +207,7 @@ func ToTimeObject(timeString string) time.Time {
 	return currentTime
 }
 
+// Convert an integer timestamp (ms) to a time object.
 func TimestampToTime(timestamp int) time.Time {
 	timeInt, err := strconv.ParseInt(strconv.Itoa(timestamp/1000), 10, 64)
 	if err != nil {
@@ -209,6 +216,7 @@ func TimestampToTime(timestamp int) time.Time {
 	return time.Unix(timeInt, 0).UTC()
 }
 
+// Convert a time object into a timestamp (ms).
 func TimeToTimestamp(timeObject time.Time) int {
 	return int(timeObject.UnixNano() / 1000000)
 }
@@ -218,6 +226,7 @@ func Round(x, decimal float64) float64 {
 	return math.Round(x/decimal) * decimal
 }
 
+// Reverse the order of a slice of floats.
 func ReverseArr(a []float64) []float64 {
 	for i := len(a)/2 - 1; i >= 0; i-- {
 		opp := len(a) - 1 - i
@@ -226,6 +235,7 @@ func ReverseArr(a []float64) []float64 {
 	return a
 }
 
+// Reverse the order of a slice of *models.Bar.
 func reverseBars(a []*models.Bar) []*models.Bar {
 	for i := len(a)/2 - 1; i >= 0; i-- {
 		opp := len(a) - 1 - i
@@ -234,6 +244,8 @@ func reverseBars(a []*models.Bar) []*models.Bar {
 	return a
 }
 
+// Generate a range of floats, given min, max, and step values.
+// I.E. 0, 4, 1 gives [0,1,2,3,4]
 func Arange(min float64, max float64, step float64) []float64 {
 	a := make([]float64, int32((max-min)/step)+1)
 	for i := range a {
@@ -242,6 +254,7 @@ func Arange(min float64, max float64, step float64) []float64 {
 	return a
 }
 
+// Calculate the percent differance between two floats (relative to second input).
 func CalculateDifference(x float64, y float64) float64 {
 	//Get percentage difference between 2 numbers
 	if y == 0 {
@@ -323,6 +336,7 @@ func SumArr(arr []float64) float64 {
 	return sum
 }
 
+// Get the exponent given a base and exponent.
 func exponent(x, y float64) float64 {
 	return math.Pow(x, y)
 }
@@ -353,19 +367,24 @@ func CreateKeyValuePairs(m map[string]interface{}, ignoreLowerCase bool, oldByte
 	return b.String()
 }
 
+// Round a float to the nearest integer.
 func round(num float64) int {
 	return int(num + math.Copysign(0.5, num))
 }
 
+// Round a float to a given precision.
 func ToFixed(num float64, precision int) float64 {
 	output := math.Pow(10, float64(precision))
 	return float64(round(num*output)) / output
 }
 
+// Round a float to a nearest interval.
 func RoundToNearest(num float64, interval float64) float64 {
 	return math.Round(num/interval) * interval
 }
 
+// Adjust a price to accomodate for a given slippage amount and side.
+// Assume slippage is linear.
 func AdjustForSlippage(price float64, side string, slippage float64) float64 {
 	adjPrice := price
 	if side == "buy" {
@@ -378,6 +397,7 @@ func AdjustForSlippage(price float64, side string, slippage float64) float64 {
 	return adjPrice
 }
 
+// Get the symbol for a given option contract, following Deribit's format.
 func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionType string) string {
 	expiryTime := time.Unix(int64(expiry/1000), 0)
 	year := strconv.Itoa(expiryTime.Year())[2:4]
@@ -392,6 +412,7 @@ func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionT
 	return currency + "-" + strconv.Itoa(int(strike)) + "-" + day + month + year + "-" + oType
 }
 
+// Get the next friday as a time object, given the current time.
 func GetNextFriday(currentTime time.Time) time.Time {
 	dayDiff := 5 - currentTime.Weekday()
 	if dayDiff <= 0 {
@@ -400,6 +421,7 @@ func GetNextFriday(currentTime time.Time) time.Time {
 	return currentTime.Truncate(24 * time.Hour).Add(time.Hour * 24 * time.Duration(dayDiff))
 }
 
+// Get the last friday of the month of a given time object.
 func GetLastFridayOfMonth(currentTime time.Time) time.Time {
 	startTime := currentTime
 	year, month, _ := currentTime.Date()
@@ -416,6 +438,8 @@ func GetLastFridayOfMonth(currentTime time.Time) time.Time {
 	return currentTime
 }
 
+// Get the next quarterly expiry (determined as the last friday of the quarter).
+// Get the next quarterly expiry if the current time is within minDays of a quarterly expiry.
 func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
 	year, month, _ := currentTime.Add(time.Hour * time.Duration(24*minDays)).Date()
 	// Get nearest quarterly month
@@ -429,6 +453,7 @@ func GetQuarterlyExpiry(currentTime time.Time, minDays int) time.Time {
 	return lastFriday
 }
 
+// Determine whether an integer is within a slice of integers.
 func IntInSlice(a int, list []int) bool {
 	for _, b := range list {
 		if b == a {
@@ -438,6 +463,7 @@ func IntInSlice(a int, list []int) bool {
 	return false
 }
 
+// Determine whether a string is within a slice of strings.
 func StringInSlice(a string, list []string) bool {
 	for _, b := range list {
 		if b == a {
@@ -447,6 +473,7 @@ func StringInSlice(a string, list []string) bool {
 	return false
 }
 
+// Copy a file from a given location to a destination directory.
 func Copy(fromFile string, toFile string) {
 	from, err := os.Open(fromFile)
 	if err != nil {
@@ -466,6 +493,7 @@ func Copy(fromFile string, toFile string) {
 	}
 }
 
+// Run a shell commmand with optional arguments. Throw an error if syntax is incomplete.
 func Run(app string, args ...string) error {
 	log.Println(app, args)
 	cmd := exec.Command(app, args...)
@@ -474,6 +502,7 @@ func Run(app string, args ...string) error {
 	return cmd.Run()
 }
 
+// Get the current weight of a market (TODO: should be in a module)
 func GetCurrentWeight(side string, marketState *models.MarketState) int {
 	if side == "buy" && marketState.Position >= 0 {
 		return 1

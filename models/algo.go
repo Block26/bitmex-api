@@ -33,6 +33,7 @@ type Algo struct {
 	Client            iex.IExchange
 }
 
+// AlgoConfig is a struct representing various parameters for simple instantiation of algo structs.
 type AlgoConfig struct {
 	Name              string
 	Exchange          string

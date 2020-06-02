@@ -1,5 +1,6 @@
 package models
 
+// Represents concise Open, High, Low, Close, and Volume data in a single struct.
 type OHLCV struct {
 	Timestamp []int64
 	Open      []float64

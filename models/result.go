@@ -1,13 +1,14 @@
 package models
 
+// The Result struct contains information about a backtest result.
 type Result struct {
-	Balance           float64
-	DailyReturn       float64
-	MaxLeverage       float64
-	MaxPositionProfit float64
-	MaxPositionDD     float64
-	MaxDD             float64
-	Score             float64
-	Sortino           float64
-	Params            string
+	Balance           float64 // Ending balance for the backtest
+	DailyReturn       float64 // Average daily return (in percent)
+	MaxLeverage       float64 // Max leverage used by the algo during the backtest
+	MaxPositionProfit float64 // Max profit of a single position in the backtest
+	MaxPositionDD     float64 // Max drawdown of a single position in the backtest
+	MaxDD             float64 // Total max drawdown during the backtest
+	Score             float64 // Sharpe ratio of the entire backtest
+	Sortino           float64 // Sortino ratio of the entire backtest
+	Params            string  // Algo params for this backtest
 }

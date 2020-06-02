@@ -1,5 +1,6 @@
 package models
 
+// Represents a bar for historical implied volatility (for use with options).
 type ImpliedVol struct {
 	Symbol       string  `db:"symbol"`
 	IV           float64 `db:"iv"`

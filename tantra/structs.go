@@ -4,22 +4,28 @@ import (
 	"encoding/json"
 )
 
+// The following structs are meant to follow the iex.IExchange structure
+
+// A generic JSON response from the mock exchange
 type jsonResponse struct {
 	Success bool            `json:"success"`
 	Message string          `json:"message"`
 	Result  json.RawMessage `json:"result"`
 }
 
+// Generic ticker summary (fits iex.IExchange structure)
 type Ticker struct {
 	Bid  float64 `json:"Bid"`
 	Ask  float64 `json:"Ask"`
 	Last float64 `json:"Last"`
 }
 
+// Struct for representing a single uuid
 type Uuid struct {
 	Id string `json:"uuid"`
 }
 
+// Various market summary information (fits iex.IExchange structure)
 type Market struct {
 	MarketName        string  `json:"MarketName"`
 	High              float64 `json:"High"`
@@ -37,16 +43,19 @@ type Market struct {
 	DisplayMarketName string  `json:"DisplayMarketName"`
 }
 
+// Represents an orderbook as two slices of OrderItems
 type OrderBook struct {
 	Buy  []OrderItem `json:"buy"`
 	Sell []OrderItem `json:"sell"`
 }
 
+// Represents a single order in an orderbook (with order price and amount)
 type OrderItem struct {
 	Quantity float64 `json:"Quantity"`
 	Rate     float64 `json:"Rate"`
 }
 
+// Represents the balance for a given asset
 type Balance struct {
 	Currency      string  `json:"Currency"`
 	Balance       float64 `json:"Balance"`
@@ -57,6 +66,7 @@ type Balance struct {
 	Uuid          string  `json:"Uuid"`
 }
 
+// Represents an open order on the exchange
 type OpenOrder struct {
 	CancelInitiated   bool        `json:"CancelInitiated"`
 	Closed            interface{} `json:"Closed"`
