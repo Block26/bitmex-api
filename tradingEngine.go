@@ -75,13 +75,18 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 // Provide a rebalance function to be called at every data interval and performs trading logic.
 // Optionally, provide a setup data to be called before rebalance to precompute relevant data and metrics for the algo.
 // This is the trading engine's entry point for a new backtest.
-func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
-	t.SetupTest(start, end, rebalance, setupData)
+func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo), live ...bool) {
+	t.SetupTest(start, end, rebalance, setupData, live...)
 	t.Connect("", false, rebalance, setupData, true)
 }
 
-func (t *TradingEngine) SetupTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo)) {
+func (t *TradingEngine) SetupTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo), live ...bool) {
 	t.isTest = true
+	isLive := false
+	if live != nil {
+		isLive = true
+	}
+
 	logger.SetLogLevel(t.Algo.BacktestLogLevel)
 	exchangeVars := iex.ExchangeConf{
 		Exchange:       t.Algo.Account.ExchangeInfo.Exchange,
@@ -90,16 +95,19 @@ func (t *TradingEngine) SetupTest(start time.Time, end time.Time, rebalance func
 		OutputResponse: false,
 	}
 	mockExchange := tantra.NewTest(exchangeVars, &t.Algo.Account, start, end, t.Algo.DataLength, t.Algo.LogBacktest)
-	barData := t.LoadBarData(t.Algo, start, end)
+	// If we are live we already have all the data we need so there is no need to fetch it again
+	if !isLive {
+		barData = t.LoadBarData(t.Algo, start, end)
+	}
 	for symbol, data := range barData {
 		logger.Infof("Loaded %v instances of bar data for %v with start %v and end %v.\n", len(data), symbol, start, end)
 	}
+
 	t.SetAlgoCandleData(barData)
 	mockExchange.SetCandleData(barData)
 	mockExchange.SetCurrentTime(start)
 	t.Algo.Client = mockExchange
 	t.Algo.Timestamp = start
-	// t.endTime = end.AddDate(0, 0, -1)
 	t.endTime = end
 	setupData(t.Algo)
 }
@@ -197,7 +205,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		}
 		t.Algo.Client, err = tradeapi.New(exchangeVars)
 		//  Fetch prelim data from db to run live
-		barData := make(map[string][]*models.Bar)
+		barData = make(map[string][]*models.Bar)
 		for symbol, ms := range t.Algo.Account.MarketStates {
 			barData[symbol] = database.GetLatestMinuteData(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+3000)
 		}
@@ -338,7 +346,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				history = append(history, state)
 				if !t.isTest {
 					t.logLiveState(marketState)
-					// t.runTest(t.Algo, setupData, rebalance)
+					t.runTest(t.Algo, setupData, rebalance)
 					t.checkWalletHistory(t.Algo, settingsFileName)
 				}
 			}
@@ -348,6 +356,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			}
+			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
 			if !t.Algo.Timestamp.Before(t.endTime) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, history, startTime)
@@ -444,17 +453,35 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 func (t *TradingEngine) runTest(algo *models.Algo, setupData func(*models.Algo), rebalance func(*models.Algo)) {
 	if t.lastTest != database.GetBars()[algo.Index].Timestamp {
 		t.lastTest = database.GetBars()[algo.Index].Timestamp
-		testAlgo := models.Algo{}
-		copier.Copy(&testAlgo, &algo)
-		logger.Info(testAlgo.Account.BaseAsset.Quantity)
+
+		testEngine := TradingEngine{}
+		// testEngine.LogBacktest = false
+		// testAlgo := models.Algo{}
+		copier.Copy(&testEngine, &t)
+		logger.Info(testEngine.Algo.Account.BaseAsset.Quantity)
 		// RESET Algo but leave base balance
-		for _, marketState := range testAlgo.Account.MarketStates {
+		for _, marketState := range testEngine.Algo.Account.MarketStates {
 			marketState.Position = 0
 			marketState.Leverage = 0
 			marketState.Weight = 0
 		}
 		// Override logger level to info so that we don't pollute logs with backtest state changes
 		// testAlgo = RunBacktest(database.GetBars(), testAlgo, rebalance, setupData)
+		now := time.Now().Local().UTC()
+		var start time.Time
+
+		// if t.Algo.RebalanceInterval == "1m" {
+		// 	start = now.Add(time.Duration(-t.Algo.DataLength) * time.Minute)
+		// 	end = now.Add(time.Duration(-1) * time.Minute)
+		// } else {
+		// TODO currently running tests once per hour, should run them at the data interval
+		start = now.Add(time.Duration(-t.Algo.DataLength) * time.Hour)
+		// end = now.Add(time.Duration(-60) * time.Minute)
+		end := t.Algo.Timestamp.Add(time.Duration(-1) * time.Minute)
+		// fmt.Println("NOW", now, "END", end)
+		// }
+		testEngine.RunTest(start, end, rebalance, setupData, true)
+		// testEngine.R
 		// logLiveState(&testAlgo, true)
 		//TODO compare the states
 	}

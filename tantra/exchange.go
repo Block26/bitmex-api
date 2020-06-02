@@ -131,6 +131,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 	}
 	go func() {
 		for index := t.index; index < numIndexes; index++ {
+			log.Println(index, numIndexes)
 			startTime := time.Now().UnixNano()
 			tradeTime := 0
 			fillTime := 0
@@ -394,7 +395,7 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 			if t.LogBacktest {
 				t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
 			}
-			log.Println("Balance after fill", marketState.Balance, "Previous Position", marketState.Position, "AC", marketState.AverageCost, "fillPrice", fillPrice, "amount", fillAmount)
+			logger.Debug("Balance after fill", marketState.Balance, "Previous Position", marketState.Position, "AC", marketState.AverageCost, "fillPrice", fillPrice, "amount", fillAmount)
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			delete(t.orders, key)
@@ -585,7 +586,7 @@ func (t *Tantra) updateBalance(currentBaseBalance *float64, currentPosition *flo
 				}
 			}
 			*currentPosition += fillAmount
-			log.Println("Position after fill", *currentPosition, "Average cost", *averageCost)
+			logger.Debug("Position after fill", *currentPosition, "Average cost", *averageCost)
 			if *currentPosition == 0 {
 				*averageCost = 0
 			}

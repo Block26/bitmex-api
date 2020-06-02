@@ -188,7 +188,7 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 		} else {
 			for i := 0; i < length-adjuster; i++ {
 				oldIndex := resampleInterval * (i + 1)
-				if oldIndex == len(bars) {
+				if oldIndex >= len(bars) {
 					break
 				}
 				ohlcv.Open[i] = bars[oldIndex-resampleInterval].Open
