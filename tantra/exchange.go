@@ -131,7 +131,6 @@ func (t *Tantra) StartWS(config interface{}) error {
 	}
 	go func() {
 		for index := t.index; index < numIndexes; index++ {
-			log.Println(index, numIndexes)
 			startTime := time.Now().UnixNano()
 			tradeTime := 0
 			fillTime := 0

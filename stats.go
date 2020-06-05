@@ -292,7 +292,7 @@ func getMinMaxStats(history []models.History) (float64, float64, float64, float6
 }
 
 func logStats(algo *models.Algo, history []models.History, startTime time.Time) {
-	log.Println("End Timestamp", algo.Timestamp)
+	log.Println("Start", history[0].Timestamp, "End", algo.Timestamp)
 	//TODO do this during test instead of after the test
 	minProfit, maxProfit, _, maxLeverage, drawdown := getMinMaxStats(history)
 

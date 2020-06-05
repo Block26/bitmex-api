@@ -30,6 +30,8 @@ import (
 var currentRunUUID time.Time
 var barData map[string][]*models.Bar
 
+const ADDITIONAL_LIVE_DATA int = 3000
+
 // The trading engine is responsible for managing communication between algos and other modules and the exchange.
 type TradingEngine struct {
 	Algo                 *models.Algo
@@ -207,7 +209,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		//  Fetch prelim data from db to run live
 		barData = make(map[string][]*models.Bar)
 		for symbol, ms := range t.Algo.Account.MarketStates {
-			barData[symbol] = database.GetLatestMinuteData(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+3000)
+			barData[symbol] = database.GetLatestMinuteData(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+ADDITIONAL_LIVE_DATA)
 		}
 		t.SetAlgoCandleData(barData)
 		if err != nil {
@@ -475,7 +477,7 @@ func (t *TradingEngine) runTest(algo *models.Algo, setupData func(*models.Algo),
 		// 	end = now.Add(time.Duration(-1) * time.Minute)
 		// } else {
 		// TODO currently running tests once per hour, should run them at the data interval
-		start = now.Add(time.Duration(-t.Algo.DataLength) * time.Hour)
+		start = now.Add(time.Duration(-(t.Algo.DataLength+ADDITIONAL_LIVE_DATA)) * time.Minute)
 		// end = now.Add(time.Duration(-60) * time.Minute)
 		end := t.Algo.Timestamp.Add(time.Duration(-1) * time.Minute)
 		// fmt.Println("NOW", now, "END", end)
@@ -804,6 +806,7 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 
 // Log the state of the Algo to influx db. Should only be called when live trading for now.
 func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bool) {
+	fmt.Println("logLiveState")
 	stateType := "live"
 	if test != nil {
 		stateType = "test"
@@ -811,10 +814,14 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 
 	influx := GetInfluxClient()
 
-	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  "algos",
 		Precision: "us",
 	})
+
+	if err != nil {
+		fmt.Println("err", err)
+	}
 
 	for symbol, ms := range t.Algo.Account.MarketStates {
 		tags := map[string]string{
@@ -915,7 +922,7 @@ func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bo
 			bp.AddPoint(pt)
 		}
 	}
-	err := client.Client.Write(influx, bp)
+	err = client.Client.Write(influx, bp)
 	if err != nil {
 		fmt.Println("err", err)
 	}
