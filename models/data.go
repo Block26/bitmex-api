@@ -6,7 +6,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/tantralabs/logger"
 	"github.com/tantralabs/tradeapi/iex"
 )
 
@@ -117,8 +116,8 @@ func (d *Data) AddData(newBars []*Bar) {
 func (d *Data) GetOHLCVData(resampleInterval int) (data OHLCV, index int) {
 	data = d.getOHLCV(resampleInterval)
 	index = len(data.Timestamp) - 1
-	logger.Debug("Last Timestamp for", resampleInterval, "min", time.Unix(data.Timestamp[index]/1000, 0).UTC())
-	logger.Debug("2nd to Last Timestamp for", resampleInterval, "min", time.Unix(data.Timestamp[index-1]/1000, 0).UTC())
+	// logger.Debug("Last Timestamp for", resampleInterval, "min", time.Unix(data.Timestamp[index]/1000, 0).UTC())
+	// logger.Debug("2nd to Last Timestamp for", resampleInterval, "min", time.Unix(data.Timestamp[index-1]/1000, 0).UTC())
 	return
 }
 

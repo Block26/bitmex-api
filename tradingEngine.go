@@ -29,8 +29,11 @@ import (
 
 var currentRunUUID time.Time
 var barData map[string][]*models.Bar
+var index int = 0
 
-const ADDITIONAL_LIVE_DATA int = 3000
+const additionalLiveData int = 3000
+const checkWalletHistoryInterval int = 60
+const liveTestInterval int = 15
 
 // The trading engine is responsible for managing communication between algos and other modules and the exchange.
 type TradingEngine struct {
@@ -162,7 +165,6 @@ func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time
 			// TODO handle extra bars to account for dataLength here
 			// barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
 			barData[symbol] = database.GetCandlesByTimeWithBuffer(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
-			algo.Index = algo.DataLength
 			marketState.Bar = *barData[symbol][len(barData[symbol])-1]
 			marketState.LastPrice = marketState.Bar.Close
 			logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
@@ -209,7 +211,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		//  Fetch prelim data from db to run live
 		barData = make(map[string][]*models.Bar)
 		for symbol, ms := range t.Algo.Account.MarketStates {
-			barData[symbol] = database.GetLatestMinuteData(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+ADDITIONAL_LIVE_DATA)
+			barData[symbol] = database.GetLatestMinuteData(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+additionalLiveData)
 		}
 		t.SetAlgoCandleData(barData)
 		if err != nil {
@@ -347,16 +349,19 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				state := logState(t.Algo, marketState)
 				history = append(history, state)
 				if !t.isTest {
-					t.logLiveState(marketState)
-					t.runTest(t.Algo, setupData, rebalance)
-					t.checkWalletHistory(t.Algo, settingsFileName)
+					t.logLiveState()
 				}
+			}
+			if !t.isTest {
+				t.runTest(t.Algo, setupData, rebalance)
+				t.checkWalletHistory(t.Algo, settingsFileName)
 			}
 			t.aggregateAccountProfit()
 			logger.Debugf("[Trading Engine] trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
-
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
+			} else {
+				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
 			if !t.Algo.Timestamp.Before(t.endTime) && t.isTest {
@@ -389,15 +394,12 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	logger.Infof("Reached end of connect.\n")
 }
 
-const walletHistoryPeriod = 60 * 60 * 60
-
 // Get the wallet history from the exchange and log it to the db.
 // Don't log this data if we have already logged within walletHistoryPeriod seconds.
 func (t *TradingEngine) checkWalletHistory(algo *models.Algo, settingsFileName string) {
-	timeSinceLastSync := database.GetBars()[algo.Index].Timestamp - t.lastWalletSync
-	if timeSinceLastSync > (walletHistoryPeriod) {
-		logger.Info("It has been", timeSinceLastSync, "seconds since the last wallet history download, fetching latest deposits and withdrawals.")
-		t.lastWalletSync = database.GetBars()[algo.Index].Timestamp
+	// Check for new wallet entry every 60m
+	if index%checkWalletHistoryInterval == 0 {
+		// logger.Info("It has been", timeSinceLastSync, "seconds since the last wallet history download, fetching latest deposits and withdrawals.")
 		walletHistory, err := algo.Client.GetWalletHistory(algo.Account.BaseAsset.Symbol)
 		if err != nil {
 			logger.Error("There was an error fetching the wallet history", err)
@@ -407,6 +409,7 @@ func (t *TradingEngine) checkWalletHistory(algo *models.Algo, settingsFileName s
 			}
 		}
 	}
+
 }
 
 // Inject orders directly into market state upon update.
@@ -453,38 +456,23 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 // Run a new backtest. This private function is meant to be called while the trading engine is running live, as a means
 // of making sure that the current state is similar to the expected state (a safety mechanism).
 func (t *TradingEngine) runTest(algo *models.Algo, setupData func(*models.Algo), rebalance func(*models.Algo)) {
-	if t.lastTest != database.GetBars()[algo.Index].Timestamp {
-		t.lastTest = database.GetBars()[algo.Index].Timestamp
-
+	// Run a test every 15m
+	if index%liveTestInterval == 0 {
 		testEngine := TradingEngine{}
-		// testEngine.LogBacktest = false
-		// testAlgo := models.Algo{}
 		copier.Copy(&testEngine, &t)
-		logger.Info(testEngine.Algo.Account.BaseAsset.Quantity)
 		// RESET Algo but leave base balance
 		for _, marketState := range testEngine.Algo.Account.MarketStates {
 			marketState.Position = 0
 			marketState.Leverage = 0
 			marketState.Weight = 0
 		}
-		// Override logger level to info so that we don't pollute logs with backtest state changes
-		// testAlgo = RunBacktest(database.GetBars(), testAlgo, rebalance, setupData)
 		now := time.Now().Local().UTC()
 		var start time.Time
 
-		// if t.Algo.RebalanceInterval == "1m" {
-		// 	start = now.Add(time.Duration(-t.Algo.DataLength) * time.Minute)
-		// 	end = now.Add(time.Duration(-1) * time.Minute)
-		// } else {
-		// TODO currently running tests once per hour, should run them at the data interval
-		start = now.Add(time.Duration(-(t.Algo.DataLength+ADDITIONAL_LIVE_DATA)) * time.Minute)
-		// end = now.Add(time.Duration(-60) * time.Minute)
+		start = now.Add(time.Duration(-(t.Algo.DataLength + additionalLiveData)) * time.Minute)
 		end := t.Algo.Timestamp.Add(time.Duration(-1) * time.Minute)
-		// fmt.Println("NOW", now, "END", end)
-		// }
 		testEngine.RunTest(start, end, rebalance, setupData, true)
-		// testEngine.R
-		// logLiveState(&testAlgo, true)
+		testEngine.logLiveState(true)
 		//TODO compare the states
 	}
 }
@@ -805,7 +793,7 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 }
 
 // Log the state of the Algo to influx db. Should only be called when live trading for now.
-func (t *TradingEngine) logLiveState(marketState *models.MarketState, test ...bool) {
+func (t *TradingEngine) logLiveState(test ...bool) {
 	fmt.Println("logLiveState")
 	stateType := "live"
 	if test != nil {

@@ -15,7 +15,6 @@ type Algo struct {
 	FillType          string                 // The simulation fill type for this Algo. Refer to exchanges.FillType() for options
 	RebalanceInterval string                 // The interval at which rebalance should be called. Refer to exchanges.RebalanceInterval() for options
 	Debug             bool                   // Turn logs on or off
-	Index             int                    // Current index of the Algo in it's data
 	Timestamp         time.Time              // Current timestamp of the Algo in it's data
 	History           []History              // Used to Store historical states
 	Params            Params                 // Save the initial Params of the Algo, for logging purposes. This is used to check the params after running a genetic search.
