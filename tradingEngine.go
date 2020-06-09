@@ -736,11 +736,11 @@ func (t *TradingEngine) logTrade(trade iex.Order) {
 	})
 
 	tags := map[string]string{
-		"algo_name":   t.Algo.Name,
-		"symbol":      trade.Symbol,
-		"commit_hash": t.commitHash,
-		"state_type":  stateType,
-		"side":        strings.ToLower(trade.Side),
+		"algo_name": t.Algo.Name,
+		"symbol":    trade.Symbol,
+		// "commit_hash": t.commitHash,
+		"state_type": stateType,
+		"side":       strings.ToLower(trade.Side),
 	}
 
 	fields := structs.Map(trade)
@@ -770,10 +770,10 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 	})
 
 	tags := map[string]string{
-		"algo_name":   t.Algo.Name,
-		"symbol":      trade.Symbol,
-		"commit_hash": t.commitHash,
-		"state_type":  stateType, "side": strings.ToLower(trade.Side),
+		"algo_name": t.Algo.Name,
+		"symbol":    trade.Symbol,
+		// "commit_hash": t.commitHash,
+		"state_type": stateType, "side": strings.ToLower(trade.Side),
 	}
 
 	fields := structs.Map(trade)
@@ -813,10 +813,10 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 
 	for symbol, ms := range t.Algo.Account.MarketStates {
 		tags := map[string]string{
-			"algo_name":   t.Algo.Name,
-			"symbol":      symbol,
-			"commit_hash": t.commitHash,
-			"state_type":  stateType,
+			"algo_name": t.Algo.Name,
+			"symbol":    symbol,
+			// "commit_hash": t.commitHash,
+			"state_type": stateType,
 		}
 		fields := structs.Map(ms)
 
