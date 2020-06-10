@@ -130,6 +130,8 @@ func (t *TradingEngine) SetAlgoCandleData(candleData map[string][]*models.Bar) {
 		} else {
 			d := models.SetupDataModel(data, len(data), t.isTest)
 			marketState.OHLCV = &d
+			b := marketState.OHLCV.GetBarData()
+			marketState.Bar = *b[len(b)-1]
 		}
 	}
 }
@@ -794,7 +796,6 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 
 // Log the state of the Algo to influx db. Should only be called when live trading for now.
 func (t *TradingEngine) logLiveState(test ...bool) {
-	fmt.Println("logLiveState")
 	stateType := "live"
 	if test != nil {
 		stateType = "test"
