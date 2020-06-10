@@ -353,7 +353,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				}
 			}
 			if !t.isTest {
-				t.runTest(t.Algo, setupData, rebalance)
+				// t.runTest(t.Algo, setupData, rebalance)
 				t.checkWalletHistory(t.Algo, settingsFileName)
 			}
 			t.aggregateAccountProfit()
@@ -419,10 +419,10 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 		// Add to existing order state
 		for _, newOrder := range orders {
 			if newOrder.OrdStatus != t.Algo.Client.GetPotentialOrderStatus().Cancelled {
-				logger.Debugf("Processing order update: %v\n", newOrder)
-				marketState, ok := algo.Account.MarketStates[newOrder.Market]
+				logger.Debugf("Processing order update: %v\n", newOrder.Symbol)
+				marketState, ok := algo.Account.MarketStates[newOrder.Symbol]
 				if !ok {
-					logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Market)
+					logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Symbol)
 					continue
 				}
 				marketState.Orders.Store(newOrder.OrderID, newOrder)

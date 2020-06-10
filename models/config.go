@@ -14,12 +14,13 @@ type Config struct {
 	Secret        string `json:"secret"`
 	Branch        string `json:"branch"`
 	Commit        string `json:"commit"`
-	AccountID     string `json:"account_id"`
 	ClusterName   string `json:"cluster_name"`
 	SecurityGroup string `json:"security_group"`
 	Subnet        string `json:"subnet"`
 	RegionName    string `json:"region_name"`
+	AccountID     int    `json:"account_id"`
 	Status        int    `json:"status"`
+	UpdatedAt     int64    `json:"updated_at"`
 }
 
 // Loads a config from a file.
