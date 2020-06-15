@@ -334,7 +334,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				if ts < currentTimestamp {
 					lastTimestamp["trades"] = currentTimestamp
 				} else {
-					fmt.Println("ERROR recieved an trade out of order...", ts, currentTimestamp)
+					log.Fatalln("ERROR recieved an trade out of order...", ts, currentTimestamp)
 					return
 				}
 			} else {
