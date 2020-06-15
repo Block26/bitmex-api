@@ -377,6 +377,9 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			t.aggregateAccountProfit()
 			logger.Debugf("[Trading Engine] trade processing took %v s\n", (time.Now().Unix() - startTimestamp))
 			logger.Debug("===========================================")
+			logger.Debugf("Fetching positions now as a stop gap")
+			positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
+			t.updatePositions(t.Algo, positions)
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			} else {
