@@ -297,11 +297,11 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 // Custom fill logic should go here- for now we assume a limit order is filled if candle wicks through limit price.
 // Assume market orders are filled at the last close, adjusted for fees and slippage.
 func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFilled bool, fillPrice, fillAmount float64) {
-	lastCandle, ok := t.currentCandle[order.Market]
+	lastCandle, ok := t.currentCandle[order.Symbol]
 	if !ok {
 		// This is probably an option order, for now simply check if market order
 		if order.Type == "market" || order.Rate == 0 {
-			option := t.Account.MarketStates[order.Market]
+			option := t.Account.MarketStates[order.Symbol]
 			if option.Info.MarketType == models.Option {
 				isFilled = true
 				fillPrice = utils.AdjustForSlippage(option.OptionTheo.Theo, order.Side, option.Info.Slippage)
@@ -383,9 +383,9 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 	var fillAmount, fillPrice float64
 	for key, order := range t.orders {
 		logger.Debugf("Found open order: %v\n", order)
-		marketState, ok := t.Account.MarketStates[order.Market]
+		marketState, ok := t.Account.MarketStates[order.Symbol]
 		if !ok {
-			logger.Errorf("Could not find market state for %v\n", order.Market)
+			logger.Errorf("Could not find market state for %v\n", order.Symbol)
 		}
 		isFilled, fillPrice, fillAmount = t.getFill(order, marketState)
 		marketState.Weight = utils.GetCurrentWeight(order.Side, marketState)
@@ -401,7 +401,7 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 			delete(t.orders, key)
 			logger.Debugf("Deleted order with key: %v\n", key)
 		}
-		filledSymbols[order.Market] = true
+		filledSymbols[order.Symbol] = true
 	}
 	if len(t.ordersToPublish) > 0 {
 		t.publishOrderUpdates()
@@ -522,6 +522,7 @@ func (t *Tantra) publishOrderUpdates() {
 	// <-t.channels.OrderChan
 	// logger.Infof("OUTPUT ORDER UPDATE: %v\n", <-t.channels.OrderChan)
 	for _, order := range t.ordersToPublish {
+		order.TransactTime = t.CurrentTime
 		t.channels.OrderChan <- []iex.Order{order}
 		<-t.channels.OrderChanComplete
 	}
@@ -853,7 +854,7 @@ func (t *Tantra) CurrentOptionProfit() float64 {
 func (t *Tantra) prepareOrderUpdate(order iex.Order, status string) {
 	o := order // make a copy so we can delete it
 	o.OrdStatus = status
-	logger.Debugf("New order update: %v %v %v at %v (%v)\n", order.Side, order.Amount, order.Market, order.Rate, o.OrdStatus)
+	logger.Debugf("New order update: %v %v %v at %v (%v)\n", order.Side, order.Amount, order.Symbol, order.Rate, o.OrdStatus)
 	t.ordersToPublish[o.OrderID] = order
 }
 
@@ -868,7 +869,7 @@ func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	//TODO order side to lower case
 	order.Side = strings.ToLower(order.Side)
 	order.TransactTime = t.CurrentTime
-	logger.Debugf("Placing order: %v %v %v at %v\n", order.Side, order.Amount, order.Market, order.Rate)
+	logger.Debugf("Placing order: %v %v %v at %v\n", order.Side, order.Amount, order.Symbol, order.Rate)
 	uuid = t.CurrentTime.String() + string(t.sequenceNumber)
 	t.sequenceNumber += 1
 	order.OrderID = uuid

@@ -397,7 +397,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			ts, ok := lastTimestamp["orders"]
 			currentTimestamp := int(newOrders[0].TransactTime.Unix())
 			if ok {
-				if ts < currentTimestamp {
+				if ts <= currentTimestamp {
 					lastTimestamp["orders"] = currentTimestamp
 				} else {
 					fmt.Println("ERROR recieved an order out of order...", ts, currentTimestamp)
