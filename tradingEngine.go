@@ -30,6 +30,7 @@ import (
 var currentRunUUID time.Time
 var barData map[string][]*models.Bar
 var index int = 0
+var lastTimestamp map[string]int
 
 const additionalLiveData int = 3000
 const checkWalletHistoryInterval int = 60
@@ -197,6 +198,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 	var err error
 	var config models.Secret
 	history := make([]models.History, 0)
+	lastTimestamp := make(map[string]int, 0)
 
 	if !t.isTest {
 		config = utils.LoadSecret(settingsFileName, secret)
@@ -276,7 +278,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 		if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
 			//Ordering is important, get wallet and position first then market info
 			logger.Infof("Subscribing to %v channels.\n", symbol)
-			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET, Symbol: symbol})
+			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_ORDER, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_POSITION, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol, Market: iex.WSMarketType{Contract: iex.WS_SWAP}})
@@ -325,16 +327,30 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				channels.PositionChanComplete <- nil
 			}
 		case trades := <-channels.TradeBinChan:
-			startTimestamp := time.Now().UnixNano()
+			// Make sure the trades are coming from the exchange in the right order.
+			ts, ok := lastTimestamp["trades"]
+			currentTimestamp := int(trades[0].Timestamp.Unix())
+			if ok {
+				if ts < currentTimestamp {
+					lastTimestamp["trades"] = currentTimestamp
+				} else {
+					fmt.Println("ERROR recieved an trade out of order...", ts, currentTimestamp)
+					return
+				}
+			} else {
+				lastTimestamp["trades"] = currentTimestamp
+			}
+
+			startTimestamp := time.Now().Unix()
 			logger.Debugf("Recieved %v new trade updates: %v\n", len(trades), trades)
 			// Update active contracts if we are trading options
-			if t.theoEngine != nil {
-				t.UpdateActiveContracts()
-				t.UpdateMidMarketPrices()
-				t.theoEngine.ScanOptions(false, true)
-			} else {
-				logger.Debugf("Cannot update active contracts, theo engine is nil\n")
-			}
+			// if t.theoEngine != nil {
+			// 	t.UpdateActiveContracts()
+			// 	t.UpdateMidMarketPrices()
+			// 	t.theoEngine.ScanOptions(false, true)
+			// } else {
+			// 	logger.Debugf("Cannot update active contracts, theo engine is nil\n")
+			// }
 			// Update your local bars
 			for _, trade := range trades {
 				t.InsertNewCandle(trade)
@@ -359,7 +375,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				t.checkWalletHistory(t.Algo, settingsFileName)
 			}
 			t.aggregateAccountProfit()
-			logger.Debugf("[Trading Engine] trade processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
+			logger.Debugf("[Trading Engine] trade processing took %v s\n", (time.Now().Unix() - startTimestamp))
+			logger.Debug("===========================================")
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			} else {
@@ -373,6 +390,19 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				return
 			}
 		case newOrders := <-channels.OrderChan:
+			// Make sure the orders are coming from the exchange in the right order.
+			ts, ok := lastTimestamp["orders"]
+			currentTimestamp := int(newOrders[0].TransactTime.Unix())
+			if ok {
+				if ts < currentTimestamp {
+					lastTimestamp["orders"] = currentTimestamp
+				} else {
+					fmt.Println("ERROR recieved an order out of order...", ts, currentTimestamp)
+					return
+				}
+			} else {
+				lastTimestamp["orders"] = currentTimestamp
+			}
 			// startTimestamp := time.Now().UnixNano()
 			// logger.Infof("Recieved %v new order updates\n", len(newOrders))
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
@@ -552,12 +582,13 @@ func (t *TradingEngine) aggregateAccountProfit() {
 	t.Algo.Account.UnrealizedProfit = totalUnrealizedProfit
 	t.Algo.Account.RealizedProfit = totalRealizedProfit
 	t.Algo.Account.Profit = totalUnrealizedProfit + totalRealizedProfit
-	logger.Debugf("Aggregated account unrealized profit: %v, realized profit: %v, total profit: %v\n",
-		t.Algo.Account.UnrealizedProfit, t.Algo.Account.RealizedProfit, t.Algo.Account.Profit)
+	logger.Debugf("Aggregated account unrealized profit: %v, realized profit: %v, total profit: %v, balance: %v\n",
+		t.Algo.Account.UnrealizedProfit, t.Algo.Account.RealizedProfit, t.Algo.Account.Profit, t.Algo.Account.BaseAsset.Quantity)
 }
 
 // Update all balances contained by the trading engine given a slice of websocket balance updates from the exchange.
 func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
+	// fmt.Println("updateAlgoBalances")
 	for _, updatedBalance := range balances {
 		balance, ok := algo.Account.Balances[updatedBalance.Currency]
 		if ok {
@@ -573,7 +604,7 @@ func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Bal
 		}
 		if updatedBalance.Currency == algo.Account.BaseAsset.Symbol {
 			algo.Account.BaseAsset.Quantity = updatedBalance.Balance
-			logger.Debugf("Updated base asset quantity: %v\n", algo.Account.BaseAsset.Quantity)
+			// logger.Debugf("Updated base asset quantity: %v\n", algo.Account.BaseAsset.Quantity)
 		} else if algo.Account.ExchangeInfo.Spot {
 			// This could be a spot position update, in which case we should update the respective market state's position
 			for symbol, marketState := range algo.Account.MarketStates {
@@ -813,7 +844,7 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 	}
 
 	for symbol, ms := range t.Algo.Account.MarketStates {
-		fmt.Println("logging", symbol, "info")
+		// fmt.Println("logging", symbol, "info")
 		tags := map[string]string{
 			"algo_name": t.Algo.Name,
 			"symbol":    symbol,

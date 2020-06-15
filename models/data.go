@@ -89,7 +89,7 @@ func (d *Data) AddData(newBars []*Bar) {
 
 	d.lookbackLength = 0
 	if newBars != nil {
-		log.Println("Adding", len(newBars), "new bars")
+		// log.Println("Adding", len(newBars), "new bars")
 		for y := range newBars {
 			if !containsInt(timestamps, newBars[y].Timestamp) {
 				d.minuteBars = append(d.minuteBars, &Bar{
