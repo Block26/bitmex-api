@@ -27,5 +27,6 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 		LogCloudBacktest:  config.LogCloudBacktest,
 		LogLevel:          logger.LogLevel().Debug,
 		BacktestLogLevel:  logger.LogLevel().Info,
+		State:             make(map[string]interface{}, 0),
 	}
 }
