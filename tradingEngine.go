@@ -939,7 +939,7 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 		// 	return true
 		// })
 
-		if t.Algo.State != nil {
+		if t.Algo.State != nil && len(t.Algo.State) > 0 {
 			pt, err := client.NewPoint(
 				"state",
 				tags,
@@ -947,7 +947,7 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 				time.Now(),
 			)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println("Algo.State err", err)
 			}
 			bp.AddPoint(pt)
 		}
