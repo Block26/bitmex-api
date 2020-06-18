@@ -772,14 +772,14 @@ func (t *TradingEngine) logTrade(trade iex.Order) {
 	})
 
 	tags := map[string]string{
-		"algo_name": t.Algo.Name,
-		"symbol":    trade.Symbol,
-		// "commit_hash": t.commitHash,
 		"state_type": stateType,
 		"side":       strings.ToLower(trade.Side),
 	}
 
 	fields := structs.Map(trade)
+	fields["algo_name"] = t.Algo.Name
+	fields["symbol"] = trade.Symbol
+
 	pt, err := client.NewPoint(
 		"trades",
 		tags,
@@ -806,13 +806,14 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 	})
 
 	tags := map[string]string{
-		"algo_name": t.Algo.Name,
-		"symbol":    trade.Symbol,
-		// "commit_hash": t.commitHash,
-		"state_type": stateType, "side": strings.ToLower(trade.Side),
+		"state_type": stateType,
+		"side":       strings.ToLower(trade.Side),
 	}
 
 	fields := structs.Map(trade)
+	fields["algo_name"] = t.Algo.Name
+	fields["symbol"] = trade.Symbol
+
 	pt, err := client.NewPoint(
 		"filled_trades",
 		tags,
@@ -849,12 +850,11 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 	for symbol, ms := range t.Algo.Account.MarketStates {
 		// fmt.Println("logging", symbol, "info")
 		tags := map[string]string{
-			"algo_name": t.Algo.Name,
-			"symbol":    symbol,
-			// "commit_hash": t.commitHash,
 			"state_type": stateType,
 		}
 		fields := structs.Map(ms)
+		fields["algo_name"] = t.Algo.Name
+		fields["symbol"] = symbol
 
 		//TODO: shouldn't have to manually delete Options param here
 		// _, ok := fields["Options"]
@@ -1114,15 +1114,14 @@ func logBacktest(algo *models.Algo) {
 	})
 
 	// uuid := algo.Name + "-" + uuid.New().String()
-	tags := map[string]string{
-		"algo_name": algo.Name,
-		"run_id":    currentRunUUID.String(),
-	}
+	tags := map[string]string{}
+	fields := structs.Map(algo.Result)
+	fields["algo_name"] = algo.Name
 
 	pt, _ := client.NewPoint(
 		"result",
 		tags,
-		structs.Map(algo.Result),
+		fields,
 		time.Now(),
 	)
 	bp.AddPoint(pt)

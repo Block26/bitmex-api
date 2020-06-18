@@ -428,9 +428,8 @@ func logCloudBacktest(algo *models.Algo, history []models.History) {
 		// upsampleReturns(algo, bp, history)
 		tags := map[string]string{
 			"algo_name": algo.Name,
-			"run_id":    currentRunUUID.String(),
 		}
-		tags["currency"] = algo.Account.BaseAsset.Symbol
+
 		if algo.RebalanceInterval == "1m" {
 			day := 1440
 			lDay := 0.
@@ -459,7 +458,6 @@ func logCloudBacktest(algo *models.Algo, history []models.History) {
 func upsampleReturns(algo *models.Algo, bp client.BatchPoints, history []models.History) {
 	tags := map[string]string{
 		"algo_name": algo.Name,
-		"run_id":    currentRunUUID.String(),
 	}
 	tags["currency"] = algo.Account.BaseAsset.Symbol
 	if algo.RebalanceInterval == "1m" {
