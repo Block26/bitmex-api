@@ -850,13 +850,13 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 	for symbol, ms := range t.Algo.Account.MarketStates {
 		// fmt.Println("logging", symbol, "info")
 		tags := map[string]string{
-			"state_type": stateType,
-			"algo_name":  t.Algo.Name,
-			"symbol":     symbol,
+			"state_type":     stateType,
+			"algo_name":      t.Algo.Name,
+			"yantra_version": t.Algo.Config.YantraVersion,
+			"symbol":         symbol,
 		}
 
 		fields := map[string]interface{}{}
-		fields["state_type"] = stateType
 		fields["Price"] = ms.Bar.Close
 		fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
 		fields["Quantity"] = ms.Position

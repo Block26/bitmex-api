@@ -12,6 +12,7 @@ type Algo struct {
 	AccountId         string                 // A UUID for the secret describing the api keys and exchange
 	Account           Account                // A representation of the account an algo uses on an exchange; offers access to active markets and market states
 	ExchangeInfo      ExchangeInfo           // Contains various information about the exchange this algo is connected to
+	Config            Config                 // The configuration settings used to deploy this algo
 	FillType          string                 // The simulation fill type for this Algo. Refer to exchanges.FillType() for options
 	RebalanceInterval string                 // The interval at which rebalance should be called. Refer to exchanges.RebalanceInterval() for options
 	Debug             bool                   // Turn logs on or off

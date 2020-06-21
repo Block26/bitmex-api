@@ -17,6 +17,7 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 	account := models.NewAccount(config.Symbol, exchangeInfo, config.StartingBalance)
 	logger.Infof("Got account with id %v: %v\n", account.AccountID, account)
 	logger.Infof("Loaded market info with symbol %v\n", account.BaseAsset.Symbol)
+	liveConfig := models.LoadConfig("config.json")
 
 	return models.Algo{
 		Name:              config.Name,
@@ -28,5 +29,6 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 		LogLevel:          logger.LogLevel().Debug,
 		BacktestLogLevel:  logger.LogLevel().Info,
 		State:             make(map[string]interface{}, 0),
+		Config:            liveConfig,
 	}
 }
