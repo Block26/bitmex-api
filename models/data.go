@@ -163,16 +163,34 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 			}
 		}
 		last := resampledIndex - adjuster
-		return OHLCV{
-			Timestamp: val.Timestamp[:last],
-			Open:      val.Open[:last],
-			High:      val.High[:last],
-			Low:       val.Low[:last],
-			Close:     val.Close[:last],
-			Volume:    val.Volume[:last],
+		if val.Close[last-1] == 0 {
+			last -= 1
 		}
+		// fmt.Println("resampleInterval", resampleInterval, "d.data[resampleInterval].Close[last]", val.Close[last-1], last, len(val.Timestamp) == last+1)
+		if len(val.Timestamp) == last {
+			// fmt.Println("last is enough", val.Close[last-1], last)
+			return OHLCV{
+				Timestamp: val.Timestamp,
+				Open:      val.Open,
+				High:      val.High,
+				Low:       val.Low,
+				Close:     val.Close,
+				Volume:    val.Volume,
+			}
+		} else {
+			return OHLCV{
+				Timestamp: val.Timestamp[:last],
+				Open:      val.Open[:last],
+				High:      val.High[:last],
+				Low:       val.Low[:last],
+				Close:     val.Close[:last],
+				Volume:    val.Volume[:last],
+			}
+		}
+
 	} else {
 		// We want to preprocess all the data and cache it for the test to use and index later
+		// fmt.Println("We want to preprocess all the data and cache it for the test to use and index later")
 		if resampleInterval == 1 {
 			length = len(bars)
 		}
