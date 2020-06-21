@@ -857,6 +857,7 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 		}
 
 		fields := map[string]interface{}{}
+		fields["state_type"] = stateType
 		fields["Price"] = ms.Bar.Close
 		fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
 		fields["Quantity"] = ms.Position
