@@ -236,13 +236,27 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 		}
 	}
 
-	return OHLCV{
-		Timestamp: d.data[resampleInterval].Timestamp[:resampledIndex-adjuster],
-		Open:      d.data[resampleInterval].Open[:resampledIndex-adjuster],
-		High:      d.data[resampleInterval].High[:resampledIndex-adjuster],
-		Low:       d.data[resampleInterval].Low[:resampledIndex-adjuster],
-		Close:     d.data[resampleInterval].Close[:resampledIndex-adjuster],
-		Volume:    d.data[resampleInterval].Volume[:resampledIndex-adjuster],
+	// fmt.Println("adjuster", adjuster, "resampledIndex", resampledIndex, "length", length)
+	// golang is wierd and so if you use : to select from a slice it will always leave out the last element
+	// so we check if we want the last element here and return the whole array if so
+	if len(d.data[resampleInterval].Timestamp) == length {
+		return OHLCV{
+			Timestamp: d.data[resampleInterval].Timestamp,
+			Open:      d.data[resampleInterval].Open,
+			High:      d.data[resampleInterval].High,
+			Low:       d.data[resampleInterval].Low,
+			Close:     d.data[resampleInterval].Close,
+			Volume:    d.data[resampleInterval].Volume,
+		}
+	} else {
+		return OHLCV{
+			Timestamp: d.data[resampleInterval].Timestamp[:resampledIndex-adjuster],
+			Open:      d.data[resampleInterval].Open[:resampledIndex-adjuster],
+			High:      d.data[resampleInterval].High[:resampledIndex-adjuster],
+			Low:       d.data[resampleInterval].Low[:resampledIndex-adjuster],
+			Close:     d.data[resampleInterval].Close[:resampledIndex-adjuster],
+			Volume:    d.data[resampleInterval].Volume[:resampledIndex-adjuster],
+		}
 	}
 
 }
