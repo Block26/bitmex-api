@@ -375,7 +375,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				t.checkWalletHistory(t.Algo, settingsFileName)
 			}
 			t.aggregateAccountProfit()
-			logger.Debugf("[Trading Engine] trade processing took %v s\n", (time.Now().Unix() - startTimestamp))
+			ttt := time.Now().Unix() - startTimestamp
+			logger.Debugf("[Trading Engine] trade processing took %v s\n", ttt)
+			if ttt > 5 {
+				log.Fatalln("trade processing took more than 5s, restarting")
+			}
 			logger.Debug("===========================================")
 			logger.Debugf("Fetching positions now as a stop gap")
 			positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
@@ -454,13 +458,15 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 		// Add to existing order state
 		for _, newOrder := range orders {
 			if newOrder.OrdStatus != t.Algo.Client.GetPotentialOrderStatus().Cancelled {
-				logger.Debugf("Processing order update: %v\n", newOrder.Symbol)
-				marketState, ok := algo.Account.MarketStates[newOrder.Symbol]
-				if !ok {
-					logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Symbol)
-					continue
-				}
-				marketState.Orders.Store(newOrder.OrderID, newOrder)
+				logger.Debugf("Processing order update for %v : Status %v\n", newOrder.Symbol, newOrder.OrdStatus)
+				// marketState, ok := algo.Account.MarketStates[newOrder.Symbol]
+				// if !ok {
+				// 	logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Symbol)
+				// 	continue
+				// }
+				// if (newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Open) {
+				// marketState.Orders.Store(newOrder.OrderID, newOrder)
+				// }
 			}
 		}
 	} else {
