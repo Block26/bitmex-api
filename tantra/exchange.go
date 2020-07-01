@@ -131,13 +131,8 @@ func (t *Tantra) StartWS(config interface{}) error {
 	}
 	go func() {
 		for index := t.index; index < numIndexes; index++ {
-			startTime := time.Now().UnixNano()
-			tradeTime := 0
-			fillTime := 0
-			positionTime := 0
-			balanceTime := 0
-			extraTime := 0
-			extraStart := time.Now().UnixNano()
+			// startTime := time.Now().UnixNano()
+			// extraStart := time.Now().UnixNano()
 			// This is the start of the time step, at this point in time some events have not happened yet
 			// so we will fill the orders that were placed at the end of the last time step first
 			// then we we publish a new trade bin so that the algo connected can make a decision for the
@@ -147,9 +142,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// TODO should this all happen synchronously, or in parallel?
 			logger.Debugf("New index: %v\n", index)
 			var tradeUpdates []iex.TradeBin
-			extraTime += int(time.Now().UnixNano() - extraStart)
+			// extraTime += int(time.Now().UnixNano() - extraStart)
 			for symbol, marketState := range t.Account.MarketStates {
-				tradeStart := time.Now().UnixNano()
+				// tradeStart := time.Now().UnixNano()
 				if marketState.Info.MarketType != models.Option {
 					t.updateCandle(index, symbol)
 					currentCandle, ok := t.currentCandle[symbol]
@@ -157,14 +152,14 @@ func (t *Tantra) StartWS(config interface{}) error {
 						tradeUpdates = append(tradeUpdates, currentCandle)
 					}
 				}
-				tradeTime += int(time.Now().UnixNano() - tradeStart)
+				// tradeTime += int(time.Now().UnixNano() - tradeStart)
 			}
 
 			// Fill all orders with the newest candles
-			fillStart := time.Now().UnixNano()
+			// fillStart := time.Now().UnixNano()
 			filledSymbols := t.processFills()
 			logger.Debugf("Got filled symbols: %v\n", filledSymbols)
-			fillTime += int(time.Now().UnixNano() - fillStart)
+			// fillTime += int(time.Now().UnixNano() - fillStart)
 
 			// Send position and balance updates if we have any fills
 			// TODO should we send balance updates if no fills?
@@ -187,7 +182,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 				}
 				// Has the balance changed? Send a balance update. No? Do Nothing
 				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
-				balanceStart := time.Now().UnixNano()
+				// balanceStart := time.Now().UnixNano()
 				if lastBalance != currentMarketState.Balance {
 					wallet := []iex.Balance{
 						{
@@ -198,10 +193,10 @@ func (t *Tantra) StartWS(config interface{}) error {
 					t.channels.WalletChan <- wallet
 					<-t.channels.WalletChanComplete
 				}
-				balanceTime += int(time.Now().UnixNano() - balanceStart)
+				// balanceTime += int(time.Now().UnixNano() - balanceStart)
 				// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
 				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
-				positionStart := time.Now().UnixNano()
+				// positionStart := time.Now().UnixNano()
 				if lastAverageCost != currentMarketState.AverageCost || lastPosition != currentMarketState.Position {
 					logger.Debugf("Building position update [last=%v, current=%v]\n", lastPosition, currentMarketState.Position)
 					pos := []iex.WsPosition{
@@ -214,11 +209,11 @@ func (t *Tantra) StartWS(config interface{}) error {
 					t.channels.PositionChan <- pos
 					<-t.channels.PositionChanComplete
 				}
-				positionTime += int(time.Now().UnixNano() - positionStart)
+				// positionTime += int(time.Now().UnixNano() - positionStart)
 			}
-			extraStart = time.Now().UnixNano()
+			// extraStart = time.Now().UnixNano()
 			t.appendToHistory()
-			extraTime += int(time.Now().UnixNano() - extraStart)
+			// extraTime += int(time.Now().UnixNano() - extraStart)
 			// Publish trade updates
 			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
@@ -226,16 +221,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 			if t.LogBacktest {
 				t.insertHistoryToDB(false)
 			}
-			logger.Debugf(`[Exchange] trade time: %v ns
-[Exchange] fill time: %v ns
-[Exchange] position time: %v ns
-[Exchange] balance time: %v ns
-[Exchange] extra time: %v ns
-[Exchange] timestep took %v ns
-[Exchange] cumulative insert time: %v ns`, tradeTime, fillTime, positionTime, balanceTime, extraTime, time.Now().UnixNano()-startTime, insertTime)
 		}
-		logger.Infof("Fill time: %v ns", fillTime)
-		logger.Infof("Insert time: %v ns", insertTime)
+		// logger.Infof("Fill time: %v ns", fillTime)
+		// logger.Infof("Insert time: %v ns", insertTime)
 		if t.LogBacktest {
 			t.insertHistoryToDB(true)
 		}
@@ -321,6 +309,7 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
 		fillPrice = getFillPrice(marketState, lastCandle)
+		fillPrice = utils.AdjustForFee(fillPrice, order.Side, t.Account.ExchangeInfo.TakerFee)
 		fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
 		if t.Account.ExchangeInfo.DenominatedInQuote {
 			if order.Side == "buy" {
@@ -346,27 +335,17 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 			}
 		}
 	} else {
-		// TODO Apply slippage to these prices
-		if t.Account.ExchangeInfo.DenominatedInQuote {
-			if order.Side == "buy" && lastCandle.Low <= order.Rate {
-				isFilled = true
-				fillPrice = order.Rate
-				fillAmount = order.Amount
-			} else if order.Side == "sell" && lastCandle.High >= order.Rate {
-				isFilled = true
-				fillPrice = order.Rate
-				fillAmount = -order.Amount
-			}
-		} else {
-			if order.Side == "buy" && lastCandle.Low <= order.Rate {
-				isFilled = true
-				fillPrice = order.Rate
-				fillAmount = order.Amount
-			} else if order.Side == "sell" && lastCandle.High >= order.Rate {
-				isFilled = true
-				fillPrice = order.Rate
-				fillAmount = -order.Amount
-			}
+		// TODO Apply slippage,fees, and denominated in quote logic to these prices
+		// fillPrice = utils.AdjustForFee(fillPrice, order.Side, t.Account.ExchangeInfo.MakerFee)
+		// fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
+		if order.Side == "buy" && lastCandle.Low <= order.Rate {
+			isFilled = true
+			fillPrice = order.Rate
+			fillAmount = order.Amount
+		} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+			isFilled = true
+			fillPrice = order.Rate
+			fillAmount = -order.Amount
 		}
 	}
 	return
@@ -413,17 +392,17 @@ var appendTime = 0
 
 // Construct account and market histories, then store them in memory.
 func (t *Tantra) appendToHistory() {
-	appendStart := time.Now().UnixNano()
-	timestamp := utils.TimeToTimestamp(t.CurrentTime)
-	t.AccountHistory = append(t.AccountHistory, models.NewAccountHistory(*t.Account, timestamp))
-	marketStates := make(map[string]models.MarketHistory)
-	for symbol, market := range t.Account.MarketStates {
-		marketStates[symbol] = models.NewMarketHistory(*market, timestamp)
-	}
-	t.PreviousMarketStates = marketStates
-	t.MarketHistory = append(t.MarketHistory, marketStates)
-	logger.Debugf("Appended to history [%v records]\n", len(t.AccountHistory))
-	appendTime += int(time.Now().UnixNano() - appendStart)
+	// appendStart := time.Now().UnixNano()
+	// timestamp := utils.TimeToTimestamp(t.CurrentTime)
+	// t.AccountHistory = append(t.AccountHistory, models.NewAccountHistory(*t.Account, timestamp))
+	// marketStates := make(map[string]models.MarketHistory)
+	// for symbol, market := range t.Account.MarketStates {
+	// 	marketStates[symbol] = models.NewMarketHistory(*market, timestamp)
+	// }
+	// t.PreviousMarketStates = marketStates
+	// t.MarketHistory = append(t.MarketHistory, marketStates)
+	// logger.Debugf("Appended to history [%v records]\n", len(t.AccountHistory))
+	// appendTime += int(time.Now().UnixNano() - appendStart)
 }
 
 // Given a trade generated by the exchange, record the trade in memory.

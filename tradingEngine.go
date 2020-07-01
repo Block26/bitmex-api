@@ -328,21 +328,21 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 			}
 		case trades := <-channels.TradeBinChan:
 			// Make sure the trades are coming from the exchange in the right order.
-			ts, ok := lastTimestamp["trades"]
-			currentTimestamp := int(trades[0].Timestamp.Unix())
-			if ok {
-				if ts < currentTimestamp {
-					lastTimestamp["trades"] = currentTimestamp
-				} else {
-					log.Fatalln("ERROR recieved an trade out of order...", ts, currentTimestamp)
-					return
-				}
-			} else {
-				lastTimestamp["trades"] = currentTimestamp
-			}
+			// ts, ok := lastTimestamp["trades"]
+			// currentTimestamp := int(trades[0].Timestamp.Unix())
+			// if ok {
+			// 	if ts < currentTimestamp {
+			// 		lastTimestamp["trades"] = currentTimestamp
+			// 	} else {
+			// 		log.Fatalln("ERROR recieved an trade out of order...", ts, currentTimestamp)
+			// 		return
+			// 	}
+			// } else {
+			// 	lastTimestamp["trades"] = currentTimestamp
+			// }
 
-			startTimestamp := time.Now().Unix()
-			logger.Debugf("Recieved %v new trade updates: %v\n", len(trades), trades)
+			// startTimestamp := time.Now().Unix()
+			// logger.Debugf("Recieved %v new trade updates: %v\n", len(trades), trades)
 			// Update active contracts if we are trading options
 			// if t.theoEngine != nil {
 			// 	t.UpdateActiveContracts()
@@ -375,18 +375,20 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				t.checkWalletHistory(t.Algo, settingsFileName)
 			}
 			t.aggregateAccountProfit()
-			ttt := time.Now().Unix() - startTimestamp
-			logger.Debugf("[Trading Engine] trade processing took %v s\n", ttt)
-			if ttt > 5 {
-				log.Fatalln("trade processing took more than 5s, restarting")
-			}
-			logger.Debug("===========================================")
-			logger.Debugf("Fetching positions now as a stop gap")
-			positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-			t.updatePositions(t.Algo, positions)
+			// ttt := time.Now().Unix() - startTimestamp
+			// logger.Debugf("[Trading Engine] trade processing took %v s\n", ttt)
+			// if ttt > 5 {
+			// log.Fatalln("trade processing took more than 5s, restarting")
+			// }
+			// logger.Debug("===========================================")
+			// logger.Debugf("Fetching positions now as a stop gap")
+			// positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
+			// t.updatePositions(t.Algo, positions)
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			} else {
+				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
+				t.updatePositions(t.Algo, positions)
 				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))

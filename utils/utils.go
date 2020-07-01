@@ -397,6 +397,19 @@ func AdjustForSlippage(price float64, side string, slippage float64) float64 {
 	return adjPrice
 }
 
+// Adjust a price to accomodate for a given fee amount and side.
+func AdjustForFee(price float64, side string, fee float64) float64 {
+	adjPrice := price
+	if side == "buy" {
+		adjPrice = price * (1. + fee)
+		logger.Debugf("Price %v, with fee %v\n", price, adjPrice)
+	} else if side == "sell" {
+		adjPrice = price * (1. - fee)
+		logger.Debugf("Price %v, with fee %v\n", price, adjPrice)
+	}
+	return adjPrice
+}
+
 // Get the symbol for a given option contract, following Deribit's format.
 func GetDeribitOptionSymbol(expiry int, strike float64, currency string, optionType string) string {
 	expiryTime := time.Unix(int64(expiry/1000), 0)

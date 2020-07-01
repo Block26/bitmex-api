@@ -436,7 +436,7 @@ func logCloudBacktest(algo *models.Algo, history []models.History) {
 			for i, row := range history {
 				if i%day == 0 {
 					tags["sample_format"] = "daily"
-					fmt.Println("Hour", i/(60*24), history[i].Balance)
+					// fmt.Println("Hour", i/(60*24), history[i].Balance)
 					pct := utils.CalculateDifference(row.UBalance, lDay)
 					pt, _ := client.NewPoint(
 						"results",
@@ -444,7 +444,7 @@ func logCloudBacktest(algo *models.Algo, history []models.History) {
 						map[string]interface{}{"pct_change": pct},
 						row.Timestamp,
 					)
-					fmt.Println(lDay, row.UBalance, pct)
+					// fmt.Println(lDay, row.UBalance, pct)
 					lDay = history[i].UBalance
 					bp.AddPoint(pt)
 				}
