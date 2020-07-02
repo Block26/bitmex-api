@@ -177,6 +177,8 @@ github.com/tantralabs/tradeapi v0.0.0-20200506131137-58fef3c55a97 h1:KZQs67yVUee
 github.com/tantralabs/tradeapi v0.0.0-20200506131137-58fef3c55a97/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tantralabs/tradeapi v0.0.0-20200615190528-b9a5e13a422f h1:jFwnPSIqL93AFu3d1SKnP9qwWGeVKh++PQXOUksyrG4=
 github.com/tantralabs/tradeapi v0.0.0-20200615190528-b9a5e13a422f/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v0.0.0-20200702070646-9ac53dff1271 h1:VD0kMtXjnQF9K64DrYPfdLVL8KepBTJFpHPK7oKlT4o=
+github.com/tantralabs/tradeapi v0.0.0-20200702070646-9ac53dff1271/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610 h1:4wb3tT/wUpjsdcO7NwnOw4KSzrIaPOHdnpR4d43C6qQ=
 github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610/go.mod h1:QN0aHde2cmzDJcZklDsH9F8MchJ2hDpDgdQwXA+QnGA=
 github.com/tantralabs/utils v0.0.0-20200205084618-c96405e79c20 h1:CNmEOUY/JVNuYyadC8bQn6eOq8KqrIUAv2yO4dxV+h8=
