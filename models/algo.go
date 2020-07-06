@@ -15,7 +15,7 @@ type Algo struct {
 	Config            Config                 // The configuration settings used to deploy this algo
 	FillType          string                 // The simulation fill type for this Algo. Refer to exchanges.FillType() for options
 	RebalanceInterval string                 // The interval at which rebalance should be called. Refer to exchanges.RebalanceInterval() for options
-	RollingInterval   int                    // The interval at which rolling calculations are based on.
+	DailyInterval     int                    // The interval at which average sharpe calculations are based on.
 	Debug             bool                   // Turn logs on or off
 	Timestamp         time.Time              // Current timestamp of the Algo in it's data
 	History           []History              // Used to Store historical states
@@ -40,7 +40,7 @@ type AlgoConfig struct {
 	Exchange          string
 	Symbol            string
 	RebalanceInterval string
-	RollingInterval   int
+	DailyInterval     int
 	DataLength        int
 	StartingBalance   float64
 	LogBacktest       bool

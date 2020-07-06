@@ -315,56 +315,57 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		last = history[i].UBalance
 	}
 
-	rollingMinutes := 0
+	window := 0
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		rollingMinutes = algo.RollingInterval * 60 * 24
+		window = algo.DailyInterval * 60 * 24
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-		rollingMinutes = algo.RollingInterval * 24
+		window = algo.DailyInterval * 24
 	}
-	var rollingChunks [][]float64
-	var rollingScores []float64
-	for i := 0; i < len(percentReturn); i += rollingMinutes {
-		if (i + rollingMinutes) >= len(percentReturn) {
+	var windowSharpes []float64
+	for i := 0; i < len(percentReturn); i += window {
+		windowReturns := make([]float64, 0)
+		if (i + window) >= len(percentReturn) {
 			if len(percentReturn[i:]) > 1 {
-				rollingChunks = append(rollingChunks, percentReturn[i:])
+				windowReturns = percentReturn[i:]
 			}
 		} else {
-			rollingChunks = append(rollingChunks, percentReturn[i:i+rollingMinutes])
+			windowReturns = percentReturn[i : i+window]
+		}
+		if len(windowReturns) > 1 {
+			mean, std := stat.MeanStdDev(windowReturns, nil)
+			windowSharpe := mean / std
+			windowSharpes = append(windowSharpes, windowSharpe)
 		}
 	}
-	for _, x := range rollingChunks {
-		mean, std := stat.MeanStdDev(x, nil)
-		score := mean / std
-		rollingScores = append(rollingScores, score)
-	}
+
 	mean, std := stat.MeanStdDev(percentReturn, nil)
 	_, downsideStd := stat.MeanStdDev(downsidePercentReturn, nil)
-	totalScore := mean / std
-	rollingScore := utils.SumArr(rollingScores) / float64(len(rollingScores))
+	totalSharpe := mean / std
+	averageSharpe := utils.SumArr(windowSharpes) / float64(len(windowSharpes))
 	sortino := mean / downsideStd
 	// TODO change the scoring based on 1h / 1m
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-		totalScore = totalScore * math.Sqrt(365*24)
+		totalSharpe = totalSharpe * math.Sqrt(365*24)
 		sortino = sortino * math.Sqrt(365*24)
-		rollingScore = rollingScore * math.Sqrt(365*24)
+		averageSharpe = averageSharpe * math.Sqrt(365*24)
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		totalScore = totalScore * math.Sqrt(365*24*60)
+		totalSharpe = totalSharpe * math.Sqrt(365*24*60)
 		sortino = sortino * math.Sqrt(365*24*60)
-		rollingScore = rollingScore * math.Sqrt(365*24*60)
+		averageSharpe = averageSharpe * math.Sqrt(365*24*60)
 	}
 
-	if math.IsNaN(totalScore) {
-		totalScore = -100
+	if math.IsNaN(totalSharpe) {
+		totalSharpe = -100
 	}
 
 	if history[historyLength-1].Balance < 0 {
-		totalScore = -100
+		totalSharpe = -100
 	}
 
 	for symbol, state := range algo.Account.MarketStates {
 		if state.Info.MarketType != models.Option {
 			kvparams := utils.CreateKeyValuePairs(algo.Params.GetAllParamsForSymbol(symbol), true)
-			log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Sharpe %0.3f \n Rolling %d Day Sharpe %0.3f \n Sortino %0.3f \n Params: %s",
+			log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Sharpe %0.3f \n Average %d Day Sharpe %0.3f \n Sortino %0.3f \n Params: %s",
 				history[historyLength-1].UBalance,
 				history[historyLength-1].AverageCost,
 				history[historyLength-1].Quantity,
@@ -372,9 +373,9 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 				drawdown,
 				maxProfit,
 				minProfit,
-				totalScore,
-				algo.RollingInterval,
-				rollingScore,
+				totalSharpe,
+				algo.DailyInterval,
+				averageSharpe,
 				sortino,
 				kvparams,
 			)
@@ -407,8 +408,8 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		MaxPositionDD:     minProfit,
 		MaxDD:             drawdown,
 		Params:            utils.CreateKeyValuePairs(algo.Params.GetAllParams(), true),
-		Score:             utils.ToFixed(totalScore, 3),
-		RollingScore:      utils.ToFixed(rollingScore, 3),
+		Score:             utils.ToFixed(totalSharpe, 3),
+		AverageScore:      utils.ToFixed(averageSharpe, 3),
 		Sortino:           utils.ToFixed(sortino, 3),
 	}
 
