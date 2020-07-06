@@ -9,6 +9,7 @@ type Result struct {
 	MaxPositionDD     float64 // Max drawdown of a single position in the backtest
 	MaxDD             float64 // Total max drawdown during the backtest
 	Score             float64 // Sharpe ratio of the entire backtest
+	RollingScore      float64 // Rolling Sharpe ratio of backtest, determined by algo.RollingInterval
 	Sortino           float64 // Sortino ratio of the entire backtest
 	Params            string  // Algo params for this backtest
 }

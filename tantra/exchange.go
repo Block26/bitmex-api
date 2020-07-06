@@ -309,7 +309,7 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
 		fillPrice = getFillPrice(marketState, lastCandle)
-		fillPrice = utils.AdjustForFee(fillPrice, order.Side, t.Account.ExchangeInfo.TakerFee)
+		// fillPrice = utils.AdjustForFee(fillPrice, order.Side, t.Account.ExchangeInfo.TakerFee)
 		fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
 		if t.Account.ExchangeInfo.DenominatedInQuote {
 			if order.Side == "buy" {

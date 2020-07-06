@@ -315,31 +315,56 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		last = history[i].UBalance
 	}
 
+	rollingMinutes := 0
+	if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
+		rollingMinutes = algo.RollingInterval * 60 * 24
+	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
+		rollingMinutes = algo.RollingInterval * 24
+	}
+	var rollingChunks [][]float64
+	var rollingScores []float64
+	for i := 0; i < len(percentReturn); i += rollingMinutes {
+		if (i + rollingMinutes) >= len(percentReturn) {
+			if len(percentReturn[i:]) > 1 {
+				rollingChunks = append(rollingChunks, percentReturn[i:])
+			}
+		} else {
+			rollingChunks = append(rollingChunks, percentReturn[i:i+rollingMinutes])
+		}
+	}
+	for _, x := range rollingChunks {
+		mean, std := stat.MeanStdDev(x, nil)
+		score := mean / std
+		rollingScores = append(rollingScores, score)
+	}
 	mean, std := stat.MeanStdDev(percentReturn, nil)
 	_, downsideStd := stat.MeanStdDev(downsidePercentReturn, nil)
-	score := mean / std
+	totalScore := mean / std
+	rollingScore := utils.SumArr(rollingScores) / float64(len(rollingScores))
 	sortino := mean / downsideStd
 	// TODO change the scoring based on 1h / 1m
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-		score = score * math.Sqrt(365*24)
+		totalScore = totalScore * math.Sqrt(365*24)
 		sortino = sortino * math.Sqrt(365*24)
+		rollingScore = rollingScore * math.Sqrt(365*24)
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		score = score * math.Sqrt(365*24*60)
+		totalScore = totalScore * math.Sqrt(365*24*60)
 		sortino = sortino * math.Sqrt(365*24*60)
+		rollingScore = rollingScore * math.Sqrt(365*24*60)
 	}
 
-	if math.IsNaN(score) {
-		score = -100
+	if math.IsNaN(totalScore) {
+		totalScore = -100
 	}
 
 	if history[historyLength-1].Balance < 0 {
-		score = -100
+		totalScore = -100
 	}
 
 	for symbol, state := range algo.Account.MarketStates {
 		if state.Info.MarketType != models.Option {
 			kvparams := utils.CreateKeyValuePairs(algo.Params.GetAllParamsForSymbol(symbol), true)
-			log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Sharpe %0.3f \n Sortino %0.3f \n Params: %s",
+			log.Printf("Balance %0.4f \n Cost %0.4f \n Quantity %0.4f \n Max Leverage %0.4f \n Max Drawdown %0.4f \n Max Profit %0.4f \n Max Position Drawdown %0.4f \n Sharpe %0.3f \n Rolling %d Day Sharpe %0.3f \n Sortino %0.3f \n Params: %s",
 				history[historyLength-1].UBalance,
 				history[historyLength-1].AverageCost,
 				history[historyLength-1].Quantity,
@@ -347,7 +372,9 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 				drawdown,
 				maxProfit,
 				minProfit,
-				score,
+				totalScore,
+				algo.RollingInterval,
+				rollingScore,
 				sortino,
 				kvparams,
 			)
@@ -380,7 +407,8 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		MaxPositionDD:     minProfit,
 		MaxDD:             drawdown,
 		Params:            utils.CreateKeyValuePairs(algo.Params.GetAllParams(), true),
-		Score:             utils.ToFixed(score, 3),
+		Score:             utils.ToFixed(totalScore, 3),
+		RollingScore:      utils.ToFixed(rollingScore, 3),
 		Sortino:           utils.ToFixed(sortino, 3),
 	}
 
