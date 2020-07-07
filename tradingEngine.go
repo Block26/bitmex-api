@@ -81,12 +81,12 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 // Provide a rebalance function to be called at every data interval and performs trading logic.
 // Optionally, provide a setup data to be called before rebalance to precompute relevant data and metrics for the algo.
 // This is the trading engine's entry point for a new backtest.
-func (t *TradingEngine) RunTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo), live ...bool) {
-	t.SetupTest(start, end, rebalance, setupData, live...)
-	t.Connect("", false, rebalance, setupData, true)
+func (t *TradingEngine) RunTest(start time.Time, end time.Time, live ...bool) {
+	t.SetupTest(start, end, live...)
+	t.Connect("", false, true)
 }
 
-func (t *TradingEngine) SetupTest(start time.Time, end time.Time, rebalance func(*models.Algo), setupData func(*models.Algo), live ...bool) {
+func (t *TradingEngine) SetupTest(start time.Time, end time.Time, live ...bool) {
 	t.isTest = true
 	isLive := false
 	if live != nil {
@@ -115,7 +115,7 @@ func (t *TradingEngine) SetupTest(start time.Time, end time.Time, rebalance func
 	t.Algo.Client = mockExchange
 	t.Algo.Timestamp = start
 	t.endTime = end
-	setupData(t.Algo)
+	t.Algo.SetupData(t.Algo)
 }
 
 // Set the candle data for the trading engine and format it according to the algo's configuration.
@@ -180,7 +180,7 @@ func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time
 // Connect is called to connect to an exchange's WS api and begin trading.
 // The current implementation will execute rebalance every 1 minute regardless of models.Algo.RebalanceInterval
 // This is intentional, look at models.Algo.AutoOrderPlacement to understand this paradigm.
-func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance func(*models.Algo), setupData func(*models.Algo), test ...bool) {
+func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bool) {
 	startTime := time.Now()
 	utils.LoadENV(secret)
 	if test != nil {
@@ -357,8 +357,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, rebalance 
 				marketState, _ := t.Algo.Account.MarketStates[trade.Symbol]
 				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
 				if t.Algo.DataLength < len(marketState.OHLCV.GetMinuteData().Timestamp) {
-					t.updateState(t.Algo, trade.Symbol, setupData)
-					rebalance(t.Algo)
+					t.updateState(t.Algo, trade.Symbol)
+					t.Algo.Rebalance(t.Algo)
 				} //else {
 				// log.Println("Not enough trade data. (local data length", len(marketState.OHLCV.GetMinuteData().Timestamp), "data length wanted by Algo", t.Algo.DataLength, ")")
 				// }
@@ -498,7 +498,7 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 
 // Run a new backtest. This private function is meant to be called while the trading engine is running live, as a means
 // of making sure that the current state is similar to the expected state (a safety mechanism).
-func (t *TradingEngine) runTest(algo *models.Algo, setupData func(*models.Algo), rebalance func(*models.Algo)) {
+func (t *TradingEngine) runTest(algo *models.Algo) {
 	// Run a test every 15m
 	if index%liveTestInterval == 0 {
 		testEngine := TradingEngine{}
@@ -514,7 +514,7 @@ func (t *TradingEngine) runTest(algo *models.Algo, setupData func(*models.Algo),
 
 		start = now.Add(time.Duration(-(t.Algo.DataLength + additionalLiveData)) * time.Minute)
 		end := t.Algo.Timestamp.Add(time.Duration(-1) * time.Minute)
-		testEngine.RunTest(start, end, rebalance, setupData, true)
+		testEngine.RunTest(start, end, true)
 		testEngine.logLiveState(true)
 		//TODO compare the states
 	}
@@ -629,14 +629,14 @@ func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Bal
 }
 
 // Setup data for a given market, and log the state of the algo to the db if necessary.
-func (t *TradingEngine) updateState(algo *models.Algo, symbol string, setupData func(*models.Algo)) {
+func (t *TradingEngine) updateState(algo *models.Algo, symbol string) {
 	marketState, ok := algo.Account.MarketStates[symbol]
 	if !ok {
 		logger.Errorf("Cannot update state for %v (could not find market state).\n", symbol)
 		return
 	}
 	if !t.isTest {
-		setupData(algo)
+		algo.SetupData(t.Algo)
 	}
 	// logger.Info("Algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if t.firstTrade {

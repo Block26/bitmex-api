@@ -33,5 +33,7 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 		BacktestLogLevel:          logger.LogLevel().Info,
 		State:                     make(map[string]interface{}, 0),
 		Config:                    liveConfig,
+		Rebalance:                 config.Rebalance,
+		SetupData:                 config.SetupData,
 	}
 }
