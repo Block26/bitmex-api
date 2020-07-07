@@ -317,9 +317,9 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 
 	window := 0
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		window = algo.DailyInterval * 60 * 24
+		window = algo.SharpeCalculationInterval * 60 * 24
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-		window = algo.DailyInterval * 24
+		window = algo.SharpeCalculationInterval * 24
 	}
 	var windowSharpes []float64
 	for i := 0; i < len(percentReturn); i += window {
@@ -340,26 +340,26 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 
 	mean, std := stat.MeanStdDev(percentReturn, nil)
 	_, downsideStd := stat.MeanStdDev(downsidePercentReturn, nil)
-	totalSharpe := mean / std
-	averageSharpe := utils.SumArr(windowSharpes) / float64(len(windowSharpes))
+	sharpe := mean / std
+	averagePeriodSharpe := utils.SumArr(windowSharpes) / float64(len(windowSharpes))
 	sortino := mean / downsideStd
 	// TODO change the scoring based on 1h / 1m
 	if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
-		totalSharpe = totalSharpe * math.Sqrt(365*24)
+		sharpe = sharpe * math.Sqrt(365*24)
 		sortino = sortino * math.Sqrt(365*24)
-		averageSharpe = averageSharpe * math.Sqrt(365*24)
+		averagePeriodSharpe = averagePeriodSharpe * math.Sqrt(365*24)
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Minute {
-		totalSharpe = totalSharpe * math.Sqrt(365*24*60)
+		sharpe = sharpe * math.Sqrt(365*24*60)
 		sortino = sortino * math.Sqrt(365*24*60)
-		averageSharpe = averageSharpe * math.Sqrt(365*24*60)
+		averagePeriodSharpe = averagePeriodSharpe * math.Sqrt(365*24*60)
 	}
 
-	if math.IsNaN(totalSharpe) {
-		totalSharpe = -100
+	if math.IsNaN(sharpe) {
+		sharpe = -100
 	}
 
 	if history[historyLength-1].Balance < 0 {
-		totalSharpe = -100
+		sharpe = -100
 	}
 
 	for symbol, state := range algo.Account.MarketStates {
@@ -373,9 +373,9 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 				drawdown,
 				maxProfit,
 				minProfit,
-				totalSharpe,
-				algo.DailyInterval,
-				averageSharpe,
+				sharpe,
+				algo.SharpeCalculationInterval,
+				averagePeriodSharpe,
 				sortino,
 				kvparams,
 			)
@@ -408,8 +408,8 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		MaxPositionDD:     minProfit,
 		MaxDD:             drawdown,
 		Params:            utils.CreateKeyValuePairs(algo.Params.GetAllParams(), true),
-		Score:             utils.ToFixed(totalSharpe, 3),
-		AverageScore:      utils.ToFixed(averageSharpe, 3),
+		Score:             utils.ToFixed(sharpe, 3),
+		AverageScore:      utils.ToFixed(averagePeriodSharpe, 3),
 		Sortino:           utils.ToFixed(sortino, 3),
 	}
 

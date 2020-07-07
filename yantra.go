@@ -18,18 +18,20 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 	logger.Infof("Got account with id %v: %v\n", account.AccountID, account)
 	logger.Infof("Loaded market info with symbol %v\n", account.BaseAsset.Symbol)
 	liveConfig := models.LoadConfig("config.json")
-	dailyWindow := 14
+	if config.SharpeCalculationInterval == 0 {
+		config.SharpeCalculationInterval = 7
+	}
 	return models.Algo{
-		Name:              config.Name,
-		Account:           account,
-		DataLength:        config.DataLength,
-		RebalanceInterval: config.RebalanceInterval,
-		DailyInterval:     dailyWindow,
-		LogBacktest:       config.LogBacktest,
-		LogCloudBacktest:  config.LogCloudBacktest,
-		LogLevel:          logger.LogLevel().Debug,
-		BacktestLogLevel:  logger.LogLevel().Info,
-		State:             make(map[string]interface{}, 0),
-		Config:            liveConfig,
+		Name:                      config.Name,
+		Account:                   account,
+		DataLength:                config.DataLength,
+		RebalanceInterval:         config.RebalanceInterval,
+		SharpeCalculationInterval: config.SharpeCalculationInterval,
+		LogBacktest:               config.LogBacktest,
+		LogCloudBacktest:          config.LogCloudBacktest,
+		LogLevel:                  logger.LogLevel().Debug,
+		BacktestLogLevel:          logger.LogLevel().Info,
+		State:                     make(map[string]interface{}, 0),
+		Config:                    liveConfig,
 	}
 }
