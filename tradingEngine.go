@@ -578,7 +578,9 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 		marketState.Leverage = (algo.Account.BaseAsset.Quantity * marketState.Bar.Close) / balance
 	}
 	marketState.Profit = marketState.UnrealizedProfit //+ marketState.RealizedProfit
-
+	if marketState.Position == 0 {
+		marketState.Leverage = 0
+	}
 }
 
 // Iterate through all visible market states and calculate unrealized, realized, and total profits across all markets.
