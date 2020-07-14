@@ -124,7 +124,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				MarketType:          Future,
 				FillType:            Close,
 				MaxLeverage:         1,
-				MinimumOrderSize:    25,
+				MinimumOrderSize:    1,
 				QuantityPrecision:   1.,
 				PricePrecision:      .5,
 				MaxOrders:           20,
