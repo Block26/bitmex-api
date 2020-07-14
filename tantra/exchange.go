@@ -315,7 +315,7 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 	if order.Type == "market" || order.Rate == 0 {
 		isFilled = true
 		fillPrice = getFillPrice(marketState, lastCandle)
-		// fillPrice = utils.AdjustForFee(fillPrice, order.Side, t.Account.ExchangeInfo.TakerFee)
+		fillPrice = utils.AdjustForFee(fillPrice, order.Side, t.Account.ExchangeInfo.TakerFee)
 		fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
 		if t.Account.ExchangeInfo.DenominatedInQuote {
 			if order.Side == "buy" {
@@ -342,15 +342,17 @@ func (t *Tantra) getFill(order iex.Order, marketState *models.MarketState) (isFi
 		}
 	} else {
 		// TODO Apply slippage,fees, and denominated in quote logic to these prices
-		// fillPrice = utils.AdjustForFee(fillPrice, order.Side, t.Account.ExchangeInfo.MakerFee)
-		// fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
-		if order.Side == "buy" && lastCandle.Low <= order.Rate {
+		if order.Side == "buy" && lastCandle.Low < order.Rate {
 			isFilled = true
 			fillPrice = order.Rate
+			fillPrice = utils.AdjustForFee(fillPrice, order.Side, t.Account.ExchangeInfo.MakerFee)
+			fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
 			fillAmount = order.Amount
-		} else if order.Side == "sell" && lastCandle.High >= order.Rate {
+		} else if order.Side == "sell" && lastCandle.High > order.Rate {
 			isFilled = true
 			fillPrice = order.Rate
+			fillPrice = utils.AdjustForFee(fillPrice, order.Side, t.Account.ExchangeInfo.MakerFee)
+			fillPrice = utils.AdjustForSlippage(fillPrice, order.Side, t.Account.ExchangeInfo.Slippage)
 			fillAmount = -order.Amount
 		}
 	}
