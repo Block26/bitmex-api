@@ -384,7 +384,7 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			delete(t.orders, key)
-			logger.Debugf("Deleted order with key: %v\n", key)
+			// log.Println("Deleted order with key:", key)
 		}
 		filledSymbols[order.Symbol] = true
 	}
@@ -875,7 +875,8 @@ func (t *Tantra) CancelOrder(cancel iex.CancelOrderF) (err error) {
 	delete(t.orders, cancel.Uuid)
 	_, ok := t.Account.MarketStates[cancel.Market]
 	if ok {
-		t.Account.MarketStates[cancel.Market].Orders.Delete(cancel.Uuid)
+		// log.Println("Cancel Order", cancel.Uuid)
+		delete(t.Account.MarketStates[cancel.Market].Orders, cancel.Uuid)
 	} else {
 		logger.Infof("Cancel for order %v has unknown market %v\n", cancel.Uuid, cancel.Market)
 	}

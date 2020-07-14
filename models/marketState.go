@@ -2,7 +2,8 @@ package models
 
 import (
 	"log"
-	"sync"
+
+	"github.com/tantralabs/tradeapi/iex"
 )
 
 type MarketStatus int
@@ -30,16 +31,16 @@ type MarketState struct {
 	RealizedProfit   float64
 	Profit           float64 // unrealized profit + realized profit
 	Leverage         float64
-	Weight           int          // sign of desired position (SHOULD BE MOVED)
-	Balance          float64      // balance assigned to the given market (total account balance if using cross margin)
-	Orders           sync.Map     // [orderId]Order
-	LastPrice        float64      // the last trade price observed in the given market
-	MidMarketPrice   float64      // average of bid and ask (not yet tracked)
-	BestBid          float64      // (not yet tracked)
-	BestAsk          float64      // (not yet tracked)
-	Bar              Bar          // the last bar of data for this market
-	OHLCV            *Data        // Open, High, Low, Close, Volume Data
-	Status           MarketStatus // is this market, open, closed, or expired?
+	Weight           int                  // sign of desired position (SHOULD BE MOVED)
+	Balance          float64              // balance assigned to the given market (total account balance if using cross margin)
+	Orders           map[string]iex.Order // [orderId]Order
+	LastPrice        float64              // the last trade price observed in the given market
+	MidMarketPrice   float64              // average of bid and ask (not yet tracked)
+	BestBid          float64              // (not yet tracked)
+	BestAsk          float64              // (not yet tracked)
+	Bar              Bar                  // the last bar of data for this market
+	OHLCV            *Data                // Open, High, Low, Close, Volume Data
+	Status           MarketStatus         // is this market, open, closed, or expired?
 
 	// Only for options
 	OptionTheo *OptionTheo
@@ -82,22 +83,20 @@ func NewMarketStateFromExchange(symbol string, exchangeInfo ExchangeInfo, balanc
 	if err != nil {
 		log.Fatal("Error loading market info")
 	}
-	var syncMap sync.Map
 	return MarketState{
 		Symbol:  symbol,
 		Info:    marketInfo,
 		Balance: balance,
-		Orders:  syncMap,
+		Orders:  make(map[string]iex.Order),
 	}
 }
 
 // Constructor for a new market state given static market information and a base account balance.
 func NewMarketStateFromInfo(marketInfo MarketInfo, balance float64) MarketState {
-	var syncMap sync.Map
 	return MarketState{
 		Symbol:  marketInfo.Symbol,
 		Info:    marketInfo,
 		Balance: balance,
-		Orders:  syncMap,
+		Orders:  make(map[string]iex.Order),
 	}
 }

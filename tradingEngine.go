@@ -459,16 +459,17 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 	if isUpdate {
 		// Add to existing order state
 		for _, newOrder := range orders {
-			if newOrder.OrdStatus != t.Algo.Client.GetPotentialOrderStatus().Cancelled {
-				logger.Debugf("Processing order update for %v : Status %v\n", newOrder.Symbol, newOrder.OrdStatus)
-				// marketState, ok := algo.Account.MarketStates[newOrder.Symbol]
-				// if !ok {
-				// 	logger.Errorf("New order symbol %v not found in account market states\n", newOrder.Symbol)
-				// 	continue
-				// }
-				// if (newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Open) {
-				// marketState.Orders.Store(newOrder.OrderID, newOrder)
-				// }
+			marketState, ok := algo.Account.MarketStates[newOrder.Symbol]
+			if !ok {
+				continue
+			}
+			if newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Cancelled ||
+				newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Filled ||
+				newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Rejected {
+				// if newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Open {
+				delete(marketState.Orders, newOrder.OrderID)
+			} else {
+				marketState.Orders[newOrder.OrderID] = newOrder
 			}
 		}
 	} else {
@@ -487,9 +488,7 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 		for symbol, marketState := range algo.Account.MarketStates {
 			orderMap, ok := openOrderMap[symbol]
 			if ok {
-				for id, order := range orderMap {
-					marketState.Orders.Store(id, order)
-				}
+				marketState.Orders = orderMap
 				logger.Infof("Set orders for %v.\n", symbol)
 			}
 		}
@@ -642,6 +641,7 @@ func (t *TradingEngine) updateState(algo *models.Algo, symbol string) {
 	}
 	// logger.Info("Algo.Timestamp", algo.Timestamp, "algo.Index", algo.Index, "Close Price", algo.Market.Price.Close)
 	if t.firstTrade {
+		marketState.Leverage = 0
 		logState(algo, marketState)
 		t.firstTrade = false
 	}
