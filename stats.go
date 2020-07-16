@@ -331,9 +331,14 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		} else {
 			windowReturns = percentReturn[i : i+window]
 		}
-		if len(windowReturns) > 1 {
-			mean, std := stat.MeanStdDev(windowReturns, nil)
-			windowSharpe := mean / std
+		windowSharpe := 0.
+		if len(windowReturns) > 1 && utils.SumArr(windowReturns) != 0 {
+			if utils.SumArr(windowReturns) == 0 {
+				windowSharpe = 0.
+			} else {
+				mean, std := stat.MeanStdDev(windowReturns, nil)
+				windowSharpe = mean / std
+			}
 			windowSharpes = append(windowSharpes, windowSharpe)
 		}
 	}
