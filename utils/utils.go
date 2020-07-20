@@ -133,29 +133,35 @@ func LoadSecret(file string, cloud bool) models.Secret {
 	}
 }
 
-func DownloadFirebaseCreds() (file *os.File) {
-	bucket := "algo-fb-key"
-	item := "live-algos.json"
+var firebaseCred *os.File
+var firebaseCredLoaded bool = false
 
-	file, err := os.Create(item)
-	if err != nil {
-		fmt.Println(err)
+func DownloadFirebaseCreds() *os.File {
+	if !firebaseCredLoaded {
+		bucket := "algo-fb-key"
+		item := "live-algos.json"
+
+		var err error
+		firebaseCred, err = os.Create(item)
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer firebaseCred.Close()
+
+		sess, _ := session.NewSession(&aws.Config{Region: aws.String("us-west-2")})
+		downloader := s3manager.NewDownloader(sess)
+		numBytes, err := downloader.Download(firebaseCred,
+			&s3.GetObjectInput{
+				Bucket: aws.String(bucket),
+				Key:    aws.String(item),
+			})
+		if err != nil {
+			fmt.Println(err)
+		}
+		firebaseCredLoaded = true
+		fmt.Println("Downloaded", firebaseCred.Name(), numBytes, "bytes")
 	}
-	defer file.Close()
-
-	sess, _ := session.NewSession(&aws.Config{Region: aws.String("us-west-2")})
-	downloader := s3manager.NewDownloader(sess)
-	numBytes, err := downloader.Download(file,
-		&s3.GetObjectInput{
-			Bucket: aws.String(bucket),
-			Key:    aws.String(item),
-		})
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	fmt.Println("Downloaded", file.Name(), numBytes, "bytes")
-	return
+	return firebaseCred
 }
 
 // Converts a slice of TradeBin structs (raw from exchange API) to generalized Bar structs.

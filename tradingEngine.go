@@ -149,7 +149,7 @@ func (t *TradingEngine) LogToFirebase() {
 	algoRepo = strings.Split(algoRepoName, ".")
 	algoRepoName = algoRepo[0]
 
-	path := "live/" + algoRepoName
+	path := "live/" + algoRepoName + "-" + t.Algo.Config.Branch
 	ref := client.NewRef(path)
 
 	err = ref.Set(ctx, map[string]interface{}{
@@ -434,6 +434,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			} else {
 				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
 				t.updatePositions(t.Algo, positions)
+				t.LogToFirebase()
 				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
