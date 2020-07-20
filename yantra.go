@@ -43,7 +43,7 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 	}
 }
 
-func GetAllAlgoStatus(algos []string) (status map[string]models.AlgoStatus) {
+func GetAllAlgoStatus() (status map[string]models.AlgoStatus) {
 	ctx := context.Background()
 
 	conf := &firebase.Config{
@@ -70,6 +70,22 @@ func GetAllAlgoStatus(algos []string) (status map[string]models.AlgoStatus) {
 		fmt.Println("Error reading value:", err)
 	}
 
-	fmt.Println(status)
+	logger.Debug("Algo Status", status)
 	return
+}
+
+func GetSelectAlgoStatus(algos []string) map[string]models.AlgoStatus {
+	status := GetAllAlgoStatus()
+
+	selected := make(map[string]models.AlgoStatus)
+	for name, algoStatus := range status {
+		for _, algoName := range algos {
+			if name == algoName {
+				selected[name] = algoStatus
+			}
+		}
+	}
+
+	logger.Debug("Selected Algo Status", selected)
+	return selected
 }
