@@ -24,6 +24,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
@@ -129,6 +131,31 @@ func LoadSecret(file string, cloud bool) models.Secret {
 		// fmt.Printf("Parsed json: %v\n", jsonParser)
 		return secret
 	}
+}
+
+func DownloadFirebaseCreds() (file *os.File) {
+	bucket := "algo-fb-key"
+	item := "live-algos.json"
+
+	file, err := os.Create(item)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer file.Close()
+
+	sess, _ := session.NewSession(&aws.Config{Region: aws.String("us-west-2")})
+	downloader := s3manager.NewDownloader(sess)
+	numBytes, err := downloader.Download(file,
+		&s3.GetObjectInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(item),
+		})
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println("Downloaded", file.Name(), numBytes, "bytes")
+	return
 }
 
 // Converts a slice of TradeBin structs (raw from exchange API) to generalized Bar structs.

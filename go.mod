@@ -3,6 +3,9 @@ module github.com/tantralabs/yantra
 go 1.13
 
 require (
+	cloud.google.com/go/firestore v1.2.0 // indirect
+	cloud.google.com/go/storage v1.10.0 // indirect
+	firebase.google.com/go v3.13.0+incompatible
 	github.com/aws/aws-sdk-go v1.29.29
 	github.com/chobie/go-gaussian v0.0.0-20150107165016-53c09d90eeaf
 	github.com/fatih/structs v1.1.0
@@ -19,4 +22,5 @@ require (
 	github.com/tantralabs/theo-engine v0.0.0-20200319174139-3371856b691a
 	github.com/tantralabs/tradeapi v0.0.0-20200703230512-c13cc637c070
 	gonum.org/v1/gonum v0.7.0
+	google.golang.org/api v0.29.0
 )

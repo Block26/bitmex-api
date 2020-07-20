@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	firebase "firebase.google.com/go"
 	"github.com/jinzhu/copier"
 	"github.com/tantralabs/logger"
 	te "github.com/tantralabs/theo-engine"
@@ -22,6 +23,7 @@ import (
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/tantra"
 	"github.com/tantralabs/yantra/utils"
+	"google.golang.org/api/option"
 
 	"github.com/fatih/structs"
 	client "github.com/influxdata/influxdb1-client/v2"
@@ -116,6 +118,80 @@ func (t *TradingEngine) SetupTest(start time.Time, end time.Time, live ...bool) 
 	t.Algo.Timestamp = start
 	t.endTime = end
 	t.Algo.SetupData(t.Algo)
+}
+
+func (t *TradingEngine) LogToFirebase() {
+	ctx := context.Background()
+
+	conf := &firebase.Config{
+		DatabaseURL: "https://live-algos.firebaseio.com",
+	}
+
+	file := utils.DownloadFirebaseCreds()
+	opt := option.WithCredentialsFile(file.Name())
+
+	// Initialize the app with a service account, granting admin privileges
+	app, err := firebase.NewApp(ctx, conf, opt)
+
+	if err != nil {
+		fmt.Println("error initializing app:", err)
+	}
+
+	client, err := app.Database(ctx)
+	if err != nil {
+		fmt.Println("Error connecting to db:", err)
+	}
+
+	// get the name of the algo repo by splitting on / and getting what is left
+	algoRepo := strings.Split(t.Algo.Config.Algo, "/")
+	algoRepoName := algoRepo[len(algoRepo)-1]
+	// then split at . to remove .git
+	algoRepo = strings.Split(algoRepoName, ".")
+	algoRepoName = algoRepo[0]
+
+	path := "live/" + algoRepoName
+	ref := client.NewRef(path)
+
+	err = ref.Set(ctx, map[string]interface{}{
+		"leverage": t.Algo.Account.MarketStates[t.Algo.Config.Symbol].Leverage,
+		// "symbol":   t.Algo.Config.Symbol,
+		// "exchange": t.Algo.Config.Exchange,
+	})
+
+	if err != nil {
+		fmt.Println("Error setting value:", err)
+	}
+}
+
+func (t *TradingEngine) GetLeverages(algos []string) {
+	ctx := context.Background()
+
+	conf := &firebase.Config{
+		DatabaseURL: "https://live-algos.firebaseio.com",
+	}
+
+	file := utils.DownloadFirebaseCreds()
+	opt := option.WithCredentialsFile(file.Name())
+
+	// Initialize the app with a service account, granting admin privileges
+	app, err := firebase.NewApp(ctx, conf, opt)
+
+	if err != nil {
+		fmt.Println("error initializing app:", err)
+	}
+
+	client, err := app.Database(ctx)
+	if err != nil {
+		fmt.Println("Error connecting to db:", err)
+	}
+
+	ref := client.NewRef("live/")
+	var leverages interface{}
+	if err := ref.Get(ctx, &leverages); err != nil {
+		fmt.Println("Error reading value:", err)
+	}
+
+	fmt.Println(leverages)
 }
 
 // Set the candle data for the trading engine and format it according to the algo's configuration.
