@@ -1,11 +1,16 @@
 package yantra
 
 import (
+	"context"
+	"fmt"
 	"log"
 
+	firebase "firebase.google.com/go"
 	"github.com/tantralabs/logger"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
+	"github.com/tantralabs/yantra/utils"
+	"google.golang.org/api/option"
 )
 
 func CreateNewAlgo(config models.AlgoConfig) models.Algo {
@@ -36,4 +41,35 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 		Rebalance:                 config.Rebalance,
 		SetupData:                 config.SetupData,
 	}
+}
+
+func GetAllAlgoStatus(algos []string) (status map[string]models.AlgoStatus) {
+	ctx := context.Background()
+
+	conf := &firebase.Config{
+		DatabaseURL: "https://live-algos.firebaseio.com",
+	}
+
+	file := utils.DownloadFirebaseCreds()
+	opt := option.WithCredentialsFile(file.Name())
+
+	// Initialize the app with a service account, granting admin privileges
+	app, err := firebase.NewApp(ctx, conf, opt)
+
+	if err != nil {
+		fmt.Println("error initializing app:", err)
+	}
+
+	client, err := app.Database(ctx)
+	if err != nil {
+		fmt.Println("Error connecting to db:", err)
+	}
+
+	ref := client.NewRef("live/")
+	if err := ref.Get(ctx, &status); err != nil {
+		fmt.Println("Error reading value:", err)
+	}
+
+	fmt.Println(status)
+	return
 }
