@@ -152,11 +152,17 @@ func (t *TradingEngine) LogToFirebase() {
 	path := "live/" + algoRepoName + "-" + t.Algo.Config.Branch
 	ref := client.NewRef(path)
 
-	err = ref.Set(ctx, map[string]interface{}{
-		"leverage": t.Algo.Account.MarketStates[t.Algo.Config.Symbol].Leverage,
-		// "symbol":   t.Algo.Config.Symbol,
-		// "exchange": t.Algo.Config.Exchange,
-	})
+	ms := t.Algo.Account.MarketStates[t.Algo.Config.Symbol]
+	leverage := ms.Leverage
+	side := math.Copysign(1, ms.Position)
+	leverage = leverage * side
+
+	status := models.AlgoStatus{
+		Leverage:           leverage,
+		ShouldHaveLeverage: ms.ShouldHaveLeverage,
+	}
+
+	err = ref.Set(ctx, status)
 
 	if err != nil {
 		fmt.Println("Error setting value:", err)
