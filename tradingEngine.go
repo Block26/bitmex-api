@@ -30,7 +30,7 @@ import (
 )
 
 var currentRunUUID time.Time
-var barData map[string][]*models.Bar
+var BarData map[string][]*models.Bar
 var index int = 0
 var lastTimestamp map[string]int
 
