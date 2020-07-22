@@ -10,8 +10,8 @@ import (
 )
 
 // GetNATR Get the Normalized Average True Range for an index and data length
-func GetNATR(high []float64, low []float64, close []float64, index int, length int) []float64 {
-	return talib.Natr(high[index-length-1:index], low[index-length-1:index], close[index-length-1:index], length)
+func GetNATR(ohlcv models.OHLCV, index int, datalength int, length int) []float64 {
+	return talib.Natr(ohlcv.High[index-datalength:index], ohlcv.Low[index-datalength:index], ohlcv.Close[index-datalength:index], length)
 }
 
 // GetNATR Get the Average True Range for an index and data length
