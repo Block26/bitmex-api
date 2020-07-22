@@ -9,16 +9,16 @@ import (
 	"github.com/tantralabs/yantra/models"
 )
 
-var barData []*models.Bar
+var BarData []*models.Bar
 
 func GetBars() []*models.Bar {
-	return barData
+	return BarData
 }
 
 func UpdateLocalBars(localBars *[]*models.Bar, newBars []*models.Bar) {
-	timestamps := make([]int64, len(barData))
-	for i := range barData {
-		timestamps[i] = barData[i].Timestamp
+	timestamps := make([]int64, len(BarData))
+	for i := range BarData {
+		timestamps[i] = BarData[i].Timestamp
 	}
 
 	if newBars != nil {
@@ -46,14 +46,14 @@ func UpdateBars(ex iex.IExchange, symbol string, bin string, count int) []*model
 		log.Fatal("err getting data", err)
 	}
 
-	timestamps := make([]int64, len(barData))
-	for i := range barData {
-		timestamps[i] = barData[i].Timestamp
+	timestamps := make([]int64, len(BarData))
+	for i := range BarData {
+		timestamps[i] = BarData[i].Timestamp
 	}
 
 	for y := range newData {
 		if !containsInt(timestamps, newData[y].Timestamp.Unix()*1000) {
-			barData = append(barData, &models.Bar{
+			BarData = append(BarData, &models.Bar{
 				Timestamp: newData[y].Timestamp.Unix() * 1000,
 				Open:      newData[y].Open,
 				High:      newData[y].High,
@@ -63,17 +63,17 @@ func UpdateBars(ex iex.IExchange, symbol string, bin string, count int) []*model
 		}
 	}
 
-	sort.Slice(barData, func(i, j int) bool { return barData[i].Timestamp < barData[j].Timestamp })
-	return barData
+	sort.Slice(BarData, func(i, j int) bool { return BarData[i].Timestamp < BarData[j].Timestamp })
+	return BarData
 }
 
 func GetLatestMinuteData(ex iex.IExchange, symbol string, exchange string, dataLength int) []*models.Bar {
 	logger.Info("Fetching", dataLength, "1m Data for symbol:", symbol, "exchange:", exchange, "from our db")
-	barData = GetCandles(symbol, exchange, "1m", dataLength)
+	BarData = GetCandles(symbol, exchange, "1m", dataLength)
 	logger.Info("Fetching", 240, "1m Data for symbol:", symbol, "exchange:", exchange, "from the exchange")
 	exchangeBars := UpdateBars(ex, symbol, "1m", 240) // 4hour buffer
-	UpdateLocalBars(&barData, exchangeBars)
-	return barData
+	UpdateLocalBars(&BarData, exchangeBars)
+	return BarData
 }
 
 func containsInt(s []int64, e int64) bool {

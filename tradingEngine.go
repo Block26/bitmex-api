@@ -105,14 +105,14 @@ func (t *TradingEngine) SetupTest(start time.Time, end time.Time, live ...bool) 
 	mockExchange := tantra.NewTest(exchangeVars, &t.Algo.Account, start, end, t.Algo.DataLength, t.Algo.LogBacktest)
 	// If we are live we already have all the data we need so there is no need to fetch it again
 	if !isLive {
-		barData = t.LoadBarData(t.Algo, start, end)
+		BarData = t.LoadBarData(t.Algo, start, end)
 	}
-	for symbol, data := range barData {
+	for symbol, data := range BarData {
 		logger.Infof("Loaded %v instances of bar data for %v with start %v and end %v.\n", len(data), symbol, start, end)
 	}
 
-	t.SetAlgoCandleData(barData)
-	mockExchange.SetCandleData(barData)
+	t.SetAlgoCandleData(BarData)
+	mockExchange.SetCandleData(BarData)
 	mockExchange.SetCurrentTime(start)
 	t.Algo.Client = mockExchange
 	t.Algo.Timestamp = start
@@ -212,20 +212,20 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 // Given an algo and a start and end time, load relevant candle data from the database.
 // The data is returned as a map of symbol to pointers of Bar structs.
 func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {
-	if barData == nil || !t.reuseData {
-		barData = make(map[string][]*models.Bar)
+	if BarData == nil || !t.reuseData {
+		BarData = make(map[string][]*models.Bar)
 		for symbol, marketState := range algo.Account.MarketStates {
 			logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
 			// TODO handle extra bars to account for dataLength here
-			// barData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
-			barData[symbol] = database.GetCandlesByTimeWithBuffer(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
-			marketState.Bar = *barData[symbol][len(barData[symbol])-1]
+			// BarData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
+			BarData[symbol] = database.GetCandlesByTimeWithBuffer(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
+			marketState.Bar = *BarData[symbol][len(BarData[symbol])-1]
 			marketState.LastPrice = marketState.Bar.Close
 			logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
 		}
-		return barData
+		return BarData
 	}
-	return barData
+	return BarData
 }
 
 // Connect is called to connect to an exchange's WS api and begin trading.
@@ -264,11 +264,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		}
 		t.Algo.Client, err = tradeapi.New(exchangeVars)
 		//  Fetch prelim data from db to run live
-		barData = make(map[string][]*models.Bar)
+		BarData = make(map[string][]*models.Bar)
 		for symbol, ms := range t.Algo.Account.MarketStates {
-			barData[symbol] = database.GetLatestMinuteData(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+additionalLiveData)
+			BarData[symbol] = database.GetLatestMinuteData(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+additionalLiveData)
 		}
-		t.SetAlgoCandleData(barData)
+		t.SetAlgoCandleData(BarData)
 		if err != nil {
 			logger.Error(err)
 		}

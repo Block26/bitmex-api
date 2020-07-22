@@ -92,18 +92,18 @@ func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
 	t.candleData = make(map[string][]iex.TradeBin)
 	t.currentCandle = make(map[string]iex.TradeBin)
 	// Convert from bar model to iex.TradeBin format
-	for symbol, barData := range data {
+	for symbol, BarData := range data {
 		var candleData []iex.TradeBin
 		var bar iex.TradeBin
-		for i := range barData {
+		for i := range BarData {
 			bar = iex.TradeBin{
-				Timestamp: utils.TimestampToTime(int(barData[i].Timestamp)),
+				Timestamp: utils.TimestampToTime(int(BarData[i].Timestamp)),
 				Symbol:    symbol,
-				Open:      barData[i].Open,
-				High:      barData[i].High,
-				Low:       barData[i].Low,
-				Close:     barData[i].Close,
-				Volume:    barData[i].Volume,
+				Open:      BarData[i].Open,
+				High:      BarData[i].High,
+				Low:       BarData[i].Low,
+				Close:     BarData[i].Close,
+				Volume:    BarData[i].Volume,
 			}
 			candleData = append(candleData, bar)
 		}

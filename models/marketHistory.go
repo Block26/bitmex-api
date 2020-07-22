@@ -54,9 +54,9 @@ func NewMarketHistory(market MarketState, timestamp int) MarketHistory {
 	// ohlcv, index := market.OHLCV.GetOHLCVData(1)
 	if market.OHLCV != nil {
 		// logger.Errorf("Close: %v\n", ohlcv.Close[index])
-		// lastBar := *barData[len(barData)-1]
-		// logger.Errorf("Last bar: %v, first bar: %v\n", lastBar, *barData[0])
-		// for _, bar := range barData {
+		// lastBar := *BarData[len(BarData)-1]
+		// logger.Errorf("Last bar: %v, first bar: %v\n", lastBar, *BarData[0])
+		// for _, bar := range BarData {
 		// 	logger.Errorf("%v, ", bar)
 		// }
 		// logger.Errorf("\n")
