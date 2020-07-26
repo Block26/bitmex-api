@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"log"
+	"strings"
 )
 
 const (
@@ -282,10 +283,9 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 			log.Println(m, "is not supported for exchange", exchange)
 		}
 	} else if exchange == Deribit {
-		switch m := market; m {
-		case "BTC-PERPETUAL":
+		if strings.Contains(market, "BTC") {
 			return MarketInfo{
-				Symbol:                  "BTC-PERPETUAL",
+				Symbol:                  market,
 				Exchange:                "deribit",
 				BaseSymbol:              "BTC",
 				QuoteSymbol:             "USD",
@@ -301,10 +301,9 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BulkCancelSupported:     false,
 				DenominatedInUnderlying: true,
 			}, nil
-
-		case "ETH-PERPETUAL":
+		} else if strings.Contains(market, "ETH") {
 			return MarketInfo{
-				Symbol:                  "ETH-PERPETUAL",
+				Symbol:                  market,
 				Exchange:                "deribit",
 				BaseSymbol:              "ETH",
 				QuoteSymbol:             "USD",
@@ -320,9 +319,8 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				BulkCancelSupported:     false,
 				DenominatedInUnderlying: true,
 			}, nil
-		default:
-			log.Println(m, "is not supported for exchange", exchange)
 		}
+		log.Println(market, "is not supported for exchange", exchange)
 	} else if exchange == DeribitTestNet {
 		switch m := market; m {
 		case "BTC-PERPETUAL":

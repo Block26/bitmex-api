@@ -319,17 +319,19 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		logger.Errorf("Error getting open orders: %v\n", err)
 	} else {
 		logger.Infof("Got %v orders.\n", len(orders))
-
+		for _, o := range orders {
+			t.Algo.Client.CancelOrder(iex.CancelOrderF{Uuid: o.OrderID, Market: o.Market})
+		}
 	}
 
 	// SUBSCRIBE TO WEBSOCKETS
 	// channels to subscribe to (only futures and spot for now)
 	var subscribeInfos []iex.WSSubscribeInfo
+	subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET})
 	for symbol, marketState := range t.Algo.Account.MarketStates {
 		if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
 			//Ordering is important, get wallet and position first then market info
 			logger.Infof("Subscribing to %v channels.\n", symbol)
-			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_ORDER, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_POSITION, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol, Market: iex.WSMarketType{Contract: iex.WS_SWAP}})
@@ -511,17 +513,15 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 	if isUpdate {
 		// Add to existing order state
 		for _, newOrder := range orders {
+			fmt.Println("newOrder", newOrder.OrdStatus, newOrder.OrderID)
 			marketState, ok := algo.Account.MarketStates[newOrder.Symbol]
 			if !ok {
 				continue
 			}
-			if newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Cancelled ||
-				newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Filled ||
-				newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Rejected {
-				// if newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Open {
-				delete(marketState.Orders, newOrder.OrderID)
-			} else {
+			if strings.ToLower(newOrder.OrdStatus) == "open" {
 				marketState.Orders[newOrder.OrderID] = newOrder
+			} else {
+				delete(marketState.Orders, newOrder.OrderID)
 			}
 		}
 	} else {
@@ -591,7 +591,8 @@ func (t *TradingEngine) updatePositions(algo *models.Algo, positions []iex.WsPos
 func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPosition) {
 	marketState, ok := algo.Account.MarketStates[position.Symbol]
 	if !ok {
-		logger.Errorf("Got position update %v for symbol %v, could not find in account market states.\n", position, position.Symbol)
+		// logger.Errorf("Got position update %v for symbol %v, could not find in account market states.\n", position, position.Symbol)
+		return
 	}
 	marketState.Position = position.CurrentQty
 	if math.Abs(marketState.Position) > 0 && position.AvgCostPrice > 0 {
@@ -1235,4 +1236,135 @@ func CreateSpread(algo *models.Algo, marketState *models.MarketState, weight int
 		orderArr = utils.ReverseArr(orderArr)
 	}
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
+}
+
+func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
+	utils.LoadENV(secret)
+
+	var err error
+	var config models.Secret
+	// history := make([]models.History, 0)
+
+	config = utils.LoadSecret(settingsFileName, secret)
+	logger.Info("Loaded config for", t.Algo.Account.ExchangeInfo.Exchange, "secret", settingsFileName)
+	exchangeVars := iex.ExchangeConf{
+		Exchange:       t.Algo.Account.ExchangeInfo.Exchange,
+		ServerUrl:      t.Algo.Account.ExchangeInfo.ExchangeURL,
+		ApiSecret:      config.APISecret,
+		ApiKey:         config.APIKey,
+		AccountID:      "test",
+		OutputResponse: false,
+	}
+	t.Algo.Client, err = tradeapi.New(exchangeVars)
+	//  Fetch prelim data from db to run live
+	BarData = make(map[string][]*models.Bar)
+	for symbol, ms := range t.Algo.Account.MarketStates {
+		BarData[symbol] = database.GetLatestMinuteDataFromExchange(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+100)
+	}
+	t.SetAlgoCandleData(BarData)
+	if err != nil {
+		logger.Error(err)
+	}
+
+	// SETUP Algo WITH RESTFUL CALLS
+	balances, _ := t.Algo.Client.GetBalances()
+	t.updateAlgoBalances(t.Algo, balances)
+
+	positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
+	t.updatePositions(t.Algo, positions)
+
+	// t.Algo.Client.CancelAllOrders()
+
+	orders, err := t.Algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: t.Algo.Account.BaseAsset.Symbol})
+	if err != nil {
+		logger.Errorf("Error getting open orders: %v\n", err)
+	} else {
+		logger.Infof("Got %v orders.\n", len(orders))
+		for _, o := range orders {
+			t.Algo.Client.CancelOrder(iex.CancelOrderF{Uuid: o.OrderID, Market: o.Market})
+		}
+	}
+	t.updateOrders(t.Algo, orders, false)
+
+	// SUBSCRIBE TO WEBSOCKETS
+	// channels to subscribe to (only futures and spot for now)
+	var subscribeInfos []iex.WSSubscribeInfo
+	subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET})
+	for symbol, marketState := range t.Algo.Account.MarketStates {
+		if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
+			//Ordering is important, get wallet and position first then market info
+			logger.Infof("Subscribing to %v channels.\n", symbol)
+			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_ORDER, Symbol: symbol})
+			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_POSITION, Symbol: symbol})
+			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_MS_PRICE, Symbol: symbol})
+		}
+	}
+
+	logger.Infof("Subscribed to %v channels.\n", len(subscribeInfos))
+
+	// Channels for recieving websocket response.
+	channels := &iex.WSChannels{
+		PositionChan: make(chan []iex.WsPosition, 1),
+		TradeBinChan: make(chan []iex.TradeBin, 1),
+		WalletChan:   make(chan []iex.Balance, 1),
+		OrderChan:    make(chan []iex.Order, 1),
+	}
+
+	// Start the websocket.
+	ctx := context.TODO()
+	wg := sync.WaitGroup{}
+	err = t.Algo.Client.StartWS(&iex.WsConfig{
+		Host:      t.Algo.Account.ExchangeInfo.WSStream,
+		Streams:   subscribeInfos,
+		Channels:  channels,
+		Ctx:       ctx,
+		Wg:        &wg,
+		ApiSecret: config.APISecret,
+		ApiKey:    config.APIKey,
+	})
+
+	if err != nil {
+		msg := fmt.Sprintf("Error starting websockets: %v\n", err)
+		log.Fatal(msg)
+	}
+
+	// All of these channels send themselves back so that the test can wait for each individual to complete
+	for {
+		select {
+		case positions := <-channels.PositionChan:
+			t.updatePositions(t.Algo, positions)
+			t.Algo.OnPositionUpdate(t.Algo)
+		case trades := <-channels.TradeBinChan:
+			// Update your local bars
+			// fmt.Println("Trades", trades)
+			for _, trade := range trades {
+				// t.InsertNewCandle(trade)
+				ms, _ := t.Algo.Account.MarketStates[trade.Symbol]
+				ms.BestBid = trade.Low
+				ms.BestAsk = trade.High
+				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
+				t.updateState(t.Algo, trade.Symbol)
+			}
+			// dont update so often cause lol
+			if index%(len(t.Algo.Account.MarketStates)*5) == 0 {
+				t.Algo.Rebalance(t.Algo)
+			}
+			// for _, marketState := range t.Algo.Account.MarketStates {
+			// state := logState(t.Algo, marketState)
+			// history = append(history, state)
+			// t.logLiveState()
+			// }
+			// t.checkWalletHistory(t.Algo, settingsFileName)
+			t.aggregateAccountProfit()
+			// t.LogToFirebase()
+			index++
+		case newOrders := <-channels.OrderChan:
+			// Make sure the orders are coming from the exchange in the right order.
+			t.updateOrders(t.Algo, newOrders, true)
+			t.Algo.OnOrderUpdate(t.Algo)
+		case update := <-channels.WalletChan:
+			t.updateAlgoBalances(t.Algo, update)
+		}
+	}
+	logger.Infof("Reached end of connect.\n")
 }

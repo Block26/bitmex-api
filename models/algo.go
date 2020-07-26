@@ -34,6 +34,8 @@ type Algo struct {
 	Client                    iex.IExchange
 	Rebalance                 func(*Algo)
 	SetupData                 func(*Algo)
+	OnOrderUpdate             func(*Algo)
+	OnPositionUpdate          func(*Algo)
 }
 
 // AlgoConfig is a struct representing various parameters for simple instantiation of algo structs.
@@ -49,4 +51,6 @@ type AlgoConfig struct {
 	LogCloudBacktest          bool
 	Rebalance                 func(*Algo)
 	SetupData                 func(*Algo)
+	OnOrderUpdate             func(*Algo)
+	OnPositionUpdate          func(*Algo)
 }

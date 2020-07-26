@@ -40,6 +40,8 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 		Config:                    liveConfig,
 		Rebalance:                 config.Rebalance,
 		SetupData:                 config.SetupData,
+		OnOrderUpdate:             config.OnOrderUpdate,
+		OnPositionUpdate:          config.OnPositionUpdate,
 	}
 }
 
