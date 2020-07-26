@@ -1021,6 +1021,59 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 	influx.Close()
 }
 
+func (t *TradingEngine) customLogLiveState() {
+	stateType := "live"
+
+	influx := GetInfluxClient()
+
+	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
+		Database:  "algos",
+		Precision: "us",
+	})
+
+	if err != nil {
+		fmt.Println("err", err)
+	}
+
+	tags := map[string]string{
+		"state_type":     stateType,
+		"algo_name":      t.Algo.Name,
+		"yantra_version": t.Algo.Config.YantraVersion,
+		"symbol":         t.Algo.Account.BaseAsset.Symbol,
+	}
+
+	fields := map[string]interface{}{}
+	fields["state_type"] = stateType
+	fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
+	fields["Quantity"] = 0.0
+
+	for symbol, ms := range t.Algo.Account.MarketStates {
+		// fmt.Println("logging", symbol, "info")
+		if symbol == t.Algo.Account.BaseAsset.Symbol {
+			fields["Price"] = ms.Bar.Close
+		}
+		fields["Price"] = ms.Bar.Close
+		fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
+		fields["Quantity"] = ms.Position + fields["Quantity"].(float64)
+	}
+
+	pt, err := client.NewPoint(
+		"market",
+		tags,
+		fields,
+		time.Now(),
+	)
+	if err != nil {
+		fmt.Println("err", err)
+	}
+	bp.AddPoint(pt)
+	err = client.Client.Write(influx, bp)
+	if err != nil {
+		fmt.Println("err", err)
+	}
+	influx.Close()
+}
+
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
 func SetLiquidity(algo *models.Algo, marketState *models.MarketState, percentage float64, side int) float64 {
 	if marketState.Info.MarketType == models.Future {
@@ -1352,7 +1405,11 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 			// for _, marketState := range t.Algo.Account.MarketStates {
 			// state := logState(t.Algo, marketState)
 			// history = append(history, state)
-			// t.logLiveState()
+			if index%(len(t.Algo.Account.MarketStates)*5*60) == 0 {
+				fmt.Println("Log State")
+				t.customLogLiveState()
+			}
+
 			// }
 			// t.checkWalletHistory(t.Algo, settingsFileName)
 			t.aggregateAccountProfit()
