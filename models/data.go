@@ -21,7 +21,8 @@ type Data struct {
 }
 
 const (
-	hour int64 = 3600000
+	hour   int64 = 3600000
+	minute int64 = 60000
 )
 
 // SetupDataModel is always passed minute level data.
@@ -169,6 +170,9 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 		// fmt.Println("resampleInterval", resampleInterval, "d.data[resampleInterval].Close[last]", val.Close[last-1], last, len(val.Timestamp) == last+1)
 		if len(val.Timestamp) == last {
 			// fmt.Println("last is enough", val.Close[last-1], last)
+			if val.Timestamp[last-1]%(minute*int64(resampleInterval)) != 0 {
+				log.Fatalln("ohlcv out of sync last ohlcv timestamp", val.Timestamp[last-1])
+			}
 			return OHLCV{
 				Timestamp: val.Timestamp,
 				Open:      val.Open,
@@ -178,6 +182,9 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 				Volume:    val.Volume,
 			}
 		} else {
+			if val.Timestamp[last]%(minute*int64(resampleInterval)) != 0 {
+				log.Fatalln("ohlcv out of sync last selected ohlcv timestamp", val.Timestamp[last])
+			}
 			return OHLCV{
 				Timestamp: val.Timestamp[:last],
 				Open:      val.Open[:last],
