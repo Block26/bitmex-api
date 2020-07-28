@@ -34,7 +34,7 @@ type Algo struct {
 	Client                    iex.IExchange
 	Rebalance                 func(*Algo)
 	SetupData                 func(*Algo)
-	OnOrderUpdate             func(*Algo)
+	OnOrderUpdate             func(*Algo, []iex.Order)
 	OnPositionUpdate          func(*Algo)
 }
 
@@ -51,6 +51,6 @@ type AlgoConfig struct {
 	LogCloudBacktest          bool
 	Rebalance                 func(*Algo)
 	SetupData                 func(*Algo)
-	OnOrderUpdate             func(*Algo)
+	OnOrderUpdate             func(*Algo, []iex.Order)
 	OnPositionUpdate          func(*Algo)
 }

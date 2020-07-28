@@ -513,7 +513,6 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 	if isUpdate {
 		// Add to existing order state
 		for _, newOrder := range orders {
-			fmt.Println("newOrder", newOrder.OrdStatus, newOrder.OrderID)
 			marketState, ok := algo.Account.MarketStates[newOrder.Symbol]
 			if !ok {
 				continue
@@ -1418,7 +1417,7 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 		case newOrders := <-channels.OrderChan:
 			// Make sure the orders are coming from the exchange in the right order.
 			t.updateOrders(t.Algo, newOrders, true)
-			t.Algo.OnOrderUpdate(t.Algo)
+			t.Algo.OnOrderUpdate(t.Algo, newOrders)
 		case update := <-channels.WalletChan:
 			t.updateAlgoBalances(t.Algo, update)
 		}
