@@ -319,7 +319,9 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		logger.Errorf("Error getting open orders: %v\n", err)
 	} else {
 		logger.Infof("Got %v orders.\n", len(orders))
-
+		for _, o := range orders {
+			t.Algo.Client.CancelOrder(iex.CancelOrderF{Uuid: o.OrderID, Market: o.Market})
+		}
 	}
 
 	// SUBSCRIBE TO WEBSOCKETS
