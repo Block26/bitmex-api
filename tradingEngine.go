@@ -33,6 +33,8 @@ var currentRunUUID time.Time
 var BarData map[string][]*models.Bar
 var index int = 0
 var lastTimestamp map[string]int
+var fillVolume float64 = 0.0
+var realBalance float64 = 0.0
 
 const additionalLiveData int = 3000
 const checkWalletHistoryInterval int = 60
@@ -469,7 +471,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			// startTimestamp := time.Now().UnixNano()
 			// logger.Infof("Recieved %v new order updates\n", len(newOrders))
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
-			t.updateOrders(t.Algo, newOrders, true)
+			t.UpdateOrders(t.Algo, newOrders, true)
 			// TODO callback to order function
 			// logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			if t.isTest {
@@ -508,7 +510,7 @@ func (t *TradingEngine) checkWalletHistory(algo *models.Algo, settingsFileName s
 }
 
 // Inject orders directly into market state upon update.
-func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUpdate bool) {
+func (t *TradingEngine) UpdateOrders(algo *models.Algo, orders []iex.Order, isUpdate bool) {
 	// logger.Infof("Processing %v order updates.\n", len(orders))
 	if isUpdate {
 		// Add to existing order state
@@ -520,27 +522,27 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 			if strings.ToLower(newOrder.OrdStatus) == "open" {
 				marketState.Orders[newOrder.OrderID] = newOrder
 			} else {
+				if strings.ToLower(newOrder.OrdStatus) == "filled" {
+					fillVolume += newOrder.Amount
+				}
 				delete(marketState.Orders, newOrder.OrderID)
 			}
 		}
 	} else {
 		// Overwrite all order states
 		openOrderMap := make(map[string]map[string]iex.Order)
-		var orderMap map[string]iex.Order
-		var ok bool
 		for _, order := range orders {
-			orderMap, ok = openOrderMap[order.Symbol]
+			_, ok := openOrderMap[order.Symbol]
 			if !ok {
 				openOrderMap[order.Symbol] = make(map[string]iex.Order)
-				orderMap = openOrderMap[order.Symbol]
 			}
-			orderMap[order.OrderID] = order
+			openOrderMap[order.Symbol][order.OrderID] = order
 		}
-		for symbol, marketState := range algo.Account.MarketStates {
+
+		for symbol := range algo.Account.MarketStates {
 			orderMap, ok := openOrderMap[symbol]
 			if ok {
-				marketState.Orders = orderMap
-				logger.Infof("Set orders for %v.\n", symbol)
+				algo.Account.MarketStates[symbol].Orders = orderMap
 			}
 		}
 	}
@@ -668,6 +670,7 @@ func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Bal
 		}
 		if updatedBalance.Currency == algo.Account.BaseAsset.Symbol {
 			algo.Account.BaseAsset.Quantity = updatedBalance.Balance
+			realBalance = updatedBalance.Available
 			// logger.Debugf("Updated base asset quantity: %v\n", algo.Account.BaseAsset.Quantity)
 		} else if algo.Account.ExchangeInfo.Spot {
 			// This could be a spot position update, in which case we should update the respective market state's position
@@ -1044,6 +1047,8 @@ func (t *TradingEngine) customLogLiveState() {
 	fields := map[string]interface{}{}
 	fields["state_type"] = stateType
 	fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
+	fields["FillVolume"] = fillVolume
+	fields["RealizedBalance"] = realBalance
 	fields["Quantity"] = 0.0
 
 	for symbol, ms := range t.Algo.Account.MarketStates {
@@ -1071,6 +1076,8 @@ func (t *TradingEngine) customLogLiveState() {
 		fmt.Println("err", err)
 	}
 	influx.Close()
+
+	fillVolume = 0.0
 }
 
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
@@ -1332,11 +1339,11 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 		logger.Errorf("Error getting open orders: %v\n", err)
 	} else {
 		logger.Infof("Got %v orders.\n", len(orders))
-		for _, o := range orders {
-			t.Algo.Client.CancelOrder(iex.CancelOrderF{Uuid: o.OrderID, Market: o.Market})
-		}
+		// for _, o := range orders {
+		// 	t.Algo.Client.CancelOrder(iex.CancelOrderF{Uuid: o.OrderID, Market: o.Market})
+		// }
 	}
-	t.updateOrders(t.Algo, orders, false)
+	t.UpdateOrders(t.Algo, orders, false)
 
 	// SUBSCRIBE TO WEBSOCKETS
 	// channels to subscribe to (only futures and spot for now)
@@ -1404,9 +1411,15 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 			// for _, marketState := range t.Algo.Account.MarketStates {
 			// state := logState(t.Algo, marketState)
 			// history = append(history, state)
-			if index%(len(t.Algo.Account.MarketStates)*5*60) == 0 {
-				fmt.Println("Log State")
+			if index%(len(t.Algo.Account.MarketStates)*5*15) == 0 {
+				fmt.Println("Log State & Get Open Orders")
 				t.customLogLiveState()
+				orders, _ := t.Algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: t.Algo.Account.BaseAsset.Symbol})
+				t.UpdateOrders(t.Algo, orders, false)
+				// fmt.Println("Total open orders", len(orders))
+				// for _, ms := range t.Algo.Account.MarketStates {
+				// 	fmt.Println("open orders for", ms.Symbol, len(ms.Orders))
+				// }
 			}
 
 			// }
@@ -1416,7 +1429,7 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 			index++
 		case newOrders := <-channels.OrderChan:
 			// Make sure the orders are coming from the exchange in the right order.
-			t.updateOrders(t.Algo, newOrders, true)
+			t.UpdateOrders(t.Algo, newOrders, true)
 			t.Algo.OnOrderUpdate(t.Algo, newOrders)
 		case update := <-channels.WalletChan:
 			t.updateAlgoBalances(t.Algo, update)

@@ -400,6 +400,19 @@ func CreateKeyValuePairs(m map[string]interface{}, ignoreLowerCase bool, oldByte
 	return b.String()
 }
 
+func CreateLimitOrder(symbol string, orderSize float64, price float64, side string, label string) iex.Order {
+	return iex.Order{
+		Symbol:   symbol,
+		Market:   symbol,
+		Currency: symbol,
+		ClOrdID:  label,
+		Amount:   math.Abs(orderSize),
+		Rate:     price,
+		Type:     "limit",
+		Side:     side,
+	}
+}
+
 // Round a float to the nearest integer.
 func round(num float64) int {
 	return int(num + math.Copysign(0.5, num))
