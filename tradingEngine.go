@@ -250,7 +250,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 
 	var err error
 	var config models.Secret
-	history := make([]models.History, 0)
+	marketStatehistory := make([]models.History, 0)
+	signalStateHistory := make([]map[string]interface{}, 0)
 	lastTimestamp := make(map[string]int, 0)
 
 	if !t.isTest {
@@ -410,6 +411,13 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			for _, trade := range trades {
 				t.InsertNewCandle(trade)
 				marketState, _ := t.Algo.Account.MarketStates[trade.Symbol]
+				t.Algo.Account.BaseAsset.Price = trade.Close
+
+				state := logState(t.Algo, marketState)
+				marketStatehistory = append(marketStatehistory, state)
+				if !t.isTest {
+					t.logLiveState()
+				}
 				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
 				if t.Algo.DataLength < len(marketState.OHLCV.GetMinuteData().Timestamp) {
 					t.updateState(t.Algo, trade.Symbol)
@@ -418,16 +426,23 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				// log.Println("Not enough trade data. (local data length", len(marketState.OHLCV.GetMinuteData().Timestamp), "data length wanted by Algo", t.Algo.DataLength, ")")
 				// }
 			}
-			for _, marketState := range t.Algo.Account.MarketStates {
-				state := logState(t.Algo, marketState)
-				history = append(history, state)
-				if !t.isTest {
-					t.logLiveState()
-				}
-			}
+
 			if !t.isTest {
 				// t.runTest(t.Algo, setupData, rebalance)
 				t.checkWalletHistory(t.Algo, settingsFileName)
+			} else {
+				if t.Algo.State != nil && t.Algo.LogStateHistory {
+					t.Algo.State["timestamp"] = t.Algo.Timestamp.Unix()
+					t.Algo.State["price"] = t.Algo.Account.BaseAsset.Price
+					// Create the target map
+					storedState := make(map[string]interface{})
+
+					// Copy from the original map to the target map
+					for key, value := range t.Algo.State {
+						storedState[key] = value
+					}
+					signalStateHistory = append(signalStateHistory, storedState)
+				}
 			}
 			t.aggregateAccountProfit()
 			// ttt := time.Now().Unix() - startTimestamp
@@ -450,7 +465,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
 			if !t.Algo.Timestamp.Before(t.endTime) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
-				logStats(t.Algo, history, startTime)
+				logStats(t.Algo, marketStatehistory, startTime)
+				logStateHistory(t.Algo, signalStateHistory)
 				logBacktest(t.Algo)
 				return
 			}
@@ -1214,43 +1230,45 @@ func GetInfluxClient() client.Client {
 
 // Log live backtest results for a given algo.
 func logBacktest(algo *models.Algo) {
-	influxURL := os.Getenv("YANTRA_BACKTEST_DB_URL")
-	if influxURL == "" {
-		log.Fatalln("You need to set the `YANTRA_BACKTEST_DB_URL` env variable")
+	if algo.LogBacktest {
+		influxURL := os.Getenv("YANTRA_BACKTEST_DB_URL")
+		if influxURL == "" {
+			log.Fatalln("You need to set the `YANTRA_BACKTEST_DB_URL` env variable")
+		}
+
+		influxUser := os.Getenv("YANTRA_BACKTEST_DB_USER")
+		influxPassword := os.Getenv("YANTRA_BACKTEST_DB_PASSWORD")
+
+		influx, _ := client.NewHTTPClient(client.HTTPConfig{
+			Addr:     influxURL,
+			Username: influxUser,
+			Password: influxPassword,
+			Timeout:  (time.Millisecond * 1000 * 10),
+		})
+
+		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+			Database:  "backtests",
+			Precision: "us",
+		})
+
+		// uuid := algo.Name + "-" + uuid.New().String()
+		tags := map[string]string{}
+		fields := structs.Map(algo.Result)
+		fields["algo_name"] = algo.Name
+
+		pt, _ := client.NewPoint(
+			"result",
+			tags,
+			fields,
+			time.Now(),
+		)
+		bp.AddPoint(pt)
+
+		err := client.Client.Write(influx, bp)
+		log.Println(algo.Name, err)
+
+		influx.Close()
 	}
-
-	influxUser := os.Getenv("YANTRA_BACKTEST_DB_USER")
-	influxPassword := os.Getenv("YANTRA_BACKTEST_DB_PASSWORD")
-
-	influx, _ := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     influxURL,
-		Username: influxUser,
-		Password: influxPassword,
-		Timeout:  (time.Millisecond * 1000 * 10),
-	})
-
-	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "backtests",
-		Precision: "us",
-	})
-
-	// uuid := algo.Name + "-" + uuid.New().String()
-	tags := map[string]string{}
-	fields := structs.Map(algo.Result)
-	fields["algo_name"] = algo.Name
-
-	pt, _ := client.NewPoint(
-		"result",
-		tags,
-		fields,
-		time.Now(),
-	)
-	bp.AddPoint(pt)
-
-	err := client.Client.Write(influx, bp)
-	log.Println(algo.Name, err)
-
-	influx.Close()
 }
 
 // Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.

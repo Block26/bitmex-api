@@ -1,6 +1,7 @@
 package yantra
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log"
 	"math"
@@ -402,6 +403,21 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		if err != nil {
 			panic(err)
 		}
+	}
+
+	if algo.LogStateHistory {
+		// Log balance history
+		os.Remove("state.csv")
+		stateFile, err := os.OpenFile("state.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+		if err != nil {
+			panic(err)
+		}
+		defer stateFile.Close()
+
+		err = gocsv.MarshalFile(&history, stateFile) // Use this to save the CSV back to the file
+		if err != nil {
+			panic(err)
+		}
 
 	}
 
@@ -431,6 +447,50 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	elapsed := time.Since(startTime)
 	fmt.Println("-------------------------------")
 	log.Printf("Execution Speed: %v \n", elapsed)
+}
+
+func areRowsTheSame(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func logStateHistory(algo *models.Algo, history []map[string]interface{}) {
+	if algo.LogStateHistory {
+		// Log balance history
+		os.Remove("state.csv")
+		stateFile, _ := os.OpenFile("state.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+		defer stateFile.Close()
+
+		writer := csv.NewWriter(stateFile)
+		defer writer.Flush()
+
+		var header []string
+		for key := range history[0] {
+			header = append(header, key)
+		}
+
+		writer.Write(header)
+		var lastRowString []string
+		for _, row := range history {
+			var rowString []string
+			for _, key := range header {
+				rowString = append(rowString, fmt.Sprintf("%v", row[key]))
+			}
+
+			same := areRowsTheSame(rowString, lastRowString)
+			if !same {
+				lastRowString = rowString
+				writer.Write(rowString)
+			}
+		}
+	}
 }
 
 func logCloudBacktest(algo *models.Algo, history []models.History) {
