@@ -312,10 +312,10 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 
 	// SETUP Algo WITH RESTFUL CALLS
 	balances, _ := t.Algo.Client.GetBalances()
-	t.updateAlgoBalances(t.Algo, balances)
+	t.UpdateAlgoBalances(t.Algo, balances)
 
 	positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-	t.updatePositions(t.Algo, positions)
+	t.UpdatePositions(t.Algo, positions)
 
 	orders, err := t.Algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: t.Algo.Account.BaseAsset.Symbol})
 	if err != nil {
@@ -378,7 +378,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 	for {
 		select {
 		case positions := <-channels.PositionChan:
-			t.updatePositions(t.Algo, positions)
+			t.UpdatePositions(t.Algo, positions)
 			if t.isTest {
 				channels.PositionChanComplete <- nil
 			}
@@ -453,12 +453,12 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			// logger.Debug("===========================================")
 			// logger.Debugf("Fetching positions now as a stop gap")
 			// positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-			// t.updatePositions(t.Algo, positions)
+			// t.UpdatePositions(t.Algo, positions)
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			} else {
 				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-				t.updatePositions(t.Algo, positions)
+				t.UpdatePositions(t.Algo, positions)
 				t.LogToFirebase()
 				index++
 			}
@@ -494,7 +494,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				channels.OrderChanComplete <- nil
 			}
 		case update := <-channels.WalletChan:
-			t.updateAlgoBalances(t.Algo, update)
+			t.UpdateAlgoBalances(t.Algo, update)
 			if t.isTest {
 				channels.WalletChanComplete <- nil
 			}
@@ -589,7 +589,7 @@ func (t *TradingEngine) runTest(algo *models.Algo) {
 }
 
 // Given a set of websocket position updates, update all relevant market states.
-func (t *TradingEngine) updatePositions(algo *models.Algo, positions []iex.WsPosition) {
+func (t *TradingEngine) UpdatePositions(algo *models.Algo, positions []iex.WsPosition) {
 	logger.Debug("Position Update:", positions)
 	if len(positions) > 0 {
 		for _, position := range positions {
@@ -669,8 +669,8 @@ func (t *TradingEngine) aggregateAccountProfit() {
 }
 
 // Update all balances contained by the trading engine given a slice of websocket balance updates from the exchange.
-func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
-	// fmt.Println("updateAlgoBalances")
+func (t *TradingEngine) UpdateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
+	// fmt.Println("UpdateAlgoBalances")
 	for _, updatedBalance := range balances {
 		balance, ok := algo.Account.Balances[updatedBalance.Currency]
 		if ok {
@@ -1345,10 +1345,10 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 
 	// SETUP Algo WITH RESTFUL CALLS
 	balances, _ := t.Algo.Client.GetBalances()
-	t.updateAlgoBalances(t.Algo, balances)
+	t.UpdateAlgoBalances(t.Algo, balances)
 
 	positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-	t.updatePositions(t.Algo, positions)
+	t.UpdatePositions(t.Algo, positions)
 
 	// t.Algo.Client.CancelAllOrders()
 
@@ -1385,11 +1385,13 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 		TradeBinChan: make(chan []iex.TradeBin, 1),
 		WalletChan:   make(chan []iex.Balance, 1),
 		OrderChan:    make(chan []iex.Order, 1),
+		Stop:         make(chan error, 1),
 	}
 
 	// Start the websocket.
 	ctx := context.TODO()
 	wg := sync.WaitGroup{}
+	wg.Add(1)
 	err = t.Algo.Client.StartWS(&iex.WsConfig{
 		Host:      t.Algo.Account.ExchangeInfo.WSStream,
 		Streams:   subscribeInfos,
@@ -1409,7 +1411,7 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 	for {
 		select {
 		case positions := <-channels.PositionChan:
-			t.updatePositions(t.Algo, positions)
+			t.UpdatePositions(t.Algo, positions)
 			t.Algo.OnPositionUpdate(t.Algo)
 		case trades := <-channels.TradeBinChan:
 			// Update your local bars
@@ -1450,7 +1452,9 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 			t.UpdateOrders(t.Algo, newOrders, true)
 			t.Algo.OnOrderUpdate(t.Algo, newOrders)
 		case update := <-channels.WalletChan:
-			t.updateAlgoBalances(t.Algo, update)
+			t.UpdateAlgoBalances(t.Algo, update)
+		case <-channels.Stop:
+			break
 		}
 	}
 	logger.Infof("Reached end of connect.\n")
