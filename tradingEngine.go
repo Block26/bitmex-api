@@ -446,7 +446,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
-			if !t.Algo.Timestamp.Before(t.endTime) && t.isTest {
+			if !t.Algo.Timestamp.Before(t.endTime.Add(-1*time.Second)) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, history, startTime)
 				logBacktest(t.Algo)
