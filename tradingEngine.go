@@ -40,7 +40,7 @@ const liveTestInterval int = 15
 // The trading engine is responsible for managing communication between algos and other modules and the exchange.
 type TradingEngine struct {
 	Algo                 *models.Algo
-	reuseData            bool
+	ReuseData            bool
 	firstTrade           bool
 	firstPositionUpdate  bool
 	isTest               bool
@@ -72,7 +72,7 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 		lastTest:             0,
 		lastWalletSync:       0,
 		startTime:            time.Now(),
-		reuseData:            reuseData[0],
+		ReuseData:            reuseData[0],
 		theoEngine:           nil,
 		lastContractUpdate:   0,
 		contractUpdatePeriod: contractUpdatePeriod,
@@ -212,7 +212,7 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 // Given an algo and a start and end time, load relevant candle data from the database.
 // The data is returned as a map of symbol to pointers of Bar structs.
 func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {
-	if t.BarData == nil || !t.reuseData {
+	if t.BarData == nil || !t.ReuseData {
 		t.BarData = make(map[string][]*models.Bar)
 		for symbol, marketState := range algo.Account.MarketStates {
 			logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
