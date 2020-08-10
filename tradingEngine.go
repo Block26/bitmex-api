@@ -958,67 +958,23 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 		}
 		bp.AddPoint(pt)
 
-		// params := t.Algo.Params.GetAllParams()
-		// pt, err = client.NewPoint(
-		// 	"params",
-		// 	tags,
-		// 	params,
-		// 	time.Now(),
-		// )
-		// if err != nil {
-		// 	fmt.Println("err", err)
-		// }
-		// bp.AddPoint(pt)
-
-		// LOG Options
-		// if ms.Info.MarketType == models.Option && ms.Position != 0 {
-		// 	tmpTags := tags
-		// 	tmpTags["symbol"] = symbol
-		// 	o := structs.Map(ms.OptionTheo)
-		// 	// Influxdb seems to interpret pointers as strings, need to dereference here
-		// 	o["CurrentTime"] = utils.TimeToTimestamp(*ms.OptionTheo.CurrentTime)
-		// 	o["UnderlyingPrice"] = *ms.OptionTheo.UnderlyingPrice
-		// 	pt1, _ := client.NewPoint(
-		// 		"optionTheo",
-		// 		tmpTags,
-		// 		o,
-		// 		time.Now(),
-		// 	)
-		// 	bp.AddPoint(pt1)
-
-		// 	o = structs.Map(ms)
-		// 	// Influxdb seems to interpret pointers as strings, need to dereference here
-		// 	o["CurrentTime"] = (*ms.OptionTheo.CurrentTime).String()
-		// 	o["UnderlyingPrice"] = *ms.OptionTheo.UnderlyingPrice
-		// 	delete(o, "OptionTheo")
-		// 	pt2, _ := client.NewPoint(
-		// 		"options",
-		// 		tmpTags,
-		// 		o,
-		// 		time.Now(),
-		// 	)
-		// 	bp.AddPoint(pt2)
-		// }
-
 		// LOG orders placed
-		// ms.Orders.Range(func(key, value interface{}) bool {
-		// 	order := value.(iex.Order)
-		// 	if order.Symbol != symbol {
-		// 		return false
-		// 	}
-		// 	fields = map[string]interface{}{
-		// 		fmt.Sprintf("%0.2f", order.Rate): order.Amount,
-		// 	}
+		for _, o := range ms.Orders {
+			orderFields := map[string]interface{}{}
+			orderFields["Quantity"] = o.Amount
+			orderFields["Price"] = o.Rate
+			orderFields["Symbol"] = o.Symbol
+			orderFields["OrderID"] = o.OrderID
+			orderFields["ClOrderID"] = o.ClOrdID
 
-		// 	pt, _ = client.NewPoint(
-		// 		"order",
-		// 		tags,
-		// 		fields,
-		// 		time.Now(),
-		// 	)
-		// 	bp.AddPoint(pt)
-		// 	return true
-		// })
+			pt, _ = client.NewPoint(
+				"order",
+				tags,
+				orderFields,
+				time.Now(),
+			)
+			bp.AddPoint(pt)
+		}
 
 		if t.Algo.State != nil && len(t.Algo.State) > 0 {
 			pt, err := client.NewPoint(
