@@ -32,6 +32,8 @@ import (
 var currentRunUUID time.Time
 var index int = 0
 var lastTimestamp map[string]int
+var fillVolume float64 = 0.0
+var realBalance float64 = 0.0
 
 const additionalLiveData int = 3000
 const checkWalletHistoryInterval int = 60
@@ -248,7 +250,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 
 	var err error
 	var config models.Secret
-	history := make([]models.History, 0)
+	marketStatehistory := make([]models.History, 0)
+	signalStateHistory := make([]map[string]interface{}, 0)
 	lastTimestamp := make(map[string]int, 0)
 
 	if !t.isTest {
@@ -309,10 +312,10 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 
 	// SETUP Algo WITH RESTFUL CALLS
 	balances, _ := t.Algo.Client.GetBalances()
-	t.updateAlgoBalances(t.Algo, balances)
+	t.UpdateAlgoBalances(t.Algo, balances)
 
 	positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-	t.updatePositions(t.Algo, positions)
+	t.UpdatePositions(t.Algo, positions)
 
 	orders, err := t.Algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: t.Algo.Account.BaseAsset.Symbol})
 	if err != nil {
@@ -327,11 +330,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 	// SUBSCRIBE TO WEBSOCKETS
 	// channels to subscribe to (only futures and spot for now)
 	var subscribeInfos []iex.WSSubscribeInfo
+	subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET})
 	for symbol, marketState := range t.Algo.Account.MarketStates {
 		if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
 			//Ordering is important, get wallet and position first then market info
 			logger.Infof("Subscribing to %v channels.\n", symbol)
-			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_ORDER, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_POSITION, Symbol: symbol})
 			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol, Market: iex.WSMarketType{Contract: iex.WS_SWAP}})
@@ -375,7 +378,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 	for {
 		select {
 		case positions := <-channels.PositionChan:
-			t.updatePositions(t.Algo, positions)
+			t.UpdatePositions(t.Algo, positions)
 			if t.isTest {
 				channels.PositionChanComplete <- nil
 			}
@@ -408,6 +411,13 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			for _, trade := range trades {
 				t.InsertNewCandle(trade)
 				marketState, _ := t.Algo.Account.MarketStates[trade.Symbol]
+				t.Algo.Account.BaseAsset.Price = trade.Close
+
+				state := logState(t.Algo, marketState)
+				marketStatehistory = append(marketStatehistory, state)
+				if !t.isTest {
+					t.logLiveState()
+				}
 				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
 				if t.Algo.DataLength < len(marketState.OHLCV.GetMinuteData().Timestamp) {
 					t.updateState(t.Algo, trade.Symbol)
@@ -416,16 +426,23 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				// log.Println("Not enough trade data. (local data length", len(marketState.OHLCV.GetMinuteData().Timestamp), "data length wanted by Algo", t.Algo.DataLength, ")")
 				// }
 			}
-			for _, marketState := range t.Algo.Account.MarketStates {
-				state := logState(t.Algo, marketState)
-				history = append(history, state)
-				if !t.isTest {
-					t.logLiveState()
-				}
-			}
+
 			if !t.isTest {
 				// t.runTest(t.Algo, setupData, rebalance)
 				t.checkWalletHistory(t.Algo, settingsFileName)
+			} else {
+				if t.Algo.State != nil && t.Algo.LogStateHistory {
+					t.Algo.State["timestamp"] = t.Algo.Timestamp.Unix()
+					t.Algo.State["price"] = t.Algo.Account.BaseAsset.Price
+					// Create the target map
+					storedState := make(map[string]interface{})
+
+					// Copy from the original map to the target map
+					for key, value := range t.Algo.State {
+						storedState[key] = value
+					}
+					signalStateHistory = append(signalStateHistory, storedState)
+				}
 			}
 			t.aggregateAccountProfit()
 			// ttt := time.Now().Unix() - startTimestamp
@@ -436,19 +453,20 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			// logger.Debug("===========================================")
 			// logger.Debugf("Fetching positions now as a stop gap")
 			// positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-			// t.updatePositions(t.Algo, positions)
+			// t.UpdatePositions(t.Algo, positions)
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			} else {
 				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-				t.updatePositions(t.Algo, positions)
+				t.UpdatePositions(t.Algo, positions)
 				t.LogToFirebase()
 				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
 			if !t.Algo.Timestamp.Before(t.endTime.Add(-1*time.Second)) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
-				logStats(t.Algo, history, startTime)
+				logStats(t.Algo, marketStatehistory, startTime)
+				logStateHistory(t.Algo, signalStateHistory)
 				logBacktest(t.Algo)
 				return
 			}
@@ -469,14 +487,14 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			// startTimestamp := time.Now().UnixNano()
 			// logger.Infof("Recieved %v new order updates\n", len(newOrders))
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
-			t.updateOrders(t.Algo, newOrders, true)
+			t.UpdateOrders(t.Algo, newOrders, true)
 			// TODO callback to order function
 			// logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
 			if t.isTest {
 				channels.OrderChanComplete <- nil
 			}
 		case update := <-channels.WalletChan:
-			t.updateAlgoBalances(t.Algo, update)
+			t.UpdateAlgoBalances(t.Algo, update)
 			if t.isTest {
 				channels.WalletChanComplete <- nil
 			}
@@ -508,7 +526,7 @@ func (t *TradingEngine) checkWalletHistory(algo *models.Algo, settingsFileName s
 }
 
 // Inject orders directly into market state upon update.
-func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUpdate bool) {
+func (t *TradingEngine) UpdateOrders(algo *models.Algo, orders []iex.Order, isUpdate bool) {
 	// logger.Infof("Processing %v order updates.\n", len(orders))
 	if isUpdate {
 		// Add to existing order state
@@ -517,33 +535,30 @@ func (t *TradingEngine) updateOrders(algo *models.Algo, orders []iex.Order, isUp
 			if !ok {
 				continue
 			}
-			if newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Cancelled ||
-				newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Filled ||
-				newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Rejected {
-				// if newOrder.OrdStatus == t.Algo.Client.GetPotentialOrderStatus().Open {
-				delete(marketState.Orders, newOrder.OrderID)
-			} else {
+			if strings.ToLower(newOrder.OrdStatus) == "open" {
 				marketState.Orders[newOrder.OrderID] = newOrder
+			} else {
+				if strings.ToLower(newOrder.OrdStatus) == "filled" {
+					fillVolume += newOrder.Amount
+				}
+				delete(marketState.Orders, newOrder.OrderID)
 			}
 		}
 	} else {
 		// Overwrite all order states
 		openOrderMap := make(map[string]map[string]iex.Order)
-		var orderMap map[string]iex.Order
-		var ok bool
 		for _, order := range orders {
-			orderMap, ok = openOrderMap[order.Symbol]
+			_, ok := openOrderMap[order.Symbol]
 			if !ok {
 				openOrderMap[order.Symbol] = make(map[string]iex.Order)
-				orderMap = openOrderMap[order.Symbol]
 			}
-			orderMap[order.OrderID] = order
+			openOrderMap[order.Symbol][order.OrderID] = order
 		}
-		for symbol, marketState := range algo.Account.MarketStates {
+
+		for symbol := range algo.Account.MarketStates {
 			orderMap, ok := openOrderMap[symbol]
 			if ok {
-				marketState.Orders = orderMap
-				logger.Infof("Set orders for %v.\n", symbol)
+				algo.Account.MarketStates[symbol].Orders = orderMap
 			}
 		}
 	}
@@ -574,7 +589,7 @@ func (t *TradingEngine) runTest(algo *models.Algo) {
 }
 
 // Given a set of websocket position updates, update all relevant market states.
-func (t *TradingEngine) updatePositions(algo *models.Algo, positions []iex.WsPosition) {
+func (t *TradingEngine) UpdatePositions(algo *models.Algo, positions []iex.WsPosition) {
 	logger.Debug("Position Update:", positions)
 	if len(positions) > 0 {
 		for _, position := range positions {
@@ -593,7 +608,8 @@ func (t *TradingEngine) updatePositions(algo *models.Algo, positions []iex.WsPos
 func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPosition) {
 	marketState, ok := algo.Account.MarketStates[position.Symbol]
 	if !ok {
-		logger.Errorf("Got position update %v for symbol %v, could not find in account market states.\n", position, position.Symbol)
+		// logger.Errorf("Got position update %v for symbol %v, could not find in account market states.\n", position, position.Symbol)
+		return
 	}
 	marketState.Position = position.CurrentQty
 	if math.Abs(marketState.Position) > 0 && position.AvgCostPrice > 0 {
@@ -653,8 +669,8 @@ func (t *TradingEngine) aggregateAccountProfit() {
 }
 
 // Update all balances contained by the trading engine given a slice of websocket balance updates from the exchange.
-func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
-	// fmt.Println("updateAlgoBalances")
+func (t *TradingEngine) UpdateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
+	// fmt.Println("UpdateAlgoBalances")
 	for _, updatedBalance := range balances {
 		balance, ok := algo.Account.Balances[updatedBalance.Currency]
 		if ok {
@@ -670,6 +686,7 @@ func (t *TradingEngine) updateAlgoBalances(algo *models.Algo, balances []iex.Bal
 		}
 		if updatedBalance.Currency == algo.Account.BaseAsset.Symbol {
 			algo.Account.BaseAsset.Quantity = updatedBalance.Balance
+			realBalance = updatedBalance.Available
 			// logger.Debugf("Updated base asset quantity: %v\n", algo.Account.BaseAsset.Quantity)
 		} else if algo.Account.ExchangeInfo.Spot {
 			// This could be a spot position update, in which case we should update the respective market state's position
@@ -1022,6 +1039,63 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 	influx.Close()
 }
 
+func (t *TradingEngine) customLogLiveState() {
+	stateType := "live"
+
+	influx := GetInfluxClient()
+
+	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
+		Database:  "algos",
+		Precision: "us",
+	})
+
+	if err != nil {
+		fmt.Println("err", err)
+	}
+
+	tags := map[string]string{
+		"state_type":     stateType,
+		"algo_name":      t.Algo.Name,
+		"yantra_version": t.Algo.Config.YantraVersion,
+		"symbol":         t.Algo.Account.BaseAsset.Symbol,
+	}
+
+	fields := map[string]interface{}{}
+	fields["state_type"] = stateType
+	fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
+	fields["FillVolume"] = fillVolume
+	fields["RealizedBalance"] = realBalance
+	fields["Quantity"] = 0.0
+
+	for symbol, ms := range t.Algo.Account.MarketStates {
+		// fmt.Println("logging", symbol, "info")
+		if symbol == t.Algo.Account.BaseAsset.Symbol {
+			fields["Price"] = ms.Bar.Close
+		}
+		fields["Price"] = ms.Bar.Close
+		fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
+		fields["Quantity"] = ms.Position + fields["Quantity"].(float64)
+	}
+
+	pt, err := client.NewPoint(
+		"market",
+		tags,
+		fields,
+		time.Now(),
+	)
+	if err != nil {
+		fmt.Println("err", err)
+	}
+	bp.AddPoint(pt)
+	err = client.Client.Write(influx, bp)
+	if err != nil {
+		fmt.Println("err", err)
+	}
+	influx.Close()
+
+	fillVolume = 0.0
+}
+
 // SetLiquidity Set the liquidity available for to buy/sell. IE put 5% of my portfolio on the bid.
 func SetLiquidity(algo *models.Algo, marketState *models.MarketState, percentage float64, side int) float64 {
 	if marketState.Info.MarketType == models.Future {
@@ -1156,43 +1230,45 @@ func GetInfluxClient() client.Client {
 
 // Log live backtest results for a given algo.
 func logBacktest(algo *models.Algo) {
-	influxURL := os.Getenv("YANTRA_BACKTEST_DB_URL")
-	if influxURL == "" {
-		log.Fatalln("You need to set the `YANTRA_BACKTEST_DB_URL` env variable")
+	if algo.LogBacktest {
+		influxURL := os.Getenv("YANTRA_BACKTEST_DB_URL")
+		if influxURL == "" {
+			log.Fatalln("You need to set the `YANTRA_BACKTEST_DB_URL` env variable")
+		}
+
+		influxUser := os.Getenv("YANTRA_BACKTEST_DB_USER")
+		influxPassword := os.Getenv("YANTRA_BACKTEST_DB_PASSWORD")
+
+		influx, _ := client.NewHTTPClient(client.HTTPConfig{
+			Addr:     influxURL,
+			Username: influxUser,
+			Password: influxPassword,
+			Timeout:  (time.Millisecond * 1000 * 10),
+		})
+
+		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+			Database:  "backtests",
+			Precision: "us",
+		})
+
+		// uuid := algo.Name + "-" + uuid.New().String()
+		tags := map[string]string{}
+		fields := structs.Map(algo.Result)
+		fields["algo_name"] = algo.Name
+
+		pt, _ := client.NewPoint(
+			"result",
+			tags,
+			fields,
+			time.Now(),
+		)
+		bp.AddPoint(pt)
+
+		err := client.Client.Write(influx, bp)
+		log.Println(algo.Name, err)
+
+		influx.Close()
 	}
-
-	influxUser := os.Getenv("YANTRA_BACKTEST_DB_USER")
-	influxPassword := os.Getenv("YANTRA_BACKTEST_DB_PASSWORD")
-
-	influx, _ := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     influxURL,
-		Username: influxUser,
-		Password: influxPassword,
-		Timeout:  (time.Millisecond * 1000 * 10),
-	})
-
-	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "backtests",
-		Precision: "us",
-	})
-
-	// uuid := algo.Name + "-" + uuid.New().String()
-	tags := map[string]string{}
-	fields := structs.Map(algo.Result)
-	fields["algo_name"] = algo.Name
-
-	pt, _ := client.NewPoint(
-		"result",
-		tags,
-		fields,
-		time.Now(),
-	)
-	bp.AddPoint(pt)
-
-	err := client.Client.Write(influx, bp)
-	log.Println(algo.Name, err)
-
-	influx.Close()
 }
 
 // Create a Spread on the bid/ask, this fuction is used to create an arrary of orders that spreads across the order book.
@@ -1237,4 +1313,149 @@ func CreateSpread(algo *models.Algo, marketState *models.MarketState, weight int
 		orderArr = utils.ReverseArr(orderArr)
 	}
 	return models.OrderArray{Price: priceArr, Quantity: orderArr}
+}
+
+func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
+	utils.LoadENV(secret)
+
+	var err error
+	var config models.Secret
+	// history := make([]models.History, 0)
+
+	config = utils.LoadSecret(settingsFileName, secret)
+	logger.Info("Loaded config for", t.Algo.Account.ExchangeInfo.Exchange, "secret", settingsFileName)
+	exchangeVars := iex.ExchangeConf{
+		Exchange:       t.Algo.Account.ExchangeInfo.Exchange,
+		ServerUrl:      t.Algo.Account.ExchangeInfo.ExchangeURL,
+		ApiSecret:      config.APISecret,
+		ApiKey:         config.APIKey,
+		AccountID:      "test",
+		OutputResponse: false,
+	}
+	t.Algo.Client, err = tradeapi.New(exchangeVars)
+	//  Fetch prelim data from db to run live
+	BarData = make(map[string][]*models.Bar)
+	for symbol, ms := range t.Algo.Account.MarketStates {
+		BarData[symbol] = database.GetLatestMinuteDataFromExchange(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+100)
+	}
+	t.SetAlgoCandleData(BarData)
+	if err != nil {
+		logger.Error(err)
+	}
+
+	// SETUP Algo WITH RESTFUL CALLS
+	balances, _ := t.Algo.Client.GetBalances()
+	t.UpdateAlgoBalances(t.Algo, balances)
+
+	positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
+	t.UpdatePositions(t.Algo, positions)
+
+	// t.Algo.Client.CancelAllOrders()
+
+	orders, err := t.Algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: t.Algo.Account.BaseAsset.Symbol})
+	if err != nil {
+		logger.Errorf("Error getting open orders: %v\n", err)
+	} else {
+		logger.Infof("Got %v orders.\n", len(orders))
+		// for _, o := range orders {
+		// 	t.Algo.Client.CancelOrder(iex.CancelOrderF{Uuid: o.OrderID, Market: o.Market})
+		// }
+	}
+	t.UpdateOrders(t.Algo, orders, false)
+
+	// SUBSCRIBE TO WEBSOCKETS
+	// channels to subscribe to (only futures and spot for now)
+	var subscribeInfos []iex.WSSubscribeInfo
+	subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_WALLET})
+	for symbol, marketState := range t.Algo.Account.MarketStates {
+		if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
+			//Ordering is important, get wallet and position first then market info
+			logger.Infof("Subscribing to %v channels.\n", symbol)
+			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_ORDER, Symbol: symbol})
+			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_POSITION, Symbol: symbol})
+			subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_MS_PRICE, Symbol: symbol})
+		}
+	}
+
+	logger.Infof("Subscribed to %v channels.\n", len(subscribeInfos))
+
+	// Channels for recieving websocket response.
+	channels := &iex.WSChannels{
+		PositionChan: make(chan []iex.WsPosition, 1),
+		TradeBinChan: make(chan []iex.TradeBin, 1),
+		WalletChan:   make(chan []iex.Balance, 1),
+		OrderChan:    make(chan []iex.Order, 1),
+		Stop:         make(chan error, 1),
+	}
+
+	// Start the websocket.
+	ctx := context.TODO()
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	err = t.Algo.Client.StartWS(&iex.WsConfig{
+		Host:      t.Algo.Account.ExchangeInfo.WSStream,
+		Streams:   subscribeInfos,
+		Channels:  channels,
+		Ctx:       ctx,
+		Wg:        &wg,
+		ApiSecret: config.APISecret,
+		ApiKey:    config.APIKey,
+	})
+
+	if err != nil {
+		msg := fmt.Sprintf("Error starting websockets: %v\n", err)
+		log.Fatal(msg)
+	}
+
+	// All of these channels send themselves back so that the test can wait for each individual to complete
+	for {
+		select {
+		case positions := <-channels.PositionChan:
+			t.UpdatePositions(t.Algo, positions)
+			t.Algo.OnPositionUpdate(t.Algo)
+		case trades := <-channels.TradeBinChan:
+			// Update your local bars
+			// fmt.Println("Trades", trades)
+			for _, trade := range trades {
+				// t.InsertNewCandle(trade)
+				ms, _ := t.Algo.Account.MarketStates[trade.Symbol]
+				ms.BestBid = trade.Low
+				ms.BestAsk = trade.High
+				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
+				t.updateState(t.Algo, trade.Symbol)
+			}
+			// dont update so often cause lol
+			if index%(len(t.Algo.Account.MarketStates)*5) == 0 {
+				t.Algo.Rebalance(t.Algo)
+			}
+			// for _, marketState := range t.Algo.Account.MarketStates {
+			// state := logState(t.Algo, marketState)
+			// history = append(history, state)
+			if index%(len(t.Algo.Account.MarketStates)*5*15) == 0 {
+				fmt.Println("Log State & Get Open Orders")
+				t.customLogLiveState()
+				orders, _ := t.Algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: t.Algo.Account.BaseAsset.Symbol})
+				t.UpdateOrders(t.Algo, orders, false)
+				// fmt.Println("Total open orders", len(orders))
+				// for _, ms := range t.Algo.Account.MarketStates {
+				// 	fmt.Println("open orders for", ms.Symbol, len(ms.Orders))
+				// }
+			}
+
+			// }
+			// t.checkWalletHistory(t.Algo, settingsFileName)
+			t.aggregateAccountProfit()
+			// t.LogToFirebase()
+			index++
+		case newOrders := <-channels.OrderChan:
+			// Make sure the orders are coming from the exchange in the right order.
+			t.UpdateOrders(t.Algo, newOrders, true)
+			t.Algo.OnOrderUpdate(t.Algo, newOrders)
+		case update := <-channels.WalletChan:
+			t.UpdateAlgoBalances(t.Algo, update)
+		case <-channels.Stop:
+			break
+		}
+	}
+	logger.Infof("Reached end of connect.\n")
 }

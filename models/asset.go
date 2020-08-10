@@ -4,4 +4,5 @@ package models
 type Asset struct {
 	Symbol   string
 	Quantity float64
+	Price    float64
 }

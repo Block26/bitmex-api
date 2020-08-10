@@ -76,6 +76,11 @@ func GetLatestMinuteData(ex iex.IExchange, symbol string, exchange string, dataL
 	return BarData
 }
 
+func GetLatestMinuteDataFromExchange(ex iex.IExchange, symbol string, exchange string, dataLength int) []*models.Bar {
+	BarData := UpdateBars(ex, symbol, "1m", 240) // 4hour buffer
+	return BarData
+}
+
 func containsInt(s []int64, e int64) bool {
 	for _, a := range s {
 		if a == e {
