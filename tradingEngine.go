@@ -1334,11 +1334,11 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 	}
 	t.Algo.Client, err = tradeapi.New(exchangeVars)
 	//  Fetch prelim data from db to run live
-	BarData = make(map[string][]*models.Bar)
+	t.BarData = make(map[string][]*models.Bar)
 	for symbol, ms := range t.Algo.Account.MarketStates {
-		BarData[symbol] = database.GetLatestMinuteDataFromExchange(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+100)
+		t.BarData[symbol] = database.GetLatestMinuteDataFromExchange(t.Algo.Client, symbol, ms.Info.Exchange, t.Algo.DataLength+100)
 	}
-	t.SetAlgoCandleData(BarData)
+	t.SetAlgoCandleData(t.BarData)
 	if err != nil {
 		logger.Error(err)
 	}
