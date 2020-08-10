@@ -964,6 +964,7 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 			orderFields["Quantity"] = o.Amount
 			orderFields["Price"] = o.Rate
 			orderFields["Symbol"] = o.Symbol
+			orderFields["Side"] = o.Side
 			orderFields["OrderID"] = o.OrderID
 			orderFields["ClOrderID"] = o.ClOrdID
 
