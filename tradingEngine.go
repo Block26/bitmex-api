@@ -943,6 +943,7 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 		fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
 		fields["Quantity"] = ms.Position
 		fields["AverageCost"] = ms.AverageCost
+		fields["FillVolume"] = fillVolume
 		fields["UnrealizedProfit"] = ms.UnrealizedProfit
 		fields["Leverage"] = ms.Leverage
 
@@ -1037,6 +1038,7 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 		fmt.Println("err", err)
 	}
 	influx.Close()
+	fillVolume = 0
 }
 
 func (t *TradingEngine) customLogLiveState() {
