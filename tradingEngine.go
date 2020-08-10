@@ -31,7 +31,8 @@ import (
 
 var currentRunUUID time.Time
 var index int = 0
-var lastTimestamp map[string]int
+
+// var lastTimestamp map[string]int
 var fillVolume float64 = 0.0
 var realBalance float64 = 0.0
 
@@ -252,11 +253,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 	var config models.Secret
 	marketStatehistory := make([]models.History, 0)
 	signalStateHistory := make([]map[string]interface{}, 0)
-	lastTimestamp := make(map[string]int, 0)
+	// lastTimestamp := make(map[string]int, 0)
 
 	if !t.isTest {
 		config = utils.LoadSecret(settingsFileName, secret)
-		logger.Info("Loaded config for", t.Algo.Account.ExchangeInfo.Exchange, "secret", settingsFileName)
+		logger.Info("Loaded config for", t.Algo.Account.ExchangeInfo.Exchange, "secret", settingsFileName, "key", config.APIKey)
 		exchangeVars := iex.ExchangeConf{
 			Exchange:       t.Algo.Account.ExchangeInfo.Exchange,
 			ServerUrl:      t.Algo.Account.ExchangeInfo.ExchangeURL,
@@ -429,7 +430,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 
 			if !t.isTest {
 				// t.runTest(t.Algo, setupData, rebalance)
-				t.checkWalletHistory(t.Algo, settingsFileName)
+				// t.checkWalletHistory(t.Algo, settingsFileName)
 			} else {
 				if t.Algo.State != nil && t.Algo.LogStateHistory {
 					t.Algo.State["timestamp"] = t.Algo.Timestamp.Unix()
@@ -471,21 +472,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				return
 			}
 		case newOrders := <-channels.OrderChan:
-			// Make sure the orders are coming from the exchange in the right order.
-			ts, ok := lastTimestamp["orders"]
-			currentTimestamp := int(newOrders[0].TransactTime.Unix())
-			if ok {
-				if ts <= currentTimestamp {
-					lastTimestamp["orders"] = currentTimestamp
-				} else {
-					fmt.Println("ERROR recieved an order out of order...", ts, currentTimestamp)
-					return
-				}
-			} else {
-				lastTimestamp["orders"] = currentTimestamp
-			}
-			// startTimestamp := time.Now().UnixNano()
-			// logger.Infof("Recieved %v new order updates\n", len(newOrders))
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
 			t.UpdateOrders(t.Algo, newOrders, true)
 			// TODO callback to order function
