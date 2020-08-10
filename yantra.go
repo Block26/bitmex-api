@@ -2,7 +2,6 @@ package yantra
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	firebase "firebase.google.com/go"
@@ -60,20 +59,19 @@ func GetAllAlgoStatus() (status map[string]models.AlgoStatus) {
 	app, err := firebase.NewApp(ctx, conf, opt)
 
 	if err != nil {
-		fmt.Println("error initializing app:", err)
+		log.Fatalln("error initializing app:", err)
 	}
 
 	client, err := app.Database(ctx)
 	if err != nil {
-		fmt.Println("Error connecting to db:", err)
+		log.Fatalln("Error connecting to db:", err)
 	}
 
 	ref := client.NewRef("live/")
 	if err := ref.Get(ctx, &status); err != nil {
-		fmt.Println("Error reading value:", err)
+		log.Fatalln("Error reading value:", err)
 	}
 
-	logger.Debug("Algo Status", status)
 	return
 }
 
@@ -89,6 +87,5 @@ func GetSelectAlgoStatus(algos []string) map[string]models.AlgoStatus {
 		}
 	}
 
-	logger.Debug("Selected Algo Status", selected)
 	return selected
 }
