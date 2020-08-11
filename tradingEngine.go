@@ -325,6 +325,11 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		logger.Infof("Got %v orders.\n", len(orders))
 		for _, o := range orders {
 			t.Algo.Client.CancelOrder(iex.CancelOrderF{Uuid: o.OrderID, Market: o.Market})
+			if err != nil {
+				fmt.Println("there was an error canceling the order", err.Error())
+			} else {
+				fmt.Println("canceled order:", o.OrderID)
+			}
 		}
 	}
 
@@ -517,11 +522,12 @@ func (t *TradingEngine) UpdateOrders(algo *models.Algo, orders []iex.Order, isUp
 	if isUpdate {
 		// Add to existing order state
 		for _, newOrder := range orders {
+			logger.Debug("New order status", strings.ToLower(newOrder.OrdStatus))
 			marketState, ok := algo.Account.MarketStates[newOrder.Symbol]
 			if !ok {
 				continue
 			}
-			if strings.ToLower(newOrder.OrdStatus) == "open" {
+			if strings.ToLower(newOrder.OrdStatus) == "open" || strings.ToLower(newOrder.OrdStatus) == "new" {
 				marketState.Orders[newOrder.OrderID] = newOrder
 			} else {
 				if strings.ToLower(newOrder.OrdStatus) == "filled" {
