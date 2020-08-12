@@ -23,4 +23,5 @@ require (
 	github.com/tantralabs/tradeapi v0.0.0-20200803011438-a68eed9a102a
 	gonum.org/v1/gonum v0.7.0
 	google.golang.org/api v0.29.0
+	gopkg.in/src-d/go-git.v4 v4.13.1
 )

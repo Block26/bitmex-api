@@ -2,7 +2,10 @@ package yantra
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
+	"os/exec"
 
 	firebase "firebase.google.com/go"
 	"github.com/tantralabs/logger"
@@ -10,6 +13,9 @@ import (
 	"github.com/tantralabs/yantra/models"
 	"github.com/tantralabs/yantra/utils"
 	"google.golang.org/api/option"
+	"gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/plumbing"
+	"gopkg.in/src-d/go-git.v4/plumbing/transport/http"
 )
 
 func CreateNewAlgo(config models.AlgoConfig) models.Algo {
@@ -88,4 +94,65 @@ func GetSelectAlgoStatus(algos []string) map[string]models.AlgoStatus {
 	}
 
 	return selected
+}
+
+// Clone an algo based on config to a local directory
+func CloneAlgo(config models.Config) (success bool) {
+	dir := "./" + config.Name
+
+	// remove files when local debugging
+	os.RemoveAll(dir)
+	refName := fmt.Sprintf("refs/heads/%s", config.Branch)
+
+	// Clone Algo to local directory
+	r, err := git.PlainClone(dir, false, &git.CloneOptions{
+		URL:           "https://" + config.Algo,
+		ReferenceName: plumbing.ReferenceName(refName),
+		Auth: &http.BasicAuth{
+			Username: "abc123", // yes, this can be anything except an empty string
+			Password: os.Getenv("GITHUB_TOKEN"),
+		},
+		Progress: os.Stdout,
+	})
+
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	// Get Working Tree
+	w, err := r.Worktree()
+
+	if err != nil {
+		log.Fatalln("working tree", err.Error())
+	}
+
+	// Checkout Algo commit hash
+	if config.Commit != "latest" {
+		err = w.Checkout(&git.CheckoutOptions{
+			Hash: plumbing.NewHash(config.Commit),
+		})
+
+		if err != nil {
+			log.Fatalln("checkout commit", err.Error())
+		}
+	}
+
+	// cd to tmp
+	os.Chdir(dir)
+	// download deps
+	run("go", "mod", "download")
+
+	// Go back to parent dir
+	os.Chdir("..")
+	return
+}
+
+func run(app string, args ...string) error {
+	log.Println(app, args)
+	cmd := exec.Command(app, args...)
+	if verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	return cmd.Run()
 }
