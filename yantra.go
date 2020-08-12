@@ -2,12 +2,15 @@ package yantra
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 
 	firebase "firebase.google.com/go"
+	"firebase.google.com/go/db"
 	"github.com/tantralabs/logger"
 	"github.com/tantralabs/yantra/exchanges"
 	"github.com/tantralabs/yantra/models"
@@ -51,9 +54,7 @@ func CreateNewAlgo(config models.AlgoConfig) models.Algo {
 	}
 }
 
-func GetAllAlgoStatus() (status map[string]models.AlgoStatus) {
-	ctx := context.Background()
-
+func getFirebaseClient(ctx context.Context) *db.Client {
 	conf := &firebase.Config{
 		DatabaseURL: "https://live-algos.firebaseio.com",
 	}
@@ -73,6 +74,31 @@ func GetAllAlgoStatus() (status map[string]models.AlgoStatus) {
 		log.Fatalln("Error connecting to db:", err)
 	}
 
+	return client
+}
+
+func GetPortfolio(portfolioName string) (portfolio models.Portfolio) {
+	ctx := context.Background()
+	client := getFirebaseClient(ctx)
+	ref := client.NewRef("portfolio/" + portfolioName + "/")
+	fmt.Println(ref.Path)
+	var res map[string]interface{}
+
+	if err := ref.Get(ctx, &res); err != nil {
+		log.Fatalln("Error reading value:", err)
+	}
+
+	file, _ := json.MarshalIndent(res, "", " ")
+	_ = ioutil.WriteFile("portfolio.json", file, 0644)
+
+	// god only knows why golang wouldnt just let me put it straight into my struct
+	portfolio = models.LoadPortfolio("portfolio.json")
+	return
+}
+
+func GetAllAlgoStatus() (status map[string]models.AlgoStatus) {
+	ctx := context.Background()
+	client := getFirebaseClient(ctx)
 	ref := client.NewRef("live/")
 	if err := ref.Get(ctx, &status); err != nil {
 		log.Fatalln("Error reading value:", err)
@@ -82,15 +108,17 @@ func GetAllAlgoStatus() (status map[string]models.AlgoStatus) {
 }
 
 func GetSelectAlgoStatus(algos []string) map[string]models.AlgoStatus {
-	status := GetAllAlgoStatus()
+	ctx := context.Background()
+	client := getFirebaseClient(ctx)
+	ref := client.NewRef("live/")
 
 	selected := make(map[string]models.AlgoStatus)
-	for name, algoStatus := range status {
-		for _, algoName := range algos {
-			if name == algoName {
-				selected[name] = algoStatus
-			}
+	for _, algoName := range algos {
+		status := models.AlgoStatus{}
+		if err := ref.Child(algoName).Get(ctx, &status); err != nil {
+			log.Fatalln("Error reading value:", err)
 		}
+		selected[algoName] = status
 	}
 
 	return selected
@@ -150,9 +178,7 @@ func CloneAlgo(config models.Config) (success bool) {
 func run(app string, args ...string) error {
 	log.Println(app, args)
 	cmd := exec.Command(app, args...)
-	if verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
