@@ -61,6 +61,7 @@ type TradingEngine struct {
 	BarData              map[string][]*models.Bar
 	preloadBarData       bool
 	csvBarDataFile       string
+	shouldExportResult   bool
 	jsonResultFile       string
 }
 
@@ -91,16 +92,16 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 }
 
 func (t *TradingEngine) checkForPreload() bool {
-	if len(os.Args) > 1 && len(os.Args[1]) > 5 && os.Args[1][:5] == "data=" {
-		// os.Args[1] = "data=...."
-		t.preloadBarData = true
-		t.csvBarDataFile = os.Args[1][5:]
-
-		if len(os.Args) > 2 && len(os.Args[2]) > 7 && os.Args[2][:7] == "export=" {
+	for _, arg := range os.Args[1:] {
+		if len(arg) > 5 && arg[:5] == "data=" {
+			// os.Args[1] = "data=...."
+			t.preloadBarData = true
+			t.shouldExportResult = true
+			t.csvBarDataFile = arg[5:]
+		} else if len(arg) > 7 && arg[:7] == "export=" {
 			// os.Args[2] = "export=...."
-			t.jsonResultFile = os.Args[2][7:]
-		} else {
-			t.jsonResultFile = "result.json"
+			t.shouldExportResult = true
+			t.jsonResultFile = arg[7:]
 		}
 	}
 	return t.preloadBarData
@@ -113,7 +114,7 @@ func (t *TradingEngine) checkForPreload() bool {
 func (t *TradingEngine) RunTest(start time.Time, end time.Time, live ...bool) {
 	t.SetupTest(start, end, live...)
 	t.Connect("", false, true)
-	if t.preloadBarData {
+	if t.shouldExportResult {
 		t.ExportResult()
 	}
 }
@@ -531,7 +532,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			} else {
 				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
 				t.UpdatePositions(t.Algo, positions)
-				t.LogToFirebase()
+				// t.LogToFirebase()
 				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
@@ -1462,7 +1463,7 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 			// }
 			// t.checkWalletHistory(t.Algo, settingsFileName)
 			t.aggregateAccountProfit()
-			// t.LogToFirebase()
+			t.LogToFirebase()
 			index++
 		case newOrders := <-channels.OrderChan:
 			// Make sure the orders are coming from the exchange in the right order.
@@ -1480,7 +1481,7 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 // ExportResult exports t.Algo.Result to a JSON file
 func (t *TradingEngine) ExportResult() {
 	if t.jsonResultFile == "" {
-		log.Fatal("Failed to export result to JSON: No result file set to export to")
+		t.jsonResultFile = "result.json"
 	}
 
 	jsonData, err := json.MarshalIndent(t.Algo.Result, "", "  ")
