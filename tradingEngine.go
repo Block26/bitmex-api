@@ -102,8 +102,6 @@ func (t *TradingEngine) checkForPreload() bool {
 		} else {
 			t.jsonResultFile = "result.json"
 		}
-		// TODO: Remove and remove comment out of firebase logging ....
-		t.Algo.LogLevel = logger.LogLevel().Info
 	}
 	return t.preloadBarData
 }
@@ -533,7 +531,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			} else {
 				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
 				t.UpdatePositions(t.Algo, positions)
-				// t.LogToFirebase()
+				t.LogToFirebase()
 				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
