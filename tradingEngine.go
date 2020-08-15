@@ -532,7 +532,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			} else {
 				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
 				t.UpdatePositions(t.Algo, positions)
-				// t.LogToFirebase()
+				t.LogToFirebase()
 				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
@@ -1463,7 +1463,7 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 			// }
 			// t.checkWalletHistory(t.Algo, settingsFileName)
 			t.aggregateAccountProfit()
-			t.LogToFirebase()
+			// t.LogToFirebase()
 			index++
 		case newOrders := <-channels.OrderChan:
 			// Make sure the orders are coming from the exchange in the right order.
