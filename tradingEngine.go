@@ -5,7 +5,9 @@ package yantra
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	firebase "firebase.google.com/go"
+	"github.com/gocarina/gocsv"
 	"github.com/jinzhu/copier"
 	"github.com/tantralabs/logger"
 	te "github.com/tantralabs/theo-engine"
@@ -56,6 +59,10 @@ type TradingEngine struct {
 	lastContractUpdate   int
 	contractUpdatePeriod int
 	BarData              map[string][]*models.Bar
+	preloadBarData       bool
+	csvBarDataFile       string
+	shouldExportResult   bool
+	jsonResultFile       string
 }
 
 // Construct a new trading engine given an algo and other configurations.
@@ -67,7 +74,7 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 		reuseData[0] = false
 	}
 
-	return TradingEngine{
+	t := TradingEngine{
 		Algo:                 algo,
 		firstTrade:           true,
 		firstPositionUpdate:  true,
@@ -80,6 +87,24 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 		lastContractUpdate:   0,
 		contractUpdatePeriod: contractUpdatePeriod,
 	}
+	t.checkForPreload()
+	return t
+}
+
+func (t *TradingEngine) checkForPreload() bool {
+	for _, arg := range os.Args[1:] {
+		if len(arg) > 5 && arg[:5] == "data=" {
+			// os.Args[1] = "data=...."
+			t.preloadBarData = true
+			t.shouldExportResult = true
+			t.csvBarDataFile = arg[5:]
+		} else if len(arg) > 7 && arg[:7] == "export=" {
+			// os.Args[2] = "export=...."
+			t.shouldExportResult = true
+			t.jsonResultFile = arg[7:]
+		}
+	}
+	return t.preloadBarData
 }
 
 // Run a backtest given a start and end time.
@@ -89,6 +114,9 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 func (t *TradingEngine) RunTest(start time.Time, end time.Time, live ...bool) {
 	t.SetupTest(start, end, live...)
 	t.Connect("", false, true)
+	if t.shouldExportResult {
+		t.ExportResult()
+	}
 }
 
 func (t *TradingEngine) SetupTest(start time.Time, end time.Time, live ...bool) {
@@ -108,7 +136,12 @@ func (t *TradingEngine) SetupTest(start time.Time, end time.Time, live ...bool) 
 	mockExchange := tantra.NewTest(exchangeVars, &t.Algo.Account, start, end, t.Algo.DataLength, t.Algo.LogBacktest)
 	// If we are live we already have all the data we need so there is no need to fetch it again
 	if !isLive {
-		t.BarData = t.LoadBarData(t.Algo, start, end)
+		if !t.preloadBarData {
+			t.BarData = t.LoadBarData(t.Algo, start, end)
+		} else {
+			t.BarData, start, end = t.LoadBarDataFromCSV(t.Algo, t.csvBarDataFile)
+			t.ReuseData = true
+		}
 	}
 	for symbol, data := range t.BarData {
 		logger.Infof("Loaded %v instances of bar data for %v with start %v and end %v.\n", len(data), symbol, start, end)
@@ -229,6 +262,40 @@ func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time
 		return t.BarData
 	}
 	return t.BarData
+}
+
+// LoadBarDataFromCSV loads bar data from a csv and stores in t.BarData
+func (t *TradingEngine) LoadBarDataFromCSV(algo *models.Algo, filePath string) (map[string][]*models.Bar, time.Time, time.Time) {
+	if t.BarData == nil || !t.ReuseData {
+		t.BarData = make(map[string][]*models.Bar)
+		dataFile, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, os.ModePerm)
+		if err != nil {
+			log.Fatal("Failed to open file when loading barData from CSV:" + err.Error())
+		}
+		var bars []*models.Bar
+		if err := gocsv.UnmarshalFile(dataFile, &bars); err != nil { // Load bars from file
+			log.Fatal("Failed to unmarshal data when loading barData from CSV:" + err.Error())
+		}
+		if err := dataFile.Close(); err != nil {
+			log.Fatal("Failed to close file when loading barData from CSV:" + err.Error())
+		}
+		if len(bars) < 2 {
+			log.Fatal("Failed to load barData from CSV: len of barData from csv file must be greater than 1 bar")
+		}
+		start := utils.TimestampToTime(int(bars[0].Timestamp))
+		end := utils.TimestampToTime(int(bars[len(bars)-1].Timestamp))
+
+		for symbol, marketState := range algo.Account.MarketStates {
+			logger.Infof("Preloading data for symbol %v from csv file %v\n", symbol, filePath)
+			// TODO handle multiple csv files for diff market states ...
+			t.BarData[symbol] = bars
+			marketState.Bar = *t.BarData[symbol][len(t.BarData[symbol])-1]
+			marketState.LastPrice = marketState.Bar.Close
+			logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
+		}
+		return t.BarData, start, end
+	}
+	return t.BarData, time.Time{}, time.Time{}
 }
 
 // Connect is called to connect to an exchange's WS api and begin trading.
@@ -1409,4 +1476,21 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 		}
 	}
 	logger.Infof("Reached end of connect.\n")
+}
+
+// ExportResult exports t.Algo.Result to a JSON file
+func (t *TradingEngine) ExportResult() {
+	if t.jsonResultFile == "" {
+		t.jsonResultFile = "result.json"
+	}
+
+	jsonData, err := json.MarshalIndent(t.Algo.Result, "", "  ")
+	if err != nil {
+		log.Fatal("Failed to unmarshal result for JSON export:" + err.Error())
+	}
+	// TODO: Fix to make pretty with nested jsonData (i.e. the params)
+
+	if err = ioutil.WriteFile(t.jsonResultFile, jsonData, 0644); err != nil {
+		log.Fatal("Failed to write result for JSON export:" + err.Error())
+	}
 }
