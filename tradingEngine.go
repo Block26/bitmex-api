@@ -456,30 +456,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				channels.PositionChanComplete <- nil
 			}
 		case trades := <-channels.TradeBinChan:
-			// Make sure the trades are coming from the exchange in the right order.
-			// ts, ok := lastTimestamp["trades"]
-			// currentTimestamp := int(trades[0].Timestamp.Unix())
-			// if ok {
-			// 	if ts < currentTimestamp {
-			// 		lastTimestamp["trades"] = currentTimestamp
-			// 	} else {
-			// 		log.Fatalln("ERROR recieved an trade out of order...", ts, currentTimestamp)
-			// 		return
-			// 	}
-			// } else {
-			// 	lastTimestamp["trades"] = currentTimestamp
-			// }
-
-			// startTimestamp := time.Now().Unix()
-			// logger.Debugf("Recieved %v new trade updates: %v\n", len(trades), trades)
-			// Update active contracts if we are trading options
-			// if t.theoEngine != nil {
-			// 	t.UpdateActiveContracts()
-			// 	t.UpdateMidMarketPrices()
-			// 	t.theoEngine.ScanOptions(false, true)
-			// } else {
-			// 	logger.Debugf("Cannot update active contracts, theo engine is nil\n")
-			// }
 			// Update your local bars
 			for _, trade := range trades {
 				t.InsertNewCandle(trade)
@@ -518,15 +494,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				}
 			}
 			t.aggregateAccountProfit()
-			// ttt := time.Now().Unix() - startTimestamp
-			// logger.Debugf("[Trading Engine] trade processing took %v s\n", ttt)
-			// if ttt > 5 {
-			// log.Fatalln("trade processing took more than 5s, restarting")
-			// }
-			// logger.Debug("===========================================")
-			// logger.Debugf("Fetching positions now as a stop gap")
-			// positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-			// t.UpdatePositions(t.Algo, positions)
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			} else {
@@ -729,7 +696,7 @@ func (t *TradingEngine) aggregateAccountProfit() {
 
 // Update all balances contained by the trading engine given a slice of websocket balance updates from the exchange.
 func (t *TradingEngine) UpdateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
-	// fmt.Println("UpdateAlgoBalances")
+	// fmt.Println("UpdateAlgoBalances", algo.Account.BaseAsset.Symbol)
 	for _, updatedBalance := range balances {
 		balance, ok := algo.Account.Balances[updatedBalance.Currency]
 		if ok {
