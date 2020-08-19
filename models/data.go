@@ -164,7 +164,7 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 			}
 		}
 		last := resampledIndex - adjuster
-		if val.Close[last-1] == 0 {
+		if last != 0 && val.Close[last-1] == 0 {
 			last -= 1
 		}
 		// fmt.Println("resampleInterval", resampleInterval, "d.data[resampleInterval].Close[last]", val.Close[last-1], last, len(val.Timestamp) == last+1)
