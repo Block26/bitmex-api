@@ -79,6 +79,7 @@ type MarketInfo struct {
 	PricePrecision          float64    // minimum granularity of order price
 	QuantityPrecision       float64    // minimum granularity of order amount
 	MinimumOrderSize        float64    // absolute minimum size of order
+	MaximumOrderSize        float64    // absolute maximum size of order
 	MaxLeverage             float64    // max leverage as ratio (i.e. 100x = 100.)
 	BulkCancelSupported     bool       // can we cancel multiple orders in one REST API call?
 	DenominatedInUnderlying bool       // is this market amount quoted in terms of base asset?
@@ -126,6 +127,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    1,
+				MaximumOrderSize:    500000,
 				QuantityPrecision:   1.,
 				PricePrecision:      .5,
 				MaxOrders:           20,
@@ -145,6 +147,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
+				MaximumOrderSize:    500000,
 				QuantityPrecision:   1.,
 				PricePrecision:      2,
 				MaxOrders:           20,
@@ -168,6 +171,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
+				MaximumOrderSize:    500000,
 				QuantityPrecision:   1.,
 				PricePrecision:      .5,
 				MaxOrders:           20,
@@ -186,6 +190,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    25,
+				MaximumOrderSize:    500000,
 				QuantityPrecision:   0.,
 				PricePrecision:      2,
 				MaxOrders:           20,
@@ -211,6 +216,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    0.002,
+				MaximumOrderSize:    50,
 				QuantityPrecision:   0.0000001,
 				PricePrecision:      0.00000100,
 				MaxOrders:           20,
@@ -231,6 +237,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    0.002,
+				MaximumOrderSize:    50,
 				QuantityPrecision:   1,
 				PricePrecision:      0.00000100,
 				MaxOrders:           20,
@@ -251,6 +258,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    0.002,
+				MaximumOrderSize:    50,
 				QuantityPrecision:   1,
 				PricePrecision:      0.00000100,
 				MaxOrders:           20,
@@ -271,6 +279,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				FillType:            Close,
 				MaxLeverage:         1,
 				MinimumOrderSize:    0.002,
+				MaximumOrderSize:    50,
 				QuantityPrecision:   1,
 				PricePrecision:      0.00000100,
 				MaxOrders:           20,
@@ -292,6 +301,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				MarketType:              Future,
 				FillType:                Close,
 				MinimumOrderSize:        10,
+				MaximumOrderSize:        500000,
 				QuantityPrecision:       10,
 				PricePrecision:          .5,
 				MaxOrders:               20,
@@ -310,6 +320,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				MarketType:              Future,
 				FillType:                Close,
 				MinimumOrderSize:        10,
+				MaximumOrderSize:        500000,
 				QuantityPrecision:       10,
 				PricePrecision:          .5,
 				MaxOrders:               20,
@@ -334,6 +345,7 @@ func LoadMarketInfo(exchange string, market string) (newMarket MarketInfo, err e
 				MarketType:          Future,
 				FillType:            Close,
 				MinimumOrderSize:    10,
+				MaximumOrderSize:    500000,
 				QuantityPrecision:   10,
 				PricePrecision:      .5,
 				MaxOrders:           20,
