@@ -403,6 +403,26 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		if err != nil {
 			panic(err)
 		}
+		// Log TrimmedHistory
+		tHistory := make([]models.TrimmedHistory, len(history))
+		for i := range history {
+			weight := math.Copysign(1, history[i].Quantity)
+			tHistory[i] = models.TrimmedHistory{
+				Timestamp: history[i].Timestamp,
+				Leverage:  history[i].Leverage * weight,
+			}
+		}
+		os.Remove("trimmed_balance.csv")
+		tHistoryFile, err := os.OpenFile("trimmed_balance.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
+		if err != nil {
+			panic(err)
+		}
+		defer tHistoryFile.Close()
+
+		err = gocsv.MarshalFile(&tHistory, tHistoryFile) // Use this to save the CSV back to the file
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	if algo.LogStateHistory {

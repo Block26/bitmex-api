@@ -19,6 +19,11 @@ type History struct {
 	Price        float64
 }
 
+type TrimmedHistory struct {
+	Timestamp time.Time
+	Leverage  float64
+}
+
 // Represents the state of account balances at a given point in time.
 type BalanceHistory struct {
 	Timestamp string  `csv:"timestamp"`
