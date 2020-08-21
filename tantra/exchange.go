@@ -64,6 +64,7 @@ type PreviousMarketState struct {
 type Tantra struct {
 	client *clients.Client // an endpoint to hit for raw API calls (should only be used in edge cases)
 	iex.IExchange
+	PaperTrade            bool                              // if true then at the end of the test the websocket will connect to an exchange and start live trading
 	channels              *iex.WSChannels                   // series of go channels used to implement mock exchange websockets
 	SimulatedExchangeName string                            // name of the exchange to be simulated, i.e. "bitmex"
 	MarketInfos           map[string]models.MarketInfo      // map of symbol to market information
@@ -132,9 +133,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 		break
 	}
 	logger.Infof("Number of indexes found: %v (LogBacktest=%v)\n", numIndexes, t.LogBacktest)
-	if t.LogBacktest {
-		t.insertHistoryToDB(false)
-	}
+	// if t.LogBacktest {
+	// 	t.insertHistoryToDB(false)
+	// }
 	go func() {
 		for index := t.index; index < numIndexes; index++ {
 			// startTime := time.Now().UnixNano()
@@ -224,14 +225,17 @@ func (t *Tantra) StartWS(config interface{}) error {
 			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
 			t.channels.TradeBinChan <- tradeUpdates
 			<-t.channels.TradeBinChanComplete
-			if t.LogBacktest {
-				t.insertHistoryToDB(false)
-			}
+			// if t.LogBacktest {
+			// 	t.insertHistoryToDB(false)
+			// }
 		}
 		// logger.Infof("Fill time: %v ns", fillTime)
 		// logger.Infof("Insert time: %v ns", insertTime)
-		if t.LogBacktest {
-			t.insertHistoryToDB(true)
+		// if t.LogBacktest {
+		// 	t.insertHistoryToDB(true)
+		// }
+		if t.PaperTrade {
+
 		}
 		logger.Infof("Exiting.\n")
 		log.Println("Done with test.")
