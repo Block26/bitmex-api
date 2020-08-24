@@ -322,6 +322,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	} else if algo.RebalanceInterval == exchanges.RebalanceInterval().Hour {
 		window = algo.SharpeCalculationInterval * 24
 	}
+
 	var windowSharpes []float64
 	for i := 0; i < len(percentReturn); i += window {
 		windowReturns := make([]float64, 0)
@@ -410,6 +411,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 			tHistory[i] = models.TrimmedHistory{
 				Timestamp: history[i].Timestamp,
 				Leverage:  history[i].Leverage * weight,
+				Score:     windowSharpes[int(i/window)],
 			}
 		}
 		os.Remove("trimmed_balance.csv")
