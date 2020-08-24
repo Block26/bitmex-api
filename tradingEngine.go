@@ -505,7 +505,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			} else {
 				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
 				t.UpdatePositions(t.Algo, positions)
-				// TODO RM: t.LogToFirebase()
+				t.LogToFirebase()
 				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
