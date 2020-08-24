@@ -25,6 +25,7 @@ type Algo struct {
 	LogStats                  bool                   // Turn logs on or off for stats of your backtest, and exports them to a stats.csv in your local directory
 	LogBacktest               bool                   // Exports the backtest history to a balance.csv in your local directory
 	LogCloudBacktest          bool                   // Exports upsampled backtest history to cloud db
+	LogCSVBacktest            bool                   // Exports the backtest history to local csv files
 	LogStateHistory           bool                   // Exports state history to local csv
 	Signals                   map[string][]float64   // Log the signals of your test
 	State                     map[string]interface{} // State of the algo, useful for logging live ta indicators.

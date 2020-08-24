@@ -93,15 +93,21 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 
 func (t *TradingEngine) checkForPreload() bool {
 	for _, arg := range os.Args[1:] {
-		if len(arg) > 5 && arg[:5] == "data=" {
+		if strings.Contains(arg, "data=") {
 			// os.Args[1] = "data=...."
 			t.preloadBarData = true
 			t.shouldExportResult = true
 			t.csvBarDataFile = arg[5:]
-		} else if len(arg) > 7 && arg[:7] == "export=" {
+		} else if strings.Contains(arg, "export=") {
 			// os.Args[2] = "export=...."
 			t.shouldExportResult = true
 			t.jsonResultFile = arg[7:]
+		} else if strings.Contains(arg, "log-backtest") {
+			t.Algo.LogBacktest = true
+		} else if strings.Contains(arg, "log-cloud-backtest") {
+			t.Algo.LogCloudBacktest = true
+		} else if strings.Contains(arg, "log-csv-backtest") {
+			t.Algo.LogCSVBacktest = true
 		}
 	}
 	return t.preloadBarData
@@ -499,7 +505,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			} else {
 				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
 				t.UpdatePositions(t.Algo, positions)
-				t.LogToFirebase()
+				// TODO RM: t.LogToFirebase()
 				index++
 			}
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
