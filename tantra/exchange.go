@@ -15,6 +15,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/tantralabs/logger"
 	te "github.com/tantralabs/theo-engine"
+	"github.com/tantralabs/tradeapi"
 	"github.com/tantralabs/tradeapi/global/clients"
 	"github.com/tantralabs/tradeapi/iex"
 	"github.com/tantralabs/yantra/database"
@@ -114,6 +115,75 @@ func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
 	logger.Debugf("Set candle data for %v symbols.\n", len(t.candleData))
 }
 
+func (t *Tantra) Process(tradeUpdates []iex.TradeBin) {
+	// Fill all orders with the newest candles
+	// fillStart := time.Now().UnixNano()
+	filledSymbols := t.processFills()
+	logger.Debugf("Got filled symbols: %v\n", filledSymbols)
+	// fillTime += int(time.Now().UnixNano() - fillStart)
+
+	// Send position and balance updates if we have any fills
+	// TODO should we send balance updates if no fills?
+	var lastBalance, lastPosition, lastAverageCost float64
+	var currentMarketState *models.MarketState
+	var lastMarketState PreviousMarketState
+	var currentOk, lastOk bool
+	for symbol := range filledSymbols {
+		currentMarketState, currentOk = t.Account.MarketStates[symbol]
+		lastMarketState, lastOk = t.PreviousMarketStates[symbol]
+		if !currentOk || !lastOk {
+			logger.Debugf("Error loading market states for %v\n", symbol)
+			lastBalance = 0
+			lastPosition = 0
+			lastAverageCost = 0
+		} else {
+			lastBalance = lastMarketState.Balance
+			lastPosition = lastMarketState.Position
+			lastAverageCost = lastMarketState.AverageCost
+		}
+		// Has the balance changed? Send a balance update. No? Do Nothing
+		// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
+		// balanceStart := time.Now().UnixNano()
+		if lastBalance != currentMarketState.Balance {
+			wallet := []iex.Balance{
+				{
+					Currency: currentMarketState.Info.BaseSymbol,
+					Balance:  currentMarketState.Balance,
+				},
+			}
+			t.channels.WalletChan <- wallet
+			<-t.channels.WalletChanComplete
+		}
+		// balanceTime += int(time.Now().UnixNano() - balanceStart)
+		// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
+		// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
+		// positionStart := time.Now().UnixNano()
+		if lastAverageCost != currentMarketState.AverageCost || lastPosition != currentMarketState.Position {
+			logger.Debugf("Building position update [last=%v, current=%v]\n", lastPosition, currentMarketState.Position)
+			pos := []iex.WsPosition{
+				iex.WsPosition{
+					Symbol:       symbol,
+					CurrentQty:   currentMarketState.Position,
+					AvgCostPrice: currentMarketState.AverageCost,
+				},
+			}
+			t.channels.PositionChan <- pos
+			<-t.channels.PositionChanComplete
+		}
+		// positionTime += int(time.Now().UnixNano() - positionStart)
+	}
+	// extraStart = time.Now().UnixNano()
+	t.appendToHistory()
+	// extraTime += int(time.Now().UnixNano() - extraStart)
+	// Publish trade updates
+	// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
+	t.channels.TradeBinChan <- tradeUpdates
+	<-t.channels.TradeBinChanComplete
+	// if t.LogBacktest {
+	// 	t.insertHistoryToDB(false)
+	// }
+}
+
 // Given a websocket configuration, start the exchange websockets by feeding pre-loaded candle data into channels, one at a time.
 // This is the entry point for a backtest.
 func (t *Tantra) StartWS(config interface{}) error {
@@ -124,15 +194,15 @@ func (t *Tantra) StartWS(config interface{}) error {
 	}
 
 	t.channels = conf.Channels
-	logger.Infof("Started exchange order update channel: %v\n", t.channels.OrderChan)
-	logger.Infof("Started exchange trade update channel: %v\n", t.channels.TradeBinChan)
+	// logger.Infof("Started exchange order update channel: %v\n", t.channels.OrderChan)
+	// logger.Infof("Started exchange trade update channel: %v\n", t.channels.TradeBinChan)
 
 	var numIndexes int
 	for _, candleData := range t.candleData {
 		numIndexes = len(candleData)
 		break
 	}
-	logger.Infof("Number of indexes found: %v (LogBacktest=%v)\n", numIndexes, t.LogBacktest)
+	// logger.Infof("Number of indexes found: %v (LogBacktest=%v)\n", numIndexes, t.LogBacktest)
 	// if t.LogBacktest {
 	// 	t.insertHistoryToDB(false)
 	// }
@@ -147,7 +217,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 
 			// Iterate through all symbols for the respective account
 			// TODO should this all happen synchronously, or in parallel?
-			logger.Debugf("New index: %v\n", index)
+			// logger.Debugf("New index: %v\n", index)
 			var tradeUpdates []iex.TradeBin
 			// extraTime += int(time.Now().UnixNano() - extraStart)
 			for symbol, marketState := range t.Account.MarketStates {
@@ -161,87 +231,66 @@ func (t *Tantra) StartWS(config interface{}) error {
 				}
 				// tradeTime += int(time.Now().UnixNano() - tradeStart)
 			}
-
-			// Fill all orders with the newest candles
-			// fillStart := time.Now().UnixNano()
-			filledSymbols := t.processFills()
-			logger.Debugf("Got filled symbols: %v\n", filledSymbols)
-			// fillTime += int(time.Now().UnixNano() - fillStart)
-
-			// Send position and balance updates if we have any fills
-			// TODO should we send balance updates if no fills?
-			var lastBalance, lastPosition, lastAverageCost float64
-			var currentMarketState *models.MarketState
-			var lastMarketState PreviousMarketState
-			var currentOk, lastOk bool
-			for symbol := range filledSymbols {
-				currentMarketState, currentOk = t.Account.MarketStates[symbol]
-				lastMarketState, lastOk = t.PreviousMarketStates[symbol]
-				if !currentOk || !lastOk {
-					logger.Debugf("Error loading market states for %v\n", symbol)
-					lastBalance = 0
-					lastPosition = 0
-					lastAverageCost = 0
-				} else {
-					lastBalance = lastMarketState.Balance
-					lastPosition = lastMarketState.Position
-					lastAverageCost = lastMarketState.AverageCost
-				}
-				// Has the balance changed? Send a balance update. No? Do Nothing
-				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
-				// balanceStart := time.Now().UnixNano()
-				if lastBalance != currentMarketState.Balance {
-					wallet := []iex.Balance{
-						{
-							Currency: currentMarketState.Info.BaseSymbol,
-							Balance:  currentMarketState.Balance,
-						},
-					}
-					t.channels.WalletChan <- wallet
-					<-t.channels.WalletChanComplete
-				}
-				// balanceTime += int(time.Now().UnixNano() - balanceStart)
-				// Has the average price or position changed? Yes? Send a Position update. No? Do Nothing
-				// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, lastMarketState.Position, market.Position)
-				// positionStart := time.Now().UnixNano()
-				if lastAverageCost != currentMarketState.AverageCost || lastPosition != currentMarketState.Position {
-					logger.Debugf("Building position update [last=%v, current=%v]\n", lastPosition, currentMarketState.Position)
-					pos := []iex.WsPosition{
-						iex.WsPosition{
-							Symbol:       symbol,
-							CurrentQty:   currentMarketState.Position,
-							AvgCostPrice: currentMarketState.AverageCost,
-						},
-					}
-					t.channels.PositionChan <- pos
-					<-t.channels.PositionChanComplete
-				}
-				// positionTime += int(time.Now().UnixNano() - positionStart)
-			}
-			// extraStart = time.Now().UnixNano()
-			t.appendToHistory()
-			// extraTime += int(time.Now().UnixNano() - extraStart)
-			// Publish trade updates
-			// logger.Infof("Pushing %v candle updates: %v\n", len(tradeUpdates), tradeUpdates)
-			t.channels.TradeBinChan <- tradeUpdates
-			<-t.channels.TradeBinChanComplete
-			// if t.LogBacktest {
-			// 	t.insertHistoryToDB(false)
-			// }
+			t.Process(tradeUpdates)
 		}
 		// logger.Infof("Fill time: %v ns", fillTime)
 		// logger.Infof("Insert time: %v ns", insertTime)
 		// if t.LogBacktest {
 		// 	t.insertHistoryToDB(true)
 		// }
-		if t.PaperTrade {
 
-		}
 		logger.Infof("Exiting.\n")
 		log.Println("Done with test.")
 		return
 	}()
 	logger.Infof("Done with time series iteration.\n")
+
+	if t.PaperTrade {
+		go func() {
+			logger.Info("Backtest complete running live paper trade")
+			var subscribeInfos []iex.WSSubscribeInfo
+			for symbol, marketState := range t.Account.MarketStates {
+				if marketState.Info.MarketType == models.Future || marketState.Info.MarketType == models.Spot {
+					subscribeInfos = append(subscribeInfos, iex.WSSubscribeInfo{Name: iex.WS_TRADE_BIN_1_MIN, Symbol: symbol, Market: iex.WSMarketType{Contract: iex.WS_SWAP}})
+				}
+			}
+
+			// Channels for recieving websocket response.
+			channels := &iex.WSChannels{
+				TradeBinChan: make(chan []iex.TradeBin, 1),
+			}
+
+			// Start the websocket.
+			ex := iex.ExchangeConf{
+				Exchange:       t.Account.ExchangeInfo.Exchange,
+				ServerUrl:      t.Account.ExchangeInfo.ExchangeURL,
+				AccountID:      "test",
+				OutputResponse: false,
+			}
+			client, err := tradeapi.New(ex)
+
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			err = client.StartWS(&iex.WsConfig{
+				Host:     t.Account.ExchangeInfo.WSStream,
+				Streams:  subscribeInfos,
+				Channels: channels,
+				Ctx:      conf.Ctx,
+				Wg:       conf.Wg,
+			})
+
+			for {
+				select {
+				case trades := <-channels.TradeBinChan:
+					t.Process(trades)
+				}
+			}
+		}()
+	}
+
+	log.Println("uh this shouldnt print")
 	return nil
 }
 

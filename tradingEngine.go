@@ -50,6 +50,7 @@ type TradingEngine struct {
 	firstTrade           bool
 	firstPositionUpdate  bool
 	isTest               bool
+	PaperTrade           bool
 	commitHash           string
 	lastTest             int64
 	lastWalletSync       int64
@@ -93,15 +94,19 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 
 func (t *TradingEngine) checkForPreload() bool {
 	for _, arg := range os.Args[1:] {
-		if len(arg) > 5 && arg[:5] == "data=" {
-			// os.Args[1] = "data=...."
+		if strings.Contains(arg, "data=") {
 			t.preloadBarData = true
 			t.shouldExportResult = true
 			t.csvBarDataFile = arg[5:]
-		} else if len(arg) > 7 && arg[:7] == "export=" {
-			// os.Args[2] = "export=...."
+		} else if strings.Contains(arg, "export=") {
 			t.shouldExportResult = true
 			t.jsonResultFile = arg[7:]
+		} else if strings.Contains(arg, "log-backtest") {
+			t.Algo.LogBacktest = true
+		} else if strings.Contains(arg, "log-backtest-cloud") {
+			t.Algo.LogCloudBacktest = true
+		} else if strings.Contains(arg, "log-backtest-csv") {
+			t.Algo.LogCSVBacktest = true
 		}
 	}
 	return t.preloadBarData
@@ -188,17 +193,19 @@ func (t *TradingEngine) LogToFirebase() {
 	path := "live/" + algoRepoName + "-" + t.Algo.Config.Branch
 	ref := client.NewRef(path)
 
-	ms := t.Algo.Account.MarketStates[t.Algo.Config.Symbol]
-	leverage := ms.Leverage
-	side := math.Copysign(1, ms.Position)
-	leverage = leverage * side
+	// TODO this will overwrite and only put 1 state
+	for _, ms := range t.Algo.Account.MarketStates {
+		leverage := ms.Leverage
+		side := math.Copysign(1, ms.Position)
+		leverage = leverage * side
 
-	status := models.AlgoStatus{
-		Leverage:           leverage,
-		ShouldHaveLeverage: ms.ShouldHaveLeverage,
+		status := models.AlgoStatus{
+			Leverage:           leverage,
+			ShouldHaveLeverage: ms.ShouldHaveLeverage,
+		}
+
+		err = ref.Set(ctx, status)
 	}
-
-	err = ref.Set(ctx, status)
 
 	if err != nil {
 		fmt.Println("Error setting value:", err)
@@ -304,6 +311,9 @@ func (t *TradingEngine) LoadBarDataFromCSV(algo *models.Algo, filePath string) (
 func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bool) {
 	startTime := time.Now()
 	utils.LoadENV(secret)
+	if t.PaperTrade && !secret {
+		utils.LoadENV(true)
+	}
 	if test != nil {
 		t.isTest = test[0]
 		database.Setup()
@@ -414,6 +424,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		}
 	}
 
+	t.Algo.Client.(*tantra.Tantra).PaperTrade = t.PaperTrade
 	logger.Infof("Subscribed to %v channels.\n", len(subscribeInfos))
 
 	// Channels for recieving websocket response.
@@ -452,10 +463,15 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		select {
 		case positions := <-channels.PositionChan:
 			t.UpdatePositions(t.Algo, positions)
-			if t.isTest {
+			if t.isTest || t.PaperTrade {
 				channels.PositionChanComplete <- nil
 			}
 		case trades := <-channels.TradeBinChan:
+			if t.PaperTrade && trades[0].Timestamp.After(startTime.Add(-1*time.Minute)) {
+				log.Println("Paper trade: new bar")
+				logger.SetLogLevel(logger.LogLevel().Debug)
+				t.isTest = false
+			}
 			// Update your local bars
 			for _, trade := range trades {
 				t.InsertNewCandle(trade)
@@ -501,26 +517,31 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				t.UpdatePositions(t.Algo, positions)
 				t.LogToFirebase()
 				index++
+				if t.PaperTrade {
+					channels.TradeBinChanComplete <- nil
+				}
 			}
+
 			// log.Println("t.isTest", t.isTest, "t.endTime", t.endTime, "t.Algo.Timestamp", t.Algo.Timestamp, !t.Algo.Timestamp.Before(t.endTime))
-			if !t.Algo.Timestamp.Before(t.endTime.Add(-1*time.Second)) && t.isTest {
+			if !t.PaperTrade && !t.Algo.Timestamp.Before(t.endTime.Add(-1*time.Second)) && t.isTest {
 				logger.Infof("Algo timestamp %v past end time %v, killing trading engine.\n", t.Algo.Timestamp, t.endTime)
 				logStats(t.Algo, marketStatehistory, startTime)
 				logStateHistory(t.Algo, signalStateHistory)
 				logBacktest(t.Algo)
 				return
 			}
+
 		case newOrders := <-channels.OrderChan:
 			// TODO look at the response for a market order, does it send 2 orders filled and placed or just filled
 			t.UpdateOrders(t.Algo, newOrders, true)
 			// TODO callback to order function
 			// logger.Infof("Order processing took %v ns\n", time.Now().UnixNano()-startTimestamp)
-			if t.isTest {
+			if t.isTest || t.PaperTrade {
 				channels.OrderChanComplete <- nil
 			}
 		case update := <-channels.WalletChan:
 			t.UpdateAlgoBalances(t.Algo, update)
-			if t.isTest {
+			if t.isTest || t.PaperTrade {
 				channels.WalletChanComplete <- nil
 			}
 		}
