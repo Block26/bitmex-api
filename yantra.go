@@ -152,6 +152,31 @@ func GetAllDeployedAlgoConfigs() map[string]models.Config {
 	return cfgs
 }
 
+func GetSelectDeployedAlgoConfigs(algoNames []string) map[string]models.Config {
+	cfgs := make(map[string]models.Config)
+	influx := GetInfluxClient()
+	q := client.NewQuery("SELECT last(*) FROM deployments GROUP BY algo_name", "deployments", "")
+	response, err := influx.Query(q)
+	if err == nil && response.Error() == nil {
+		for i := range response.Results {
+			for j := range response.Results[i].Series {
+				cfg := seriesToConfig(response.Results[i].Series[j])
+				if cfg.Status == 1 {
+					for _, selectedAlgo := range algoNames {
+						if cfg.Name == selectedAlgo {
+							fmt.Println("deployment :", cfg.Name, "status", cfg.Status)
+							cfgs[cfg.Name] = cfg
+						}
+					}
+				}
+			}
+		}
+	} else {
+		log.Fatalln("Failed to load deployed algo configs (err, responseError):", err, response.Error())
+	}
+	return cfgs
+}
+
 func seriesToConfig(series influxModels.Row) models.Config {
 	m := make(map[string]interface{})
 	for k := range series.Columns {
