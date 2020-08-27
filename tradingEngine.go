@@ -105,9 +105,9 @@ func (t *TradingEngine) checkForPreload() bool {
 			t.Algo.LogBacktest = true
 		} else if strings.Contains(arg, "log-backtest-cloud") {
 			t.Algo.LogCloudBacktest = true
-		} else if strings.Contains(arg, "log-backtest-csv") {
-			t.Algo.LogCSVBacktest = true
-		}
+		} //else if strings.Contains(arg, "log-backtest-csv") {
+		// t.Algo.LogCSVBacktest = true
+		// }
 	}
 	return t.preloadBarData
 }

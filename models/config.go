@@ -16,6 +16,7 @@ type Config struct {
 	Commit        string `json:"commit"`
 	ClusterName   string `json:"cluster_name"`
 	SecurityGroup string `json:"security_group"`
+	PaperTrade    bool   `json:"paper_trade"`
 	Subnet        string `json:"subnet"`
 	RegionName    string `json:"region_name"`
 	YantraVersion string `json:"yantra_version"`
