@@ -1,5 +1,10 @@
 package models
 
+import (
+	"encoding/json"
+	"io/ioutil"
+)
+
 // The Result struct contains information about a backtest result.
 type Result struct {
 	Balance           float64 // Ending balance for the backtest
@@ -12,4 +17,10 @@ type Result struct {
 	AverageScore      float64 // Rolling Sharpe ratio of backtest, determined by algo.RollingInterval
 	Sortino           float64 // Sortino ratio of the entire backtest
 	Params            string  // Algo params for this backtest
+}
+
+func LoadResult(fileName string) (result Result) {
+	file, _ := ioutil.ReadFile(fileName)
+	_ = json.Unmarshal([]byte(file), &result)
+	return
 }

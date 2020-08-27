@@ -22,6 +22,7 @@ type History struct {
 type TrimmedHistory struct {
 	Timestamp time.Time
 	Leverage  float64
+	Score     float64
 }
 
 // Represents the state of account balances at a given point in time.

@@ -95,19 +95,21 @@ func NewTradingEngine(algo *models.Algo, contractUpdatePeriod int, reuseData ...
 func (t *TradingEngine) checkForPreload() bool {
 	for _, arg := range os.Args[1:] {
 		if strings.Contains(arg, "data=") {
+			// os.Args[1] = "data=...."
 			t.preloadBarData = true
 			t.shouldExportResult = true
 			t.csvBarDataFile = arg[5:]
 		} else if strings.Contains(arg, "export=") {
+			// os.Args[2] = "export=...."
 			t.shouldExportResult = true
 			t.jsonResultFile = arg[7:]
 		} else if strings.Contains(arg, "log-backtest") {
 			t.Algo.LogBacktest = true
-		} else if strings.Contains(arg, "log-backtest-cloud") {
+		} else if strings.Contains(arg, "log-cloud-backtest") {
 			t.Algo.LogCloudBacktest = true
-		} //else if strings.Contains(arg, "log-backtest-csv") {
-		// t.Algo.LogCSVBacktest = true
-		// }
+		} else if strings.Contains(arg, "log-csv-backtest") {
+			t.Algo.LogCSVBacktest = true
+		}
 	}
 	return t.preloadBarData
 }
