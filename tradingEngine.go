@@ -1183,17 +1183,18 @@ func getMaxPositionAbsProfit(algo *models.Algo, marketState *models.MarketState)
 // Log the state of the Algo and update variables like leverage.
 func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...time.Time) (state models.History) {
 	state = models.History{
-		Timestamp:   algo.Timestamp,
-		Symbol:      marketState.Symbol,
-		Balance:     marketState.Balance,
-		Quantity:    marketState.Position,
-		AverageCost: marketState.AverageCost,
-		Leverage:    marketState.Leverage,
-		Profit:      marketState.Profit,
-		Weight:      int(marketState.Weight),
-		MaxLoss:     getMaxPositionAbsLoss(algo, marketState),
-		MaxProfit:   getMaxPositionAbsProfit(algo, marketState),
-		Price:       marketState.Bar.Close,
+		Timestamp:          algo.Timestamp,
+		Symbol:             marketState.Symbol,
+		Balance:            marketState.Balance,
+		Quantity:           marketState.Position,
+		AverageCost:        marketState.AverageCost,
+		Leverage:           marketState.Leverage,
+		ShouldHaveLeverage: marketState.ShouldHaveLeverage,
+		Profit:             marketState.Profit,
+		Weight:             int(marketState.Weight),
+		MaxLoss:            getMaxPositionAbsLoss(algo, marketState),
+		MaxProfit:          getMaxPositionAbsProfit(algo, marketState),
+		Price:              marketState.Bar.Close,
 	}
 
 	if marketState.Info.MarketType == models.Future {
