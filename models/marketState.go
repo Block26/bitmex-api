@@ -33,6 +33,7 @@ type MarketState struct {
 	Leverage         float64
 	Weight           int                  // sign of desired position (SHOULD BE MOVED)
 	Balance          float64              // balance assigned to the given market (total account balance if using cross margin)
+	UBalance         float64              // unrealized balance assigned to the given market (total account balance if using cross margin)
 	Orders           map[string]iex.Order // [orderId]Order
 	LastPrice        float64              // the last trade price observed in the given market
 	MidMarketPrice   float64              // average of bid and ask (not yet tracked)

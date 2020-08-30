@@ -148,7 +148,7 @@ func (t *Tantra) Process(tradeUpdates []iex.TradeBin) {
 			wallet := []iex.Balance{
 				{
 					Currency: currentMarketState.Info.BaseSymbol,
-					Balance:  currentMarketState.Balance,
+					Balance:  currentMarketState.UBalance,
 				},
 			}
 			t.channels.WalletChan <- wallet
@@ -442,6 +442,9 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 			// log.Println("Deleted order with key:", key)
 		}
 		filledSymbols[order.Symbol] = true
+	}
+	for _, ms := range t.Account.MarketStates {
+		ms.UBalance = ms.Balance + ms.UnrealizedProfit
 	}
 	if len(t.ordersToPublish) > 0 {
 		t.publishOrderUpdates()
