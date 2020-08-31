@@ -109,6 +109,9 @@ func (t *TradingEngine) checkForPreload() bool {
 			t.Algo.LogCloudBacktest = true
 		} else if strings.Contains(arg, "log-csv-backtest") {
 			t.Algo.LogCSVBacktest = true
+		} else if strings.Contains(arg, "paper") {
+			t.PaperTrade = true
+
 		}
 	}
 	return t.preloadBarData
@@ -131,6 +134,11 @@ func (t *TradingEngine) SetupTest(start time.Time, end time.Time, live ...bool) 
 	isLive := false
 	if live != nil {
 		isLive = true
+	}
+
+	if t.PaperTrade {
+		start = time.Now().Add(-time.Minute * 60 * 34 * 60)
+		end = time.Now()
 	}
 
 	logger.SetLogLevel(t.Algo.BacktestLogLevel)
@@ -330,6 +338,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 
 	var err error
 	var config models.Secret
+	var lastBar *models.Bar
 	marketStatehistory := make([]models.History, 0)
 	signalStateHistory := make([]map[string]interface{}, 0)
 	// lastTimestamp := make(map[string]int, 0)
@@ -354,6 +363,10 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		t.SetAlgoCandleData(t.BarData)
 		if err != nil {
 			logger.Error(err)
+		}
+	} else if t.PaperTrade {
+		for symbol := range t.Algo.Account.MarketStates {
+			lastBar = t.BarData[symbol][len(t.BarData[symbol])-1]
 		}
 	}
 
@@ -469,10 +482,14 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				channels.PositionChanComplete <- nil
 			}
 		case trades := <-channels.TradeBinChan:
-			if t.PaperTrade && trades[0].Timestamp.After(startTime.Add(-1*time.Minute)) {
-				log.Println("Paper trade: new bar")
+			// fmt.Println("trades[0].Timestamp.Unix() >= lastBar.Timestamp", trades[0].Timestamp.Unix() >= lastBar.Timestamp, trades[0].Timestamp.Unix(), lastBar.Timestamp)
+			if t.PaperTrade && t.isTest && trades[0].Timestamp.Unix() >= lastBar.Timestamp/1000 {
+				log.Println("Paper trade: last bar", trades[0].Timestamp)
 				logger.SetLogLevel(logger.LogLevel().Debug)
 				t.isTest = false
+				for symbol := range t.Algo.Account.MarketStates {
+					t.Algo.Account.MarketStates[symbol].OHLCV.SetIsTest(false)
+				}
 			}
 			// Update your local bars
 			for _, trade := range trades {

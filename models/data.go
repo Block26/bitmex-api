@@ -49,6 +49,10 @@ func SetupDataModel(minuteBars []*Bar, initialIndex int, isTest bool) Data {
 	}
 }
 
+func (d *Data) SetIsTest(enable bool) {
+	d.isTest = enable
+}
+
 // Return minute bar data as a slice of Bar structs.
 func (d *Data) GetBarData() []*Bar {
 	return d.minuteBars
@@ -165,7 +169,7 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 		}
 		last := resampledIndex - adjuster
 		if last != 0 && val.Close[last-1] == 0 {
-			last -= 1
+			last--
 		}
 		// fmt.Println("resampleInterval", resampleInterval, "d.data[resampleInterval].Close[last]", val.Close[last-1], last, len(val.Timestamp) == last+1)
 		if len(val.Timestamp) == last {

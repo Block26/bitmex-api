@@ -45,10 +45,10 @@ func New(vars iex.ExchangeConf, account *models.Account, log bool) *Tantra {
 		ordersToPublish:       make(map[string]iex.Order),
 	}
 
-	if log {
-		t.db = database.NewDB()
-		t.LogBacktest = true
-	}
+	// if log {
+	// 	t.db = database.NewDB()
+	// 	t.LogBacktest = true
+	// }
 
 	return t
 }
@@ -290,7 +290,6 @@ func (t *Tantra) StartWS(config interface{}) error {
 		}()
 	}
 
-	log.Println("uh this shouldnt print")
 	return nil
 }
 
@@ -432,9 +431,9 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 		logger.Debugf("Filled: %v\n", isFilled)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
-			if t.LogBacktest {
-				t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
-			}
+			// if t.LogBacktest {
+			// 	t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
+			// }
 			logger.Debug("Balance after fill", marketState.Balance, "Previous Position", marketState.Position, "AC", marketState.AverageCost, "fillPrice", fillPrice, "amount", fillAmount)
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
@@ -904,7 +903,7 @@ func (t *Tantra) prepareOrderUpdate(order iex.Order, status string) {
 // If the order is valid, we add it to memory and return the generated order id.
 func (t *Tantra) PlaceOrder(newOrder iex.Order) (uuid string, err error) {
 	if newOrder.Amount <= 0 || newOrder.Rate < 0 {
-		logger.Errorf("Invalid order: %v\n", newOrder)
+		logger.Error("Invalid order", newOrder.Symbol, newOrder.Amount, newOrder.Rate)
 		return
 	}
 	order := newOrder //TODO is copy necessary here?
