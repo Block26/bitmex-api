@@ -370,6 +370,10 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		}
 	}
 
+	if t.PaperTrade {
+		t.Algo.Client.(*tantra.Tantra).PaperTrade = t.PaperTrade
+	}
+
 	//TODO do we need this order status?
 	// t.orderStatus = algo.Client.GetPotentialOrderStatus()
 	if t.Algo.Account.ExchangeInfo.Options {
@@ -439,7 +443,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		}
 	}
 
-	t.Algo.Client.(*tantra.Tantra).PaperTrade = t.PaperTrade
 	logger.Infof("Subscribed to %v channels.\n", len(subscribeInfos))
 
 	// Channels for recieving websocket response.
