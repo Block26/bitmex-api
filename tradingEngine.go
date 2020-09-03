@@ -267,19 +267,23 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 // Given an algo and a start and end time, load relevant candle data from the database.
 // The data is returned as a map of symbol to pointers of Bar structs.
 func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {
-	if barData == nil || !t.ReuseData {
-		t.BarData = make(map[string][]*models.Bar)
+	if len(barData) == 0 || !t.ReuseData {
+		barData = make(map[string][]*models.Bar)
 		for symbol, marketState := range algo.Account.MarketStates {
 			logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
 			// TODO handle extra bars to account for dataLength here
 			// t.BarData[symbol] = database.GetData(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, algo.DataLength+100)
-			t.BarData[symbol] = database.GetCandlesByTimeWithBuffer(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
-			marketState.Bar = *t.BarData[symbol][len(t.BarData[symbol])-1]
+			barData[symbol] = database.GetCandlesByTimeWithBuffer(symbol, algo.Account.ExchangeInfo.Exchange, algo.RebalanceInterval, start, end, algo.DataLength)
+			marketState.Bar = *barData[symbol][len(barData[symbol])-1]
 			marketState.LastPrice = marketState.Bar.Close
 			logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
 		}
-		barData = t.BarData
-		return t.BarData
+		return barData
+	}
+
+	for symbol := range barData {
+		logger.Infof("Getting bardata with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
+
 	}
 	return barData
 }
