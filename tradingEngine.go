@@ -38,6 +38,7 @@ var index int = 0
 // var lastTimestamp map[string]int
 var fillVolume float64 = 0.0
 var realBalance float64 = 0.0
+var barData map[string][]*models.Bar
 
 const additionalLiveData int = 3000
 const checkWalletHistoryInterval int = 60
@@ -155,6 +156,7 @@ func (t *TradingEngine) SetupTest(start time.Time, end time.Time, live ...bool) 
 			t.BarData = t.LoadBarData(t.Algo, start, end)
 		} else {
 			t.BarData, start, end = t.LoadBarDataFromCSV(t.Algo, t.csvBarDataFile)
+			barData = t.BarData
 			t.ReuseData = true
 		}
 	}
@@ -265,7 +267,7 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 // Given an algo and a start and end time, load relevant candle data from the database.
 // The data is returned as a map of symbol to pointers of Bar structs.
 func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time.Time) map[string][]*models.Bar {
-	if t.BarData == nil || !t.ReuseData {
+	if barData == nil || !t.ReuseData {
 		t.BarData = make(map[string][]*models.Bar)
 		for symbol, marketState := range algo.Account.MarketStates {
 			logger.Infof("Getting data with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
@@ -276,9 +278,10 @@ func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time
 			marketState.LastPrice = marketState.Bar.Close
 			logger.Infof("Initialized bar for %v: %v\n", symbol, marketState.Bar)
 		}
+		barData = t.BarData
 		return t.BarData
 	}
-	return t.BarData
+	return barData
 }
 
 // LoadBarDataFromCSV loads bar data from a csv and stores in t.BarData
