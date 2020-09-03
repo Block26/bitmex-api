@@ -33,7 +33,6 @@ import (
 )
 
 var currentRunUUID time.Time
-var index int = 0
 
 // var lastTimestamp map[string]int
 var fillVolume float64 = 0.0
@@ -65,6 +64,7 @@ type TradingEngine struct {
 	csvBarDataFile       string
 	shouldExportResult   bool
 	jsonResultFile       string
+	index                int
 }
 
 // Construct a new trading engine given an algo and other configurations.
@@ -254,7 +254,7 @@ func (t *TradingEngine) InsertNewCandle(candle iex.TradeBin) {
 		t.Algo.Timestamp = candle.Timestamp
 	}
 	// instead of inserting a new bar in the data all the time in a test
-	// just increment the index
+	// just increment the t.index
 	if t.isTest {
 		marketState.OHLCV.IncrementIndex()
 	} else {
@@ -283,7 +283,6 @@ func (t *TradingEngine) LoadBarData(algo *models.Algo, start time.Time, end time
 
 	for symbol := range barData {
 		logger.Infof("Getting bardata with symbol %v, decisioninterval %v, datalength %v\n", symbol, algo.RebalanceInterval, algo.DataLength+1)
-
 	}
 	return barData
 }
@@ -545,7 +544,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
 				t.UpdatePositions(t.Algo, positions)
 				t.LogToFirebase()
-				index++
+				t.index++
 				if t.PaperTrade {
 					channels.TradeBinChanComplete <- nil
 				}
@@ -586,7 +585,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 // Don't log this data if we have already logged within walletHistoryPeriod seconds.
 func (t *TradingEngine) checkWalletHistory(algo *models.Algo, settingsFileName string) {
 	// Check for new wallet entry every 60m
-	if index%checkWalletHistoryInterval == 0 {
+	if t.index%checkWalletHistoryInterval == 0 {
 		// logger.Info("It has been", timeSinceLastSync, "seconds since the last wallet history download, fetching latest deposits and withdrawals.")
 		walletHistory, err := algo.Client.GetWalletHistory(algo.Account.BaseAsset.Symbol)
 		if err != nil {
@@ -644,7 +643,7 @@ func (t *TradingEngine) UpdateOrders(algo *models.Algo, orders []iex.Order, isUp
 // of making sure that the current state is similar to the expected state (a safety mechanism).
 func (t *TradingEngine) runTest(algo *models.Algo) {
 	// Run a test every 15m
-	if index%liveTestInterval == 0 {
+	if t.index%liveTestInterval == 0 {
 		testEngine := TradingEngine{}
 		copier.Copy(&testEngine, &t)
 		// RESET Algo but leave base balance
@@ -1461,13 +1460,13 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 				t.updateState(t.Algo, trade.Symbol)
 			}
 			// dont update so often cause lol
-			if index%(len(t.Algo.Account.MarketStates)*5) == 0 {
+			if t.index%(len(t.Algo.Account.MarketStates)*5) == 0 {
 				t.Algo.Rebalance(t.Algo)
 			}
 			// for _, marketState := range t.Algo.Account.MarketStates {
 			// state := logState(t.Algo, marketState)
 			// history = append(history, state)
-			if index%(len(t.Algo.Account.MarketStates)*5*15) == 0 {
+			if t.index%(len(t.Algo.Account.MarketStates)*5*15) == 0 {
 				fmt.Println("Log State & Get Open Orders")
 				t.customLogLiveState()
 				orders, _ := t.Algo.Client.GetOpenOrders(iex.OpenOrderF{Currency: t.Algo.Account.BaseAsset.Symbol})
@@ -1482,7 +1481,7 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 			// t.checkWalletHistory(t.Algo, settingsFileName)
 			t.aggregateAccountProfit()
 			// t.LogToFirebase()
-			index++
+			t.index++
 		case newOrders := <-channels.OrderChan:
 			// Make sure the orders are coming from the exchange in the right order.
 			t.UpdateOrders(t.Algo, newOrders, true)
