@@ -56,7 +56,7 @@ func New(vars iex.ExchangeConf, account *models.Account, log bool) *Tantra {
 const InsertBatchSize = 10000 // The number of historical data entries to accumulate before inserting into the database.
 
 type PreviousMarketState struct {
-	Balance     float64
+	UBalance    float64
 	Position    float64
 	AverageCost float64
 }
@@ -119,7 +119,7 @@ func (t *Tantra) Process(tradeUpdates []iex.TradeBin) {
 	// Fill all orders with the newest candles
 	// fillStart := time.Now().UnixNano()
 	filledSymbols := t.processFills()
-	logger.Debugf("Got filled symbols: %v\n", filledSymbols)
+	// logger.Debugf("Got filled symbols: %v\n", filledSymbols)
 	// fillTime += int(time.Now().UnixNano() - fillStart)
 
 	// Send position and balance updates if we have any fills
@@ -137,14 +137,14 @@ func (t *Tantra) Process(tradeUpdates []iex.TradeBin) {
 			lastPosition = 0
 			lastAverageCost = 0
 		} else {
-			lastBalance = lastMarketState.Balance
+			lastBalance = lastMarketState.UBalance
 			lastPosition = lastMarketState.Position
 			lastAverageCost = lastMarketState.AverageCost
 		}
 		// Has the balance changed? Send a balance update. No? Do Nothing
 		// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
 		// balanceStart := time.Now().UnixNano()
-		if lastBalance != currentMarketState.Balance {
+		if lastBalance != currentMarketState.UBalance {
 			wallet := []iex.Balance{
 				{
 					Currency: currentMarketState.Info.BaseSymbol,
@@ -284,6 +284,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 			for {
 				select {
 				case trades := <-channels.TradeBinChan:
+					log.Println("Trades came in", len(trades))
 					t.Process(trades)
 				}
 			}
@@ -458,7 +459,7 @@ func (t *Tantra) appendToHistory() {
 	marketStates := make(map[string]PreviousMarketState)
 	for symbol, market := range t.Account.MarketStates {
 		pms := PreviousMarketState{
-			Balance:     market.Balance,
+			UBalance:    market.UBalance,
 			Position:    market.Position,
 			AverageCost: market.AverageCost,
 		}

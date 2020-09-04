@@ -537,7 +537,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 					signalStateHistory = append(signalStateHistory, storedState)
 				}
 			}
-			t.aggregateAccountProfit()
+			// t.aggregateAccountProfit()
+			logger.Debug("===========================================")
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			} else {
@@ -736,16 +737,16 @@ func (t *TradingEngine) aggregateAccountProfit() {
 		totalUnrealizedProfit += marketState.UnrealizedProfit
 		totalRealizedProfit += marketState.RealizedProfit
 	}
-	t.Algo.Account.UnrealizedProfit = totalUnrealizedProfit
-	t.Algo.Account.RealizedProfit = totalRealizedProfit
-	t.Algo.Account.Profit = totalUnrealizedProfit + totalRealizedProfit
+	// t.Algo.Account.UnrealizedProfit = totalUnrealizedProfit
+	// t.Algo.Account.RealizedProfit = totalRealizedProfit
+	// t.Algo.Account.Profit = totalUnrealizedProfit + totalRealizedProfit
 	logger.Debugf("Aggregated account unrealized profit: %v, realized profit: %v, total profit: %v, balance: %v\n",
 		t.Algo.Account.UnrealizedProfit, t.Algo.Account.RealizedProfit, t.Algo.Account.Profit, t.Algo.Account.BaseAsset.Quantity)
 }
 
 // Update all balances contained by the trading engine given a slice of websocket balance updates from the exchange.
 func (t *TradingEngine) UpdateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
-	// fmt.Println("UpdateAlgoBalances", algo.Account.BaseAsset.Symbol)
+	logger.Debug("UpdateAlgoBalances", algo.Account.BaseAsset.Symbol)
 	for _, updatedBalance := range balances {
 		balance, ok := algo.Account.Balances[updatedBalance.Currency]
 		if ok {
@@ -762,7 +763,7 @@ func (t *TradingEngine) UpdateAlgoBalances(algo *models.Algo, balances []iex.Bal
 		if updatedBalance.Currency == algo.Account.BaseAsset.Symbol {
 			algo.Account.BaseAsset.Quantity = updatedBalance.Balance
 			realBalance = updatedBalance.Available
-			// logger.Debugf("Updated base asset quantity: %v\n", algo.Account.BaseAsset.Quantity)
+			logger.Debugf("Updated base asset quantity: %v\n", algo.Account.BaseAsset.Quantity)
 		} else if algo.Account.ExchangeInfo.Spot {
 			// This could be a spot position update, in which case we should update the respective market state's position
 			for symbol, marketState := range algo.Account.MarketStates {
@@ -1479,7 +1480,7 @@ func (t *TradingEngine) CustomConnect(settingsFileName string, secret bool) {
 
 			// }
 			// t.checkWalletHistory(t.Algo, settingsFileName)
-			t.aggregateAccountProfit()
+			// t.aggregateAccountProfit()
 			// t.LogToFirebase()
 			t.index++
 		case newOrders := <-channels.OrderChan:
