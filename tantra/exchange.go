@@ -149,7 +149,7 @@ func (t *Tantra) Process(tradeUpdates []iex.TradeBin) {
 			wallet := []iex.Balance{
 				{
 					Currency: currentMarketState.Info.BaseSymbol,
-					Balance:  currentMarketState.UBalance,
+					Balance:  currentMarketState.Balance,
 				},
 			}
 			t.channels.WalletChan <- wallet

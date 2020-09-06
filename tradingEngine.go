@@ -1249,7 +1249,7 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 			state.UBalance = ((math.Abs(marketState.Position) * marketState.AverageCost) + marketState.UnrealizedProfit) + marketState.Balance
 			state.QuoteBalance = marketState.Balance
 		} else {
-			state.UBalance = marketState.Balance //+ marketState.UnrealizedProfit
+			state.UBalance = marketState.Balance + marketState.UnrealizedProfit
 			state.QuoteBalance = (marketState.Balance) * marketState.Bar.Close
 		}
 	} else {
