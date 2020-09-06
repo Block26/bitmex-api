@@ -4,6 +4,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/tantralabs/tradeapi/iex"
@@ -51,6 +52,9 @@ func SetupDataModel(minuteBars []*Bar, initialIndex int, isTest bool) Data {
 
 func (d *Data) SetIsTest(enable bool) {
 	d.isTest = enable
+	for resampleInterval := range d.data {
+		delete(d.data, resampleInterval)
+	}
 }
 
 // Return minute bar data as a slice of Bar structs.
@@ -110,11 +114,13 @@ func (d *Data) AddData(newBars []*Bar) {
 		}
 	}
 
-	for resampleInterval, _ := range d.data {
-		// TODO Make this function work live
-		// d.rebuildOHLCV(resampleInterval)
-		delete(d.data, resampleInterval)
-	}
+	d.data = make(map[int]OHLCV, 0)
+
+	// for resampleInterval := range d.data {
+	// 	// TODO Make this function work live
+	// 	// d.rebuildOHLCV(resampleInterval)
+	// 	delete(d.data, resampleInterval)
+	// }
 }
 
 // Get OHLCV data from the data model with a given resampling interval.
@@ -142,6 +148,15 @@ func (d *Data) GetMinuteData() OHLCV {
 	return d.getOHLCV(1)
 }
 
+// Convert an integer timestamp (ms) to a time object.
+func TimestampToTime(timestamp int) time.Time {
+	timeInt, err := strconv.ParseInt(strconv.Itoa(timestamp/1000), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return time.Unix(timeInt, 0).UTC()
+}
+
 // getOHLCVBars Break down the bars into open, high, low, close arrays that are easier to manipulate.
 func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 	bars := d.minuteBars
@@ -157,7 +172,9 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 	}
 	// Check to see if we have already cached the data
 	if val, ok := d.data[resampleInterval]; ok {
+		// logger.Debug("why is this ok?", ok)
 		if len(all) > 0 && all[0] == true {
+			// logger.Debug("return all")
 			return OHLCV{
 				Timestamp: val.Timestamp,
 				Open:      val.Open,
@@ -169,13 +186,20 @@ func (d *Data) getOHLCV(resampleInterval int, all ...bool) OHLCV {
 		}
 		last := resampledIndex - adjuster
 		if last != 0 && val.Close[last-1] == 0 {
+			// logger.Debug("last--", last)
 			last--
 		}
 		// fmt.Println("resampleInterval", resampleInterval, "d.data[resampleInterval].Close[last]", val.Close[last-1], last, len(val.Timestamp) == last+1)
 		if len(val.Timestamp) == last {
 			// fmt.Println("last is enough", val.Close[last-1], last)
 			if val.Timestamp[last-1]%(minute*int64(resampleInterval)) != 0 {
-				log.Fatalln("ohlcv out of sync last ohlcv timestamp", val.Timestamp[last-1])
+				log.Println(TimestampToTime(int(bars[len(bars)-6].Timestamp)))
+				log.Println(TimestampToTime(int(bars[len(bars)-5].Timestamp)))
+				log.Println(TimestampToTime(int(bars[len(bars)-4].Timestamp)))
+				log.Println(TimestampToTime(int(bars[len(bars)-3].Timestamp)))
+				log.Println(TimestampToTime(int(bars[len(bars)-2].Timestamp)))
+				log.Println(TimestampToTime(int(bars[len(bars)-1].Timestamp)))
+				log.Fatalln("resample", resampleInterval, "ohlcv out of sync last ohlcv timestamp", TimestampToTime(int(val.Timestamp[last-1])), TimestampToTime(int(val.Timestamp[last-2])), val.Timestamp[last-1]%(minute*int64(resampleInterval)))
 			}
 			return OHLCV{
 				Timestamp: val.Timestamp,

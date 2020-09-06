@@ -6,6 +6,7 @@ package tantra
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -118,7 +119,7 @@ func (t *Tantra) SetCandleData(data map[string][]*models.Bar) {
 func (t *Tantra) Process(tradeUpdates []iex.TradeBin) {
 	// Fill all orders with the newest candles
 	// fillStart := time.Now().UnixNano()
-	filledSymbols := t.processFills()
+	t.processFills()
 	// logger.Debugf("Got filled symbols: %v\n", filledSymbols)
 	// fillTime += int(time.Now().UnixNano() - fillStart)
 
@@ -128,7 +129,7 @@ func (t *Tantra) Process(tradeUpdates []iex.TradeBin) {
 	var currentMarketState *models.MarketState
 	var lastMarketState PreviousMarketState
 	var currentOk, lastOk bool
-	for symbol := range filledSymbols {
+	for symbol := range t.Account.MarketStates {
 		currentMarketState, currentOk = t.Account.MarketStates[symbol]
 		lastMarketState, lastOk = t.PreviousMarketStates[symbol]
 		if !currentOk || !lastOk {
@@ -142,7 +143,7 @@ func (t *Tantra) Process(tradeUpdates []iex.TradeBin) {
 			lastAverageCost = lastMarketState.AverageCost
 		}
 		// Has the balance changed? Send a balance update. No? Do Nothing
-		// fmt.Println(index, lastMarketState.LastPrice, market.LastPrice, *lastMarketState.Balance, market.Balance)
+		// logger.Debug(t.index, lastMarketState.AverageCost, market.LastPrice, lastMarketState.Balance, market.Balance)
 		// balanceStart := time.Now().UnixNano()
 		if lastBalance != currentMarketState.UBalance {
 			wallet := []iex.Balance{
@@ -232,6 +233,7 @@ func (t *Tantra) StartWS(config interface{}) error {
 				// tradeTime += int(time.Now().UnixNano() - tradeStart)
 			}
 			t.Process(tradeUpdates)
+			t.index = index
 		}
 		// logger.Infof("Fill time: %v ns", fillTime)
 		// logger.Infof("Insert time: %v ns", insertTime)
@@ -239,14 +241,9 @@ func (t *Tantra) StartWS(config interface{}) error {
 		// 	t.insertHistoryToDB(true)
 		// }
 
-		logger.Infof("Exiting.\n")
-		log.Println("Done with test.")
-		return
-	}()
-	logger.Infof("Done with time series iteration.\n")
+		log.Println("[Exchange] last timestamp", t.CurrentTime, t.index)
 
-	if t.PaperTrade {
-		go func() {
+		if t.PaperTrade {
 			logger.Info("Backtest complete running live paper trade")
 			var subscribeInfos []iex.WSSubscribeInfo
 			for symbol, marketState := range t.Account.MarketStates {
@@ -281,15 +278,36 @@ func (t *Tantra) StartWS(config interface{}) error {
 				Wg:       conf.Wg,
 			})
 
+			if ex.Exchange == "deribit" {
+				t.CurrentTime = t.CurrentTime.Add(-time.Minute)
+			}
+
 			for {
 				select {
 				case trades := <-channels.TradeBinChan:
-					log.Println("Trades came in", len(trades))
-					t.Process(trades)
+					// log.Println("Trades came in", len(trades))
+					newTimestamp := false
+					for _, trade := range trades {
+						if trade.Timestamp.After(t.CurrentTime) {
+							fmt.Println(trade.Symbol, trade.Timestamp, trade.Close)
+							t.index++
+							t.candleData[trade.Symbol] = append(t.candleData[trade.Symbol], trade)
+							t.updateCandle(t.index, trade.Symbol)
+							t.CurrentTime = t.currentCandle[trade.Symbol].Timestamp.UTC()
+							newTimestamp = true
+						}
+					}
+					if newTimestamp {
+						fmt.Println("[Exchange] advanced to", t.CurrentTime, t.index)
+						t.Process(trades)
+					}
+
 				}
 			}
-		}()
-	}
+		}
+
+		return
+	}()
 
 	return nil
 }
@@ -317,7 +335,7 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 		return
 	}
 	//TODO update marketState.Bar here?
-	if len(candleData) >= index {
+	if len(candleData) > index {
 		t.currentCandle[symbol] = candleData[index]
 		// TODO initialize vwap, quote volume?
 		// minuteData := marketState.OHLCV.GetMinuteData()
@@ -334,7 +352,6 @@ func (t *Tantra) updateCandle(index int, symbol string) {
 		// t.Account.MarketStates[symbol].Bar = candleData[index]
 		// logger.Infof("Current candle for %v: %v\n", symbol, t.currentCandle[symbol])
 		t.CurrentTime = t.currentCandle[symbol].Timestamp.UTC()
-		// log.Println("[Exchange] advanced to", t.CurrentTime)
 		// logger.Infof("Updated exchange current time: %v\n", t.CurrentTime)
 	}
 }
@@ -429,13 +446,13 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 		}
 		isFilled, fillPrice, fillAmount = t.getFill(order, marketState)
 		marketState.Weight = utils.GetCurrentWeight(order.Side, marketState)
-		logger.Debugf("Filled: %v\n", isFilled)
+		// logger.Debugf("Filled: %v\n", isFilled)
 		if isFilled {
 			logger.Debugf("Processing fill for order: %v\n", order)
 			// if t.LogBacktest {
 			// 	t.processTrade(models.NewTradeFromOrder(order, utils.TimeToTimestamp(t.CurrentTime)))
 			// }
-			logger.Debug("Balance after fill", marketState.Balance, "Previous Position", marketState.Position, "AC", marketState.AverageCost, "fillPrice", fillPrice, "amount", fillAmount)
+			// logger.Debug("Balance after fill", marketState.Balance, "Previous Position", marketState.Position, "AC", marketState.AverageCost, "fillPrice", fillPrice, "amount", fillAmount)
 			t.updateBalance(&marketState.Balance, &marketState.Position, &marketState.AverageCost, fillPrice, fillAmount, marketState)
 			t.prepareOrderUpdate(order, t.GetPotentialOrderStatus().Filled)
 			delete(t.orders, key)
@@ -444,12 +461,38 @@ func (t *Tantra) processFills() (filledSymbols map[string]bool) {
 		filledSymbols[order.Symbol] = true
 	}
 	for _, ms := range t.Account.MarketStates {
+		ms.UnrealizedProfit = t.getPositionAbsProfit(ms)
+		// log.Println("ms.Balance", ms.Balance)
 		ms.UBalance = ms.Balance + ms.UnrealizedProfit
 	}
 	if len(t.ordersToPublish) > 0 {
 		t.publishOrderUpdates()
 	}
 	return
+}
+
+// Get the PNL on the position for a given market state at close price.
+func (t *Tantra) getPositionAbsProfit(marketState *models.MarketState) float64 {
+	positionProfit := 0.0
+	if t.Account.ExchangeInfo.DenominatedInQuote {
+		positionProfit = ((math.Abs(marketState.Position) * marketState.Bar.Close) * (getCurrentProfit(marketState, marketState.Bar.Close) * marketState.Leverage))
+	} else {
+		positionProfit = (t.Account.BaseAsset.Quantity * (getCurrentProfit(marketState, marketState.Bar.Close) * marketState.Leverage))
+	}
+
+	return positionProfit
+}
+
+// CurrentProfit Calculate the current % profit of the position vs
+func getCurrentProfit(marketState *models.MarketState, price float64) float64 {
+	//TODO this doesnt work on a spot backtest
+	if marketState.Position == 0 {
+		return 0
+	} else if marketState.Position < 0 {
+		return utils.CalculateDifference(marketState.AverageCost, price)
+	} else {
+		return utils.CalculateDifference(price, marketState.AverageCost)
+	}
 }
 
 var appendTime = 0

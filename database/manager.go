@@ -72,7 +72,9 @@ func GetLatestMinuteData(ex iex.IExchange, symbol string, exchange string, dataL
 	BarData = GetCandles(symbol, exchange, "1m", dataLength)
 	logger.Info("Fetching", 240, "1m Data for symbol:", symbol, "exchange:", exchange, "from the exchange")
 	exchangeBars := UpdateBars(ex, symbol, "1m", 240) // 4hour buffer
+	// logger.Infof("Loaded %v instances of exchangeBars for %v with start %v and end %v.\n", len(exchangeBars), symbol, utils.TimestampToTime(int(exchangeBars[0].Timestamp)), utils.TimestampToTime(int(exchangeBars[len(exchangeBars)-1].Timestamp)))
 	UpdateLocalBars(&BarData, exchangeBars)
+	// logger.Infof("Loaded %v instances of bar data for %v with start %v and end %v.\n", len(BarData), symbol, utils.TimestampToTime(int(BarData[0].Timestamp)), utils.TimestampToTime(int(BarData[len(BarData)-1].Timestamp)))
 	return BarData
 }
 

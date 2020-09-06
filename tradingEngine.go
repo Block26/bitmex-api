@@ -152,7 +152,20 @@ func (t *TradingEngine) SetupTest(start time.Time, end time.Time, live ...bool) 
 	mockExchange := tantra.NewTest(exchangeVars, &t.Algo.Account, start, end, t.Algo.DataLength, t.Algo.LogBacktest)
 	// If we are live we already have all the data we need so there is no need to fetch it again
 	if !isLive {
-		if !t.preloadBarData {
+		if t.PaperTrade {
+			exchangeVars := iex.ExchangeConf{
+				Exchange:       t.Algo.Account.ExchangeInfo.Exchange,
+				ServerUrl:      t.Algo.Account.ExchangeInfo.ExchangeURL,
+				AccountID:      "test",
+				OutputResponse: false,
+			}
+			ex, _ := tradeapi.New(exchangeVars)
+			//  Fetch prelim data from db to run live
+			t.BarData = make(map[string][]*models.Bar)
+			for symbol, ms := range t.Algo.Account.MarketStates {
+				t.BarData[symbol] = database.GetLatestMinuteData(ex, symbol, ms.Info.Exchange, t.Algo.DataLength+(24*60*60))
+			}
+		} else if !t.preloadBarData {
 			t.BarData = t.LoadBarData(t.Algo, start, end)
 		} else {
 			t.BarData, start, end = t.LoadBarDataFromCSV(t.Algo, t.csvBarDataFile)
@@ -161,7 +174,7 @@ func (t *TradingEngine) SetupTest(start time.Time, end time.Time, live ...bool) 
 		}
 	}
 	for symbol, data := range t.BarData {
-		logger.Infof("Loaded %v instances of bar data for %v with start %v and end %v.\n", len(data), symbol, start, end)
+		logger.Infof("Loaded %v instances of bar data for %v with start %v and end %v.\n", len(data), symbol, utils.TimestampToTime(int(data[0].Timestamp)), utils.TimestampToTime(int(data[len(data)-1].Timestamp)))
 	}
 
 	t.SetAlgoCandleData(t.BarData)
@@ -482,6 +495,7 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		log.Fatal(msg)
 	}
 
+	// logger.SetLogLevel(logger.LogLevel().Debug)
 	// All of these channels send themselves back so that the test can wait for each individual to complete
 	for {
 		select {
@@ -492,13 +506,15 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			}
 		case trades := <-channels.TradeBinChan:
 			// fmt.Println("trades[0].Timestamp.Unix() >= lastBar.Timestamp", trades[0].Timestamp.Unix() >= lastBar.Timestamp, trades[0].Timestamp.Unix(), lastBar.Timestamp)
-			if t.PaperTrade && t.isTest && trades[0].Timestamp.Unix() >= lastBar.Timestamp/1000 {
-				log.Println("Paper trade: last bar", trades[0].Timestamp)
+			if t.PaperTrade && t.isTest && trades[0].Timestamp.Unix() >= (lastBar.Timestamp/1000) {
+				fmt.Println("Paper trade: last bar", trades[0].Timestamp.UTC(), trades[0].Timestamp.UTC(), utils.TimestampToTime(int(lastBar.Timestamp)).UTC())
 				logger.SetLogLevel(logger.LogLevel().Debug)
 				t.isTest = false
 				for symbol := range t.Algo.Account.MarketStates {
 					t.Algo.Account.MarketStates[symbol].OHLCV.SetIsTest(false)
 				}
+			} else if t.PaperTrade && trades[0].Timestamp.Unix() > (lastBar.Timestamp/1000) {
+				logger.Debug("Paper trade: New Bar", trades[0].Timestamp.UTC(), trades[0])
 			}
 			// Update your local bars
 			for _, trade := range trades {
@@ -542,10 +558,14 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			} else {
-				positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
-				t.UpdatePositions(t.Algo, positions)
+				if !t.PaperTrade {
+					positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
+					t.UpdatePositions(t.Algo, positions)
+				}
+
 				t.LogToFirebase()
 				t.index++
+
 				if t.PaperTrade {
 					channels.TradeBinChanComplete <- nil
 				}
@@ -694,7 +714,7 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 	} else if position.CurrentQty == 0 {
 		marketState.AverageCost = 0
 	}
-	marketState.UnrealizedProfit = getPositionAbsProfit(algo, marketState)
+	// marketState.UnrealizedProfit = getPositionAbsProfit(algo, marketState)
 	logger.Debugf("Got position update for %v with quantity %v, average cost %v\n",
 		position.Symbol, marketState.Position, marketState.AverageCost)
 	if t.firstPositionUpdate {
@@ -708,7 +728,7 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 			marketState.Leverage = (position / (marketState.Balance + position))
 			balance = (math.Abs(marketState.Position) * marketState.Bar.Close) + algo.Account.BaseAsset.Quantity
 			// marketState.Leverage = balance / marketState.Balance
-			log.Println("BTC Position", marketState.Position, "USDT Balance", marketState.Balance, "UBalance", balance, "Leverage", marketState.Leverage, "Price", marketState.Bar.Close)
+			logger.Debug("BTC Position", marketState.Position, "USDT Balance", marketState.Balance, "UBalance", balance, "Leverage", marketState.Leverage, "Price", marketState.Bar.Close)
 		} else {
 			balance = algo.Account.BaseAsset.Quantity
 			marketState.Leverage = math.Abs(marketState.Position) / (marketState.Bar.Close * balance)
@@ -729,20 +749,20 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 }
 
 // Iterate through all visible market states and calculate unrealized, realized, and total profits across all markets.
-func (t *TradingEngine) aggregateAccountProfit() {
-	totalUnrealizedProfit := 0.
-	totalRealizedProfit := 0.
-	for _, marketState := range t.Algo.Account.MarketStates {
-		// TODO Should this be calculated or grabbed from the exchange?
-		totalUnrealizedProfit += marketState.UnrealizedProfit
-		totalRealizedProfit += marketState.RealizedProfit
-	}
-	// t.Algo.Account.UnrealizedProfit = totalUnrealizedProfit
-	// t.Algo.Account.RealizedProfit = totalRealizedProfit
-	// t.Algo.Account.Profit = totalUnrealizedProfit + totalRealizedProfit
-	logger.Debugf("Aggregated account unrealized profit: %v, realized profit: %v, total profit: %v, balance: %v\n",
-		t.Algo.Account.UnrealizedProfit, t.Algo.Account.RealizedProfit, t.Algo.Account.Profit, t.Algo.Account.BaseAsset.Quantity)
-}
+// func (t *TradingEngine) aggregateAccountProfit() {
+// 	totalUnrealizedProfit := 0.
+// 	totalRealizedProfit := 0.
+// 	for _, marketState := range t.Algo.Account.MarketStates {
+// 		// TODO Should this be calculated or grabbed from the exchange?
+// 		totalUnrealizedProfit += marketState.UnrealizedProfit
+// 		totalRealizedProfit += marketState.RealizedProfit
+// 	}
+// 	// t.Algo.Account.UnrealizedProfit = totalUnrealizedProfit
+// 	// t.Algo.Account.RealizedProfit = totalRealizedProfit
+// 	// t.Algo.Account.Profit = totalUnrealizedProfit + totalRealizedProfit
+// 	logger.Debugf("Aggregated account unrealized profit: %v, realized profit: %v, total profit: %v, balance: %v\n",
+// 		t.Algo.Account.UnrealizedProfit, t.Algo.Account.RealizedProfit, t.Algo.Account.Profit, t.Algo.Account.BaseAsset.Quantity)
+// }
 
 // Update all balances contained by the trading engine given a slice of websocket balance updates from the exchange.
 func (t *TradingEngine) UpdateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
@@ -1229,8 +1249,8 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 			state.UBalance = ((math.Abs(marketState.Position) * marketState.AverageCost) + marketState.UnrealizedProfit) + marketState.Balance
 			state.QuoteBalance = marketState.Balance
 		} else {
-			state.UBalance = marketState.Balance + marketState.UnrealizedProfit
-			state.QuoteBalance = (marketState.Balance + marketState.UnrealizedProfit) * marketState.Bar.Close
+			state.UBalance = marketState.Balance //+ marketState.UnrealizedProfit
+			state.QuoteBalance = (marketState.Balance) * marketState.Bar.Close
 		}
 	} else {
 		state.UBalance = (algo.Account.BaseAsset.Quantity * marketState.Bar.Close) + marketState.Position
