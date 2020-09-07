@@ -302,9 +302,13 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	percentReturn := make([]float64, historyLength)
 	downsidePercentReturn := make([]float64, 0)
 	last := 0.0
+	relMarketImpact := make([]float64, len(history))
+	suggestedMarketImpact := make([]float64, len(history))
+	maxBalanceMarketImpact := make([]float64, len(history))
 	for i := range history {
 		if i == 0 {
 			percentReturn[i] = 0
+			relMarketImpact[i] = 0
 			downsidePercentReturn = append(downsidePercentReturn, 0)
 		} else {
 			percentReturn[i] = utils.CalculateDifference(history[i].UBalance, last)
@@ -312,8 +316,20 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 				percentReturn[i] = percentReturn[i-1]
 			}
 			downsidePercentReturn = append(downsidePercentReturn, percentReturn[i])
+
+			// Calculate the market impact
+			marketImpactThreshold := 0.1 * history[i].Volume // TODO: make 0.1 more flexible/optimize param
+
+			relMarketImpact[i] = math.Abs(history[i].ShouldHaveLeverage - history[i-1].ShouldHaveLeverage)
+			suggestedMarketImpact[i] = relMarketImpact[i] * history[i].Volume
+			if relMarketImpact[i] != 0.0 {
+				maxBalanceMarketImpact[i] = marketImpactThreshold / relMarketImpact[i]
+			}
 		}
 		last = history[i].UBalance
+
+		// TODO: do better ...
+		history[i].MarketImpact = maxBalanceMarketImpact[i]
 	}
 
 	window := 0

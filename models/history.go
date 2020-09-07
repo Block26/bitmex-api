@@ -19,6 +19,7 @@ type History struct {
 	MaxProfit          float64
 	Price              float64
 	Volume             float64
+	MarketImpact       float64
 }
 
 type TrimmedHistory struct {
