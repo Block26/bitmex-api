@@ -18,6 +18,7 @@ type History struct {
 	MaxLoss            float64
 	MaxProfit          float64
 	Price              float64
+	Volume             float64
 }
 
 type TrimmedHistory struct {

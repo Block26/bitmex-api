@@ -1242,6 +1242,7 @@ func logState(algo *models.Algo, marketState *models.MarketState, timestamp ...t
 		MaxLoss:            getMaxPositionAbsLoss(algo, marketState),
 		MaxProfit:          getMaxPositionAbsProfit(algo, marketState),
 		Price:              marketState.Bar.Close,
+		Volume:             marketState.Bar.Volume,
 	}
 
 	if marketState.Info.MarketType == models.Future {
