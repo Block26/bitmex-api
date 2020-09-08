@@ -424,11 +424,18 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 		tHistory := make([]models.TrimmedHistory, len(history))
 		for i := range history {
 			weight := math.Copysign(1, history[i].Quantity)
+			windowIndex := int(i / window)
+			windowSharpe := 0.0
+			if windowIndex < len(windowSharpes) {
+				windowSharpe = windowSharpes[windowIndex]
+			} else {
+				windowSharpe = windowSharpes[len(windowSharpes)-1]
+			}
 			tHistory[i] = models.TrimmedHistory{
 				Timestamp:          history[i].Timestamp,
 				Leverage:           history[i].Leverage * weight,
 				ShouldHaveLeverage: history[i].ShouldHaveLeverage,
-				Score:              windowSharpes[int(i/window)],
+				Score:              windowSharpe,
 			}
 		}
 		os.Remove("trimmed_balance.csv")

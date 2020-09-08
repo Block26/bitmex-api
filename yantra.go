@@ -241,6 +241,7 @@ func CloneAlgo(config models.Config) (success bool) {
 	os.Chdir(dir)
 	// download deps
 	run("go", "mod", "download")
+	run("go", "get", "github.com/tantralabs/yantra")
 
 	// Go back to parent dir
 	os.Chdir("..")
