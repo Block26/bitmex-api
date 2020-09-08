@@ -215,7 +215,11 @@ func (t *TradingEngine) LogToFirebase() {
 	algoRepo = strings.Split(algoRepoName, ".")
 	algoRepoName = algoRepo[0]
 
-	path := "live/" + algoRepoName + "-" + t.Algo.Config.Branch
+	if t.Algo.Config.Name == "" {
+		t.Algo.Config.Name = "err"
+	}
+
+	path := "live/" + t.Algo.Config.Name
 	ref := client.NewRef(path)
 
 	// TODO this will overwrite and only put 1 state
@@ -524,9 +528,6 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 
 				state := logState(t.Algo, marketState)
 				marketStatehistory = append(marketStatehistory, state)
-				if !t.isTest {
-					t.logLiveState()
-				}
 				// Did we get enough data to run this? If we didn't then throw fatal error to notify system
 				if t.Algo.DataLength < len(marketState.OHLCV.GetMinuteData().Timestamp) {
 					t.updateState(t.Algo, trade.Symbol)
@@ -537,6 +538,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 			}
 
 			if !t.isTest {
+				// log after rebalance incase of crashing
+				t.logLiveState()
 				// t.runTest(t.Algo, setupData, rebalance)
 				// t.checkWalletHistory(t.Algo, settingsFileName)
 			} else {
@@ -1036,7 +1039,11 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 		fields := map[string]interface{}{}
 		fields["state_type"] = stateType
 		fields["Price"] = ms.Bar.Close
-		fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
+		if t.PaperTrade {
+			fields["Balance"] = ms.UBalance
+		} else {
+			fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
+		}
 		fields["Quantity"] = ms.Position
 		fields["AverageCost"] = ms.AverageCost
 		fields["FillVolume"] = fillVolume
