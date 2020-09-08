@@ -536,13 +536,9 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 				// log.Println("Not enough trade data. (local data length", len(marketState.OHLCV.GetMinuteData().Timestamp), "data length wanted by Algo", t.Algo.DataLength, ")")
 				// }
 			}
-
-			if !t.isTest {
-				// log after rebalance incase of crashing
-				t.logLiveState()
-				// t.runTest(t.Algo, setupData, rebalance)
-				// t.checkWalletHistory(t.Algo, settingsFileName)
-			} else {
+			// t.aggregateAccountProfit()
+			logger.Debug("===========================================")
+			if t.isTest {
 				if t.Algo.State != nil && t.Algo.LogStateHistory {
 					t.Algo.State["timestamp"] = t.Algo.Timestamp.Unix()
 					t.Algo.State["price"] = t.Algo.Account.BaseAsset.Price
@@ -555,17 +551,13 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 					}
 					signalStateHistory = append(signalStateHistory, storedState)
 				}
-			}
-			// t.aggregateAccountProfit()
-			logger.Debug("===========================================")
-			if t.isTest {
 				channels.TradeBinChanComplete <- nil
 			} else {
 				if !t.PaperTrade {
 					positions, _ := t.Algo.Client.GetPositions(t.Algo.Account.BaseAsset.Symbol)
 					t.UpdatePositions(t.Algo, positions)
 				}
-
+				t.logLiveState()
 				t.LogToFirebase()
 				t.index++
 
