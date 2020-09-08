@@ -769,7 +769,7 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 
 // Update all balances contained by the trading engine given a slice of websocket balance updates from the exchange.
 func (t *TradingEngine) UpdateAlgoBalances(algo *models.Algo, balances []iex.Balance) {
-	logger.Debug("UpdateAlgoBalances", algo.Account.BaseAsset.Symbol)
+	// logger.Debug("UpdateAlgoBalances", algo.Account.BaseAsset.Symbol)
 	for _, updatedBalance := range balances {
 		balance, ok := algo.Account.Balances[updatedBalance.Currency]
 		if ok {
@@ -786,7 +786,7 @@ func (t *TradingEngine) UpdateAlgoBalances(algo *models.Algo, balances []iex.Bal
 		if updatedBalance.Currency == algo.Account.BaseAsset.Symbol {
 			algo.Account.BaseAsset.Quantity = updatedBalance.Balance
 			realBalance = updatedBalance.Available
-			logger.Debugf("Updated base asset quantity: %v\n", algo.Account.BaseAsset.Quantity)
+			// logger.Debugf("Updated base asset quantity: %v\n", algo.Account.BaseAsset.Quantity)
 		} else if algo.Account.ExchangeInfo.Spot {
 			// This could be a spot position update, in which case we should update the respective market state's position
 			for symbol, marketState := range algo.Account.MarketStates {
