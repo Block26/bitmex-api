@@ -1004,7 +1004,7 @@ func (t *TradingEngine) logFilledTrade(trade iex.Order) {
 // Log the state of the Algo to influx db. Should only be called when live trading for now.
 func (t *TradingEngine) logLiveState(test ...bool) {
 	stateType := "live"
-	if test != nil {
+	if test != nil || t.PaperTrade {
 		stateType = "test"
 	}
 
