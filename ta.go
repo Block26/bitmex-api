@@ -58,9 +58,9 @@ func GetStochF(ms models.MarketState, dataInterval int, fastKPeriod int, fastDPe
 }
 
 // GetRoc calculates rate of change of a certain amount of hours based on close price (we use an EMA instead of close price for each hour)
-func GetRoc(ms models.MarketState, ma []float64, length int) []float64 {
+func GetRoc(ms models.MarketState, ma []float64, index int, length int) []float64 {
 	// close := ms.OHLCV.FetchAllData(dataInterval).Close
-	roc := talib.Roc(ma, length)
+	roc := talib.Roc(ma[index-length-100:index], length)
 	return roc
 }
 
