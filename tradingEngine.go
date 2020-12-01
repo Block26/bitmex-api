@@ -480,6 +480,22 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 		OrderChanComplete:    make(chan error, 1),
 	}
 
+	// setup a channel that runs every 2min to see if we have heard from the exchange
+	// if we havent then we restart
+	watcherChannel := make(chan error, 1)
+	if !t.isTest {
+		lastTimestamp := t.Algo.Timestamp
+		go func() {
+			for {
+				time.Sleep(time.Minute * 2)
+				if t.Algo.Timestamp == lastTimestamp {
+					watcherChannel <- nil
+				}
+				lastTimestamp = t.Algo.Timestamp
+			}
+		}()
+	}
+
 	// Start the websocket.
 
 	ctx := context.TODO()
@@ -503,6 +519,8 @@ func (t *TradingEngine) Connect(settingsFileName string, secret bool, test ...bo
 	// All of these channels send themselves back so that the test can wait for each individual to complete
 	for {
 		select {
+		case <-watcherChannel:
+			log.Fatalln("RESTART: no updates happened for 2 min")
 		case positions := <-channels.PositionChan:
 			t.UpdatePositions(t.Algo, positions)
 			if t.isTest || t.PaperTrade {
