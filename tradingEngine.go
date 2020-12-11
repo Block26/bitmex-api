@@ -104,10 +104,15 @@ func (t *TradingEngine) checkForPreload() bool {
 			// os.Args[2] = "export=...."
 			t.shouldExportResult = true
 			t.jsonResultFile = arg[7:]
+		} else if strings.Contains(arg, "name=") {
+			// os.Args[2] = "export=...."
+			t.Algo.Name = arg[5:]
 		} else if strings.Contains(arg, "log-backtest") {
 			t.Algo.LogBacktest = true
 		} else if strings.Contains(arg, "log-cloud-backtest") {
 			t.Algo.LogCloudBacktest = true
+		} else if strings.Contains(arg, "log-cloud-test") {
+			t.Algo.LogCloudTest = true
 		} else if strings.Contains(arg, "log-csv-backtest") {
 			t.Algo.LogCSVBacktest = true
 		} else if strings.Contains(arg, "paper") {
@@ -1055,6 +1060,8 @@ func (t *TradingEngine) logLiveState(test ...bool) {
 			fields["Balance"] = t.Algo.Account.BaseAsset.Quantity
 		}
 		fields["Quantity"] = ms.Position
+		fields["ShouldHaveQuantity"] = ms.ShouldHaveQuantity
+		fields["ShouldHaveLeverage"] = ms.ShouldHaveLeverage
 		fields["AverageCost"] = ms.AverageCost
 		fields["FillVolume"] = fillVolume
 		fields["UnrealizedProfit"] = ms.UnrealizedProfit

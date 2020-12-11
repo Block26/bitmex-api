@@ -406,6 +406,7 @@ func logStats(algo *models.Algo, history []models.History, startTime time.Time) 
 	}
 
 	logCloudBacktest(algo, history)
+	logCloudtest(algo, history)
 
 	if algo.LogCSVBacktest {
 		// Log balance history
@@ -591,6 +592,54 @@ func logCloudBacktest(algo *models.Algo, history []models.History) {
 			}
 		}
 		err := client.Client.Write(influx, bp)
+		log.Println(algo.Name, err)
+	}
+}
+
+func logCloudtest(algo *models.Algo, history []models.History) {
+	if algo.LogCloudTest {
+		influxURL := os.Getenv("YANTRA_LIVE_DB_URL")
+		if influxURL == "" {
+			log.Fatalln("You need to set the `YANTRA_LIVE_DB_URL` env variable")
+		}
+
+		influxUser := os.Getenv("YANTRA_LIVE_DB_USER")
+		influxPassword := os.Getenv("YANTRA_LIVE_DB_PASSWORD")
+
+		influx, _ := client.NewHTTPClient(client.HTTPConfig{
+			Addr:     influxURL,
+			Username: influxUser,
+			Password: influxPassword,
+		})
+
+		// uuid := algo.Name + "-" + uuid.New().String()
+
+		log.Println("LogCloudTest")
+		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+			Database:  "algos",
+			Precision: "us",
+		})
+
+		tags := map[string]string{
+			"algo_name":  algo.Name,
+			"state_type": "test",
+		}
+
+		trimmedHistory := history[len(history)-1440:]
+		for _, row := range trimmedHistory {
+			pt, _ := client.NewPoint(
+				"test_market",
+				tags,
+				map[string]interface{}{
+					"Leverage":    row.Leverage,
+					"AverageCost": row.AverageCost,
+				},
+				row.Timestamp,
+			)
+			bp.AddPoint(pt)
+		}
+		err := client.Client.Write(influx, bp)
+		log.Println(len(trimmedHistory), "written to db")
 		log.Println(algo.Name, err)
 	}
 }
