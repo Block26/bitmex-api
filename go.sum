@@ -296,6 +296,8 @@ github.com/tantralabs/tradeapi v1.0.2 h1:kZnCXtOhPdsuehTYHWHmKEo/A3bT2d1q1nDIrO1
 github.com/tantralabs/tradeapi v1.0.2/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tantralabs/tradeapi v1.0.3 h1:JVFX0KQnfgD9H0jB3F2DK3a7xLooM5gLtOKe19IPjOg=
 github.com/tantralabs/tradeapi v1.0.3/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
+github.com/tantralabs/tradeapi v1.0.4 h1:oIed7LJNHeO6GQw17B5NeZYJvIeCfohs7Yb0LuUjNL4=
+github.com/tantralabs/tradeapi v1.0.4/go.mod h1:AM77WQiVBIDd3ZPQEOqkjaPhtOeM9eXe5jAwB8/5rFo=
 github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610 h1:4wb3tT/wUpjsdcO7NwnOw4KSzrIaPOHdnpR4d43C6qQ=
 github.com/tantralabs/utils v0.0.0-20200204185958-7a6749081610/go.mod h1:QN0aHde2cmzDJcZklDsH9F8MchJ2hDpDgdQwXA+QnGA=
 github.com/tantralabs/utils v0.0.0-20200205084618-c96405e79c20 h1:CNmEOUY/JVNuYyadC8bQn6eOq8KqrIUAv2yO4dxV+h8=
