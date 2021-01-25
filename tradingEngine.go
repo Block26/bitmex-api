@@ -704,7 +704,7 @@ func (t *TradingEngine) runTest(algo *models.Algo) {
 
 // Given a set of websocket position updates, update all relevant market states.
 func (t *TradingEngine) UpdatePositions(algo *models.Algo, positions []iex.WsPosition) {
-	logger.Debug("Position Update:", positions)
+	// logger.Debug("Position Update:", positions)
 	if len(positions) > 0 {
 		for _, position := range positions {
 			if position.Symbol == algo.Account.BaseAsset.Symbol {
@@ -733,7 +733,7 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 		marketState.AverageCost = 0
 	}
 	// marketState.UnrealizedProfit = getPositionAbsProfit(algo, marketState)
-	logger.Debugf("Got position update for %v with quantity %v, average cost %v\n",
+	// logger.Debugf("Got position update for %v with quantity %v, average cost %v\n",
 		position.Symbol, marketState.Position, marketState.AverageCost)
 	if t.firstPositionUpdate {
 		marketState.ShouldHaveQuantity = marketState.Position
