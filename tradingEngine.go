@@ -734,7 +734,7 @@ func (t *TradingEngine) updateStatePosition(algo *models.Algo, position iex.WsPo
 	}
 	// marketState.UnrealizedProfit = getPositionAbsProfit(algo, marketState)
 	// logger.Debugf("Got position update for %v with quantity %v, average cost %v\n",
-		position.Symbol, marketState.Position, marketState.AverageCost)
+	// position.Symbol, marketState.Position, marketState.AverageCost)
 	if t.firstPositionUpdate {
 		marketState.ShouldHaveQuantity = marketState.Position
 	}
